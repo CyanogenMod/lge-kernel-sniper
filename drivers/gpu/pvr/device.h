@@ -247,6 +247,8 @@ typedef struct _PVRSRV_DEVICE_NODE_
 	
 	IMG_BOOL				bReProcessDeviceCommandComplete;
 	
+	IMG_VOID				(*pfnCacheInvalidate)(struct _PVRSRV_DEVICE_NODE_ *psDeviceNode);
+
 	
 	DEVICE_MEMORY_INFO		sDevMemoryInfo;
 

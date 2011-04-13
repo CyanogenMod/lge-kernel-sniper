@@ -27,8 +27,6 @@
 #if !defined(__SOCCONFIG_H__)
 #define __SOCCONFIG_H__
 
-#include "syscommon.h"
-
 #define VS_PRODUCT_NAME	"OMAP3"
 
 #if defined(SGX530) && (SGX_CORE_REV == 125)
@@ -55,5 +53,8 @@
 #define SYS_OMAP3430_GP11TIMER_REGS_SYS_PHYS_BASE	 0x48088028
 #define SYS_OMAP3430_GP11TIMER_TSICR_SYS_PHYS_BASE	 0x48088040
 
+#if defined(__linux__)
+#define	SYS_SGX_DEV_NAME	"omap_gpu"
+#endif
 
 #endif

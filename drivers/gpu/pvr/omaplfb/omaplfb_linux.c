@@ -180,6 +180,7 @@ static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
 	struct omapfb_info *ofbi = FB2OFB(framebuffer);
 	unsigned long fb_offset;
 	int i;
+	struct omap_overlay_info overlay_info;
 
 	fb_offset = aPhyAddr - psDevInfo->sSystemBuffer.sSysAddr.uiAddr;
 
@@ -189,7 +190,7 @@ static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
 		struct omap_dss_driver *driver = NULL;
 		struct omap_overlay_manager *manager;
 		struct omap_overlay *overlay;
-		struct omap_overlay_info overlay_info;
+//		struct omap_overlay_info overlay_info;
 
 		overlay = ofbi->overlays[i];
 		manager = overlay->manager;
@@ -221,6 +222,22 @@ static void OMAPLFBFlipNoLock(OMAPLFB_SWAPCHAIN *psSwapChain,
 		}
 
 	}
+//--[[ LGE_UBIQUIX_MODIFIED_START : hycho@ubiquix.com [2011.08.02] - froyo code merge, gally hdmi display
+#if defined(CONFIG_PRODUCT_LGE_HUB) || defined(CONFIG_PRODUCT_LGE_JUSTIN)
+#ifdef CONFIG_OMAP2_DSS_HDMI //porting natting for new ddk for HDMI : TI - shawn
+{
+    extern int hdmi_update_l4(u32 paddr, u16 x, u16 y, u16 w, u16 h);
+    extern int is_hdmi_enabled(void);
+
+    if ( is_hdmi_enabled() )
+    {
+        hdmi_update_l4(framebuffer->fix.smem_start + fb_offset,
+						  0, 0, overlay_info.width, overlay_info.height);
+    }
+}
+#endif
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : hycho@ubiquix.com [2011.08.02] - froyo code merge, gally hdmi display	
 }
 
 #else
@@ -241,7 +258,6 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 }
 
 // prime@sdcmicro.com For sync-up framedone before enter suspend [START]
-#if defined(CONFIG_MACH_LGE_OMAP3)
 static struct omap_dss_device *Prev_disp;
 void _FrameDone_Sync(void)
 {
@@ -249,7 +265,6 @@ void _FrameDone_Sync(void)
 		Prev_disp->driver->sync(Prev_disp);
 }
 // prime@sdcmicro.com For sync-up framedone before enter suspend [END]
-#endif
 
 /*
  * Present frame and synchronize with the display to prevent tearing
@@ -271,11 +286,8 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 	omapfb_lock(fbdev);
 
 // prime@sdcmicro.com Backup the Display device for using later [START]
-#if defined(CONFIG_MACH_LGE_OMAP3)
+////	display = fb2display(framebuffer);
 	Prev_disp = display = fb2display(framebuffer);
-#else
-	display = fb2display(framebuffer);
-#endif	
 // prime@sdcmicro.com Backup the Display device for using later [END]
 	/* The framebuffer doesn't have a display attached, just bail out */
 	if (!display) {
@@ -398,11 +410,8 @@ static void OMAPLFBDriverSuspend_Entry(struct early_suspend *ea_event)
 	DEBUG_PRINTK("Requested driver suspend");
 
 // prime@sdcmicro.com For sync-up framedone before enter suspend [START]
-#if defined(CONFIG_MACH_LGE_OMAP3)
 	_FrameDone_Sync();
-#endif
 // prime@sdcmicro.com For sync-up framedone before enter suspend [END]
-
 	OMAPLFBCommonSuspend();
 }
 
