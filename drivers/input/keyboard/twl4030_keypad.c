@@ -35,6 +35,18 @@
 #include <linux/slab.h>
 
 
+#include <asm/gpio.h>
+#include <linux/delay.h>
+#include "../mux.h"
+
+
+#include <linux/wakelock.h>
+
+
+
+#include <linux/dvs_suite.h>
+
+
 /*
  * The TWL4030 family chips include a keypad controller that supports
  * up to an 8x8 switch matrix.  The controller can issue system wakeup
@@ -58,6 +70,20 @@
 #define TWL4030_ROW_SHIFT	4
 #define TWL4030_KEYMAP_SIZE	(TWL4030_MAX_ROWS << TWL4030_ROW_SHIFT)
 
+
+#define CP_DOWN_INT		176
+
+
+#define GKPD_BUF_MAX		20		
+static unsigned int test_mode = 0;
+static int test_code, gkpd_state, gkpd_last_index = 0;
+static unsigned char gkpd_value[GKPD_BUF_MAX+1];
+
+static struct wake_lock key_wake_lock;
+
+
+extern void resumekey_pressed();
+
 struct twl4030_keypad {
 	unsigned short	keymap[TWL4030_KEYMAP_SIZE];
 	u16		kp_state[TWL4030_MAX_ROWS];
@@ -68,6 +94,8 @@ struct twl4030_keypad {
 	struct device *dbg_dev;
 	struct input_dev *input;
 };
+
+static struct twl4030_keypad *twl_key = NULL;
 
 /*----------------------------------------------------------------------*/
 
@@ -133,7 +161,115 @@ struct twl4030_keypad {
 #define KEYP_EDR_MIS_RISING		0x80
 
 
+int key_row;
+int key_col;
+int key_pressed;
+
+
 /*----------------------------------------------------------------------*/
+
+void twl4030_kp_irq_disable()
+{
+	disable_irq(twl_key->irq);
+	//disable_irq_nosync(twl_key->irq);
+}
+EXPORT_SYMBOL(twl4030_kp_irq_disable);
+
+void twl4030_kp_irq_enable()
+{
+	enable_irq(twl_key->irq);
+}
+EXPORT_SYMBOL(twl4030_kp_irq_enable);
+
+
+
+int get_test_mode(void)
+{
+	return test_mode;
+}
+EXPORT_SYMBOL(get_test_mode);
+
+#if 1
+typedef struct
+{
+	char         out;
+	unsigned char in;
+
+} Conv;
+
+ Conv GKPD_table[]=
+ {
+ #if 0
+	 {'#',  UTA_KBD_KEY_HASH}
+	,{'*',  UTA_KBD_KEY_STAR}
+	,{'0',  UTA_KBD_KEY_0}
+	,{'1',  UTA_KBD_KEY_1}
+	,{'2',  UTA_KBD_KEY_2}
+	,{'3',  UTA_KBD_KEY_3}
+	,{'4',  UTA_KBD_KEY_4}
+	,{'5',  UTA_KBD_KEY_5}
+	,{'6',  UTA_KBD_KEY_6}
+	,{'7',  UTA_KBD_KEY_7}
+	,{'8',  UTA_KBD_KEY_8}
+	,{'9',  UTA_KBD_KEY_9}
+	,{'^',  UTA_KBD_KEY_UP}
+	,{'V',  UTA_KBD_KEY_DOWN}
+	,{'L',  UTA_KBD_KEY_LEFT}
+	,{'R',  UTA_KBD_KEY_RIGHT}
+	,{'E',  UTA_KBD_KEY_ONOFF}
+	,{'[',  UTA_KBD_KEY_LSO}
+	,{']',  UTA_KBD_KEY_RSO}
+	,{'S',  UTA_KBD_KEY_DIAL}
+	,{'Y',  UTA_KBD_KEY_CLEAR}
+	,{'O',  UTA_KBD_KEY_OK} // Key_Reassign winneck test 080717
+    ,{'U',  UTA_KBD_KEY_VOL_UP}
+	,{'M',  UTA_KBD_CUSTOMER_KEY_1}
+#endif	
+	{'D',  KEY_VOLUMEDOWN}
+	,{'A',  KEY_VOLUMEUP}
+	 ,{'F',  KEY_KPJPCOMMA}
+	,{'H',  KEY_HOOK} 
+	,{0, 0}
+};
+
+int gkpd_KeyConvert(int key)
+{
+	u16 indexCount = 40;
+	int i = 0;
+	
+	while ((i < indexCount) && (key != 0xFF))
+	{
+		if (GKPD_table[i].in == key)
+			return GKPD_table[i].out;
+		i++;
+	}
+	return key;
+}
+#endif
+
+void write_gkpd_value(int value)
+{
+	int i;
+	int con ;
+
+	con=gkpd_KeyConvert(value);
+	value = con;
+
+	if (gkpd_last_index == GKPD_BUF_MAX) {
+		gkpd_value[gkpd_last_index] = value;
+		for ( i = 0; i < GKPD_BUF_MAX ; i++) {
+			gkpd_value[i] = gkpd_value[i + 1];
+		}			
+		gkpd_value[gkpd_last_index] = '\n';
+	}
+	else {
+		gkpd_value[gkpd_last_index] = value;
+		gkpd_value[gkpd_last_index + 1] = '\n';
+		gkpd_last_index++;
+	}		
+}
+EXPORT_SYMBOL(write_gkpd_value);
+
 
 static int twl4030_kpread(struct twl4030_keypad *kp,
 		u8 *data, u32 reg, u8 num_bytes)
@@ -209,12 +345,14 @@ static void twl4030_kp_scan(struct twl4030_keypad *kp, bool release_all)
 	u16 new_state[TWL4030_MAX_ROWS];
 	int col, row;
 
-	if (release_all)
+	if (release_all){
+		key_pressed = key_col = key_row = 0; 
 		memset(new_state, 0, sizeof(new_state));
-	else {
+	}else {
 		/* check for any changes */
 		int ret = twl4030_read_kp_matrix_state(kp, new_state);
 
+		key_pressed = 1;
 		if (ret < 0)	/* panic ... */
 			return;
 
@@ -244,8 +382,25 @@ static void twl4030_kp_scan(struct twl4030_keypad *kp, bool release_all)
 			input_event(input, EV_MSC, MSC_SCAN, code);
 			input_report_key(input, kp->keymap[code],
 					 new_state[row] & (1 << col));
+			
+			
+			if(test_mode == 1 && (new_state[row] & (1 << col)))
+				write_gkpd_value(kp->keymap[code]);	
+			
+			
+			if(KEY_KPJPCOMMA == kp->keymap[code])
+				resumekey_pressed();
+			
 		}
 		kp->kp_state[row] = new_state[row];
+		
+		if(key_pressed){
+			key_row = row;
+			key_col = col;
+		} else {
+			key_row = 0;
+			key_col = 0;
+		}
 	}
 	input_sync(input);
 }
@@ -267,7 +422,29 @@ static irqreturn_t do_kp_irq(int irq, void *_kp)
 	if (ret >= 0 && (reg & KEYP_IMR1_KP))
 		twl4030_kp_scan(kp, false);
 	else
+	{
 		twl4030_kp_scan(kp, true);
+	}
+
+
+/* Move this code later to somewhere common, such as the irq entry point.
+ */
+#if 1
+	if(ds_status.flag_run_dvs == 1){
+        ds_status.flag_touch_timeout_count = DS_TOUCH_TIMEOUT_COUNT_MAX;    // = 6
+        if(ds_status.touch_timeout_sec == 0){
+            if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
+                ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
+                ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
+            }
+            else{
+                ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
+                ds_status.touch_timeout_usec = (ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
+            }
+        }
+    }
+#endif
+
 
 	return IRQ_HANDLED;
 }
@@ -325,18 +502,132 @@ static int __devinit twl4030_kp_program(struct twl4030_keypad *kp)
 	return 0;
 }
 
+
+extern void hub_reboot_device(void);
+extern char reset_mode;
+extern int hidden_reset_enabled; 
+
+
+//Description: ISR for modem restart handling
+extern void modem_restart(void);
+static irqreturn_t hub_cp_int_handler(int irq, void *_kp)
+{
+	struct twl4030_keypad *kp = _kp;
+
+    pr_err("modem crash!\n");
+#if 0 
+	if (hidden_reset_enabled) {
+#if 0 
+		reset_mode = 'h';
+		hub_reboot_device();
+#else
+        //modem_restart();
+#endif
+	} else {
+		input_report_key(kp->input, KEY_PROG3, 1);
+		mdelay(10);
+		input_report_key(kp->input, KEY_PROG3, 0);
+		input_sync(kp->input);
+		
+	}
+#else
+     
+      // must be check to modem crash in booting sequence by kweop
+      input_report_key(kp->input, KEY_PROG3, 1);
+      mdelay(10);
+      input_report_key(kp->input, KEY_PROG3, 0);
+      input_sync(kp->input);
+	 
+#endif 
+	
+	return IRQ_HANDLED;
+}
+
+
+
 /*
  * Registers keypad device with input subsystem
  * and configures TWL4030 keypad registers
  */
+
+
+static ssize_t hub_keypad_test_mode_show(struct device *dev,  struct device_attribute *attr,  char *buf)
+{
+	int i;
+	int r = 0;
+	for(i = 0; i < gkpd_last_index; i++)
+	{
+		printk(KERN_WARNING"[!] %s() code value : %d\n", __func__, gkpd_value[i]);
+		r += sprintf(buf+r, "%c", gkpd_value[i]);
+#if 0		
+		if(i == gkpd_last_index - 1) 
+			r += sprintf(buf+r, "%2x\n", gkpd_value[i]);
+		else
+			r += sprintf(buf+r, "%2x, ", gkpd_value[i]);
+#endif
+	}
+//	r += sprintf(buf+r, "%d", '\n');
+	gkpd_last_index = 0;
+	memset(gkpd_value, 0, sizeof(gkpd_value));
+	return r;
+//	return (ssize_t)(&gkpd_value);
+#if 0
+	return sprintf(buf, "%d\n", gkpd_value);
+#else
+#endif
+}
+
+static ssize_t hub_keypad_test_mode_store(struct device *dev,  struct device_attribute *attr,  const char *buf, size_t count)
+{
+//	int val;
+    int ret;
+	int i;
+
+//	val = simple_strtoul(buf, NULL, 10);
+    ret = sscanf(buf, "%d", &test_mode);
+
+	if(test_mode == 1) {
+
+
+		wake_lock(&key_wake_lock);
+
+
+		for(i = 0; i < gkpd_last_index; i++)
+			gkpd_value[i] = 0;
+
+		gkpd_last_index = 0;
+	}
+
+	else if(test_mode == 0) {
+		wake_unlock(&key_wake_lock);
+	}
+
+//	test_mode = ret;
+
+	return ret;
+}
+static DEVICE_ATTR(key_test_mode, 0644, hub_keypad_test_mode_show, hub_keypad_test_mode_store);
+
+
 static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 {
 	struct twl4030_keypad_data *pdata = pdev->dev.platform_data;
-	const struct matrix_keymap_data *keymap_data = pdata->keymap_data;
+	const struct matrix_keymap_data *keymap_data;
 	struct twl4030_keypad *kp;
 	struct input_dev *input;
 	u8 reg;
 	int error;
+
+
+	int ret = 0;
+	omap_mux_init_gpio(CP_DOWN_INT, OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+
+	
+	if (!pdata) {
+		WARN_ON(1);
+		return -EINVAL;
+	}
+	keymap_data = pdata->keymap_data;
 
 	if (!pdata || !pdata->rows || !pdata->cols ||
 	    pdata->rows > TWL4030_MAX_ROWS || pdata->cols > TWL4030_MAX_COLS) {
@@ -358,6 +649,8 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 	kp->n_cols = pdata->cols;
 	kp->irq = platform_get_irq(pdev, 0);
 
+	twl_key = kp;
+
 	/* setup input device */
 	__set_bit(EV_KEY, input->evbit);
 
@@ -367,8 +660,8 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 
 	input_set_capability(input, EV_MSC, MSC_SCAN);
 
-	input->name		= "twl4030-keypad";
-	input->phys		= "twl4030-keypad/input0";
+	input->name		= "TWL4030_Keypad";
+	input->phys		= "TWL4030_Keypad/input0";
 	input->dev.parent	= &pdev->dev;
 
 	input->id.bustype	= BUS_HOST;
@@ -415,6 +708,45 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 		goto err3;
 	}
 
+
+	wake_lock_init(&key_wake_lock, WAKE_LOCK_SUSPEND, "TWL4030_Keypad");
+
+
+
+	ret = gpio_request(CP_DOWN_INT, "cp int gpio");
+
+	if(ret < 0) {
+			printk(KERN_WARNING"%s() can't get hub GPIO\n", __func__);
+			kzfree(kp);
+			return -ENOSYS;
+		}
+	
+	ret = gpio_direction_input(CP_DOWN_INT);
+
+	ret = request_irq(gpio_to_irq(CP_DOWN_INT), hub_cp_int_handler, IRQF_TRIGGER_FALLING /*| IRQF_TRIGGER_RISING*/, "CP_INT", kp);
+	if (ret < 0){
+			printk(KERN_INFO "[CP Reset] GPIO 176 IRQ line set up failed!\n");
+			free_irq(gpio_to_irq(CP_DOWN_INT), kp);
+			return -ENOSYS;
+		}	
+		/* Make the interrupt on wake up OMAP which is in suspend mode */
+		ret = enable_irq_wake(gpio_to_irq(CP_DOWN_INT));
+		if(ret < 0){
+			printk(KERN_INFO "[CP Reset] GPIO 176 CP Switching wake up source setting failed!\n");
+			disable_irq_wake(gpio_to_irq(CP_DOWN_INT));
+			return -ENOSYS;
+		}
+//	omap_mux_init_gpio(CP_DOWN_INT, OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+
+
+	ret = device_create_file(&pdev->dev, &dev_attr_key_test_mode);
+	if (ret) {
+		printk( "Hub-keypad: keypad_probe: Fail\n");
+		device_remove_file(&pdev->dev, &dev_attr_key_test_mode);
+		return ret;
+	}
+
+
 	platform_set_drvdata(pdev, kp);
 	return 0;
 
@@ -439,6 +771,9 @@ static int __devexit twl4030_kp_remove(struct platform_device *pdev)
 	input_unregister_device(kp->input);
 	platform_set_drvdata(pdev, NULL);
 	kfree(kp);
+
+	wake_lock_destroy(&key_wake_lock);
+
 
 	return 0;
 }

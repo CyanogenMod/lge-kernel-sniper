@@ -1707,6 +1707,7 @@ EXPORT_SYMBOL(snd_pcm_period_elapsed);
  * The available space is stored on availp.  When err = 0 and avail = 0
  * on the capture stream, it indicates the stream is in DRAINING state.
  */
+extern int cur_mode_check; /* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
 static int wait_for_avail_min(struct snd_pcm_substream *substream,
 			      snd_pcm_uframes_t *availp)
 {
@@ -1726,7 +1727,17 @@ static int wait_for_avail_min(struct snd_pcm_substream *substream,
 		}
 		set_current_state(TASK_INTERRUPTIBLE);
 		snd_pcm_stream_unlock_irq(substream);
-		tout = schedule_timeout(msecs_to_jiffies(10000));
+/* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
+//		if((pcm_hw_enable)||(cur_mode_check==11)||(cur_mode_check==10))
+		if(cur_mode_check == 0)
+		{
+		tout = schedule_timeout(msecs_to_jiffies(10000)); /* default */
+		}
+		else
+		{
+			tout = schedule_timeout(msecs_to_jiffies(1000));
+		}
+/* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
 		snd_pcm_stream_lock_irq(substream);
 		switch (runtime->status->state) {
 		case SNDRV_PCM_STATE_SUSPENDED:

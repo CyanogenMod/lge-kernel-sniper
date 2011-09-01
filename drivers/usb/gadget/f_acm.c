@@ -22,6 +22,15 @@
 #include "u_serial.h"
 #include "gadget_chips.h"
 
+//20101205, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
+/* LG host driver use 16 bytes as max packet size of notify ep,
+ * but QCT use 10 bytes. Therefore we apply non-public patch for matching
+ * with LG host driver.
+ *
+ * TODO: This definition may be included into kernel configuration
+ */
+#define LG_ACM_FIX 1
+//20101205, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 
 /*
  * This CDC ACM function support just wraps control functions and
@@ -99,7 +108,12 @@ static inline struct f_acm *port_to_acm(struct gserial *p)
 /* notification endpoint uses smallish and infrequent fixed-size messages */
 
 #define GS_LOG2_NOTIFY_INTERVAL		5	/* 1 << 5 == 32 msec */
+//20101205, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
+#ifdef LG_ACM_FIX
+#define GS_NOTIFY_MAXPACKET		16	/* For LG host driver */
+#else
 #define GS_NOTIFY_MAXPACKET		10	/* notification + 2 bytes */
+#endif
 
 /* interface and class descriptors: */
 
@@ -112,7 +126,7 @@ acm_iad_descriptor = {
 	.bInterfaceCount = 	2,	// control + data
 	.bFunctionClass =	USB_CLASS_COMM,
 	.bFunctionSubClass =	USB_CDC_SUBCLASS_ACM,
-	.bFunctionProtocol =	USB_CDC_PROTO_NONE,
+	.bFunctionProtocol = USB_CDC_ACM_PROTO_AT_V25TER,
 	/* .iFunction =		DYNAMIC */
 };
 
@@ -334,8 +348,9 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	/* SET_LINE_CODING ... just read and save what the host sends */
 	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_REQ_SET_LINE_CODING:
+
 		if (w_length != sizeof(struct usb_cdc_line_coding)
-				|| w_index != acm->ctrl_id)
+				 || w_index != acm->ctrl_id  ) 
 			goto invalid;
 
 		value = w_length;
@@ -346,6 +361,7 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	/* GET_LINE_CODING ... return what host sent, or initial value */
 	case ((USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_REQ_GET_LINE_CODING:
+	
 		if (w_index != acm->ctrl_id)
 			goto invalid;
 
@@ -357,6 +373,7 @@ static int acm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 	/* SET_CONTROL_LINE_STATE ... save what the host sent */
 	case ((USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) << 8)
 			| USB_CDC_REQ_SET_CONTROL_LINE_STATE:
+	
 		if (w_index != acm->ctrl_id)
 			goto invalid;
 
@@ -697,7 +714,15 @@ acm_unbind(struct usb_configuration *c, struct usb_function *f)
 	if (gadget_is_dualspeed(c->cdev->gadget))
 		usb_free_descriptors(f->hs_descriptors);
 	usb_free_descriptors(f->descriptors);
+
+//20100819, jm1.lee@lge.com, This prevents kernel panic from acm patch [START]
+#if defined (CONFIG_LGE_ANDROID_USB)
+	if (acm->notify_req)
 	gs_free_req(acm->notify, acm->notify_req);
+#else
+	gs_free_req(acm->notify, acm->notify_req);
+#endif
+//20100819, jm1.lee@lge.com, This prevents kernel panic from acm patch [END]
 	kfree(acm);
 }
 
@@ -778,8 +803,9 @@ int acm_bind_config(struct usb_configuration *c, u8 port_num)
 	acm->port.func.setup = acm_setup;
 	acm->port.func.disable = acm_disable;
 
+
 	/* start disabled */
-	acm->port.func.disabled = 1;
+	acm->port.func.disabled = 0;
 
 	status = usb_add_function(c, &acm->port.func);
 	if (status)
@@ -792,8 +818,6 @@ int acm_bind_config(struct usb_configuration *c, u8 port_num)
 int acm_function_bind_config(struct usb_configuration *c)
 {
 	int ret = acm_bind_config(c, 0);
-	if (ret == 0)
-		gserial_setup(c->cdev->gadget, 1);
 	return ret;
 }
 

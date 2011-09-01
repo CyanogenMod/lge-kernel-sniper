@@ -251,14 +251,16 @@ static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 			i, mbox_ctx[i]);
 	}
 
-	omap2_mbox_shutdown(mbox);
+	// temporary blocked..
+	// omap2_mbox_shutdown(mbox);
 }
 
 static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
 {
 	int i, j;
 
-	omap2_mbox_startup(mbox);
+	// temporary blocked..
+	//omap2_mbox_startup(mbox);
 
 	/* Restore irqs per user */
 	for (j = 0, i = 0; j < nr_mbox_users; i++, j++) {

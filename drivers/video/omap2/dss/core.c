@@ -285,7 +285,7 @@ unsigned long dss_clk_get_rate(enum dss_clock clk)
 	}
 
 	BUG();
-	return 153600000;
+	return 0;
 }
 
 static unsigned count_clk_bits(enum dss_clock clks)
@@ -393,6 +393,7 @@ static void dss_clk_disable_no_ctx(enum dss_clock clks)
 	if (clks & DSS_CLK_96M)
 		clk_disable(core.dss_96m_fck);
 
+	core.num_clks_enabled -= num_clks;
 }
 
 void dss_clk_disable(enum dss_clock clks)

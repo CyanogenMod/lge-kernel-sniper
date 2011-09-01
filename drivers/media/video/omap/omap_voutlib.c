@@ -30,6 +30,13 @@ MODULE_AUTHOR("Texas Instruments");
 MODULE_DESCRIPTION("OMAP Video library");
 MODULE_LICENSE("GPL");
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+/* with isp resizer, resizing limitation in 34xx is 8x to 1/8x scaling. */
+#define DOWNSCALE_RATIO 8
+#else
+#define DOWNSCALE_RATIO 4
+#endif
+
 /* Return the default overlay cropping rectangle in crop given the image
  * size in pix and the video display size in fbuf.  The default
  * cropping rectangle is the largest rectangle no larger than the capture size
@@ -138,12 +145,12 @@ int omap_vout_new_window(struct v4l2_rect *crop,
 				crop->width = 768;
 		}
 	} else if (cpu_is_omap34xx()) {
-		/* For 34xx limit is 8x to 1/4x scaling. */
-		if ((crop->height/win->w.height) >= 4)
-			crop->height = win->w.height * 4;
+		/* TODO: It assumed ISP resizer enabled */
+		if ((crop->height/win->w.height) >= DOWNSCALE_RATIO)
+			crop->height = win->w.height * DOWNSCALE_RATIO;
 
-		if ((crop->width/win->w.width) >= 4)
-			crop->width = win->w.width * 4;
+		if ((crop->width/win->w.width) >= DOWNSCALE_RATIO)
+			crop->width = win->w.width * DOWNSCALE_RATIO;
 	}
 	return 0;
 }
@@ -161,7 +168,8 @@ EXPORT_SYMBOL_GPL(omap_vout_new_window);
  */
 int omap_vout_new_crop(struct v4l2_pix_format *pix,
 	      struct v4l2_rect *crop, struct v4l2_window *win,
-	      struct v4l2_framebuffer *fbuf, const struct v4l2_rect *new_crop)
+		struct v4l2_framebuffer *fbuf, const struct v4l2_rect *new_crop,
+		int *use_isp_rsz_for_downscale)
 {
 	struct v4l2_rect try_crop;
 	unsigned long vresize, hresize;
@@ -209,8 +217,21 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 	vresize = (1024 * crop->height) / win->w.height;
 	if (cpu_is_omap24xx() && (vresize > 2048))
 		vresize = 2048;
-	else if (cpu_is_omap34xx() && (vresize > 4096))
+	else if (cpu_is_omap34xx()) {
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+		if (vresize > 4096) {
+			*use_isp_rsz_for_downscale = 1;
+			printk(KERN_INFO "\n<%s> Using ISP resizer vresize "
+					"= %lu\n\n",
+					__func__, vresize);
+			if (vresize > 8096)
+				vresize = 8096;
+		}
+#else
+		if (vresize > 4096)
 		vresize = 4096;
+#endif
+	}
 
 	win->w.height = ((1024 * try_crop.height) / vresize) & ~1;
 	if (win->w.height == 0)
@@ -226,10 +247,28 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 	}
 	/* horizontal resizing */
 	hresize = (1024 * crop->width) / win->w.width;
-	if (cpu_is_omap24xx() && (hresize > 2048))
+	if (cpu_is_omap24xx() && (hresize > 2048)) {
 		hresize = 2048;
-	else if (cpu_is_omap34xx() && (hresize > 4096))
+	} else if (cpu_is_omap34xx()) {
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+		/* DSS DMA resizer handles the 8x to 1/4x horz scaling
+		 * for 1/4x to 1/8x scaling ISP resizer is used
+		 * for width > 1024 and scaling 1/2x-1/8x ISP resizer is used
+		 */
+		if (hresize > 4096
+				||(hresize > 2048 && try_crop.width > 1024)) {
+			*use_isp_rsz_for_downscale = 1;
+			printk(KERN_INFO "\n<%s> Using ISP resizer "
+					"hresize = %lu, width = %u\n\n",
+					__func__, hresize, try_crop.width);
+			if (hresize > 8096)
+				hresize = 8096;
+		}
+#else
+		if (hresize > 4096)
 		hresize = 4096;
+#endif
+	}
 	win->w.width = ((1024 * try_crop.width) / hresize) & ~1;
 	if (win->w.width == 0)
 		win->w.width = 2;
@@ -258,11 +297,12 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 				try_crop.width = 768;
 		}
 	} else if (cpu_is_omap34xx()) {
-		if ((try_crop.height/win->w.height) >= 4)
-			try_crop.height = win->w.height * 4;
+		/* TODO: It assumed ISP resizer enabled */
+		if ((try_crop.height/win->w.height) >= DOWNSCALE_RATIO)
+			try_crop.height = win->w.height * DOWNSCALE_RATIO;
 
-		if ((try_crop.width/win->w.width) >= 4)
-			try_crop.width = win->w.width * 4;
+		if ((try_crop.width/win->w.width) >= DOWNSCALE_RATIO)
+			try_crop.width = win->w.width * DOWNSCALE_RATIO;
 	}
 	/* update our cropping rectangle and we're done */
 	*crop = try_crop;

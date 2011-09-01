@@ -21,7 +21,9 @@
 
 /* Fixed constants first: */
 #undef NR_OPEN
-#define INR_OPEN 1024		/* Initial setting for nfile rlimits */
+/* LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-03-22, Modify for test. (1024->4096)*/
+#define INR_OPEN 4096		/* Initial setting for nfile rlimits */
+/* LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-03-22, Modify for test. (1024->4096)*/
 
 #define BLOCK_SIZE_BITS 10
 #define BLOCK_SIZE (1<<BLOCK_SIZE_BITS)

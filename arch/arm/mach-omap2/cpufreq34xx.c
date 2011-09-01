@@ -27,6 +27,8 @@
 #include <plat/cpu.h>
 #include <plat/clock.h>
 
+#include <linux/dvs_suite.h>
+
 #include "cm-regbits-34xx.h"
 #include "prm.h"
 #include "omap3-opp.h"
@@ -86,9 +88,9 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	/* MPU OPP2 - OPP100 */
 	OMAP_OPP_DEF("mpu", true,  600000000, 1100000),
 	/* MPU OPP3 - OPP-Turbo */
-	OMAP_OPP_DEF("mpu", false, 800000000, 1260000),
+	OMAP_OPP_DEF("mpu", true, 800000000, 1260000),
 	/* MPU OPP4 - OPP-SB */
-	OMAP_OPP_DEF("mpu", false, 1000000000, 1350000),
+	OMAP_OPP_DEF("mpu", true, 1000000000, 1350000),
 
 	/* L3 OPP1 - OPP50 */
 	OMAP_OPP_DEF("l3_main", true, 100000000, 930000),
@@ -100,9 +102,9 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	/* DSP OPP2 - OPP100 */
 	OMAP_OPP_DEF("iva", true,  520000000, 1100000),
 	/* DSP OPP3 - OPP-Turbo */
-	OMAP_OPP_DEF("iva", false, 660000000, 1260000),
+	OMAP_OPP_DEF("iva", true, 660000000, 1260000),
 	/* DSP OPP4 - OPP-SB */
-	OMAP_OPP_DEF("iva", false, 800000000, 1350000),
+	OMAP_OPP_DEF("iva", true, 800000000, 1350000),
 };
 static u32 omap36xx_opp_def_size = ARRAY_SIZE(omap36xx_opp_def_list);
 
@@ -133,6 +135,7 @@ static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
 {
 	unsigned long cur_rate = omap3_mpu_get_rate(dev);
 	int ret;
+	//printk("MPU: Current %lu ,Next %lu\n",cur_rate, rate);
 
 #ifdef CONFIG_CPU_FREQ
 	struct cpufreq_freqs freqs_notify;
@@ -141,6 +144,7 @@ static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
 	freqs_notify.new = rate / 1000;
 	freqs_notify.cpu = 0;
 	/* Send pre notification to CPUFreq */
+	if(ds_status.flag_correct_cpu_op_update_path == 0)
 	cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
 #endif
 	ret = clk_set_rate(dpll1_clk, rate);
@@ -152,6 +156,7 @@ static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
 
 #ifdef CONFIG_CPU_FREQ
 	/* Send a post notification to CPUFreq */
+	if(ds_status.flag_correct_cpu_op_update_path == 0)
 	cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
 #endif
 
@@ -170,6 +175,7 @@ static unsigned long omap3_mpu_get_rate(struct device *dev)
 
 static int omap3_iva_set_rate(struct device *dev, unsigned long rate)
 {
+	//printk("DSP: Current %lu ,Next %lu\n", omap3_mpu_get_rate(dev), rate);
 	return clk_set_rate(dpll2_clk, rate);
 }
 

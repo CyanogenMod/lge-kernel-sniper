@@ -58,6 +58,7 @@ work_resched:
  */
 ENTRY(ret_to_user)
 ret_slow_syscall:
+	/*bl	ds_update_cpu_op*/	@ 110331 sookyoung.kim@lg.com LG-DVFS
 	disable_irq				@ disable interrupts
 	ldr	r1, [tsk, #TI_FLAGS]
 	tst	r1, #_TIF_WORK_MASK

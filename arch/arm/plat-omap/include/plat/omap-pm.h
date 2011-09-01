@@ -279,7 +279,7 @@ int omap_pm_set_min_clk_rate(struct device *dev, struct clk *c, long r);
  * frequency entries.  The final item in the array should have .rate =
  * .opp_id = 0.
  */
-const struct omap_opp *omap_pm_dsp_get_opp_table(void);
+struct omap_opp *omap_pm_dsp_get_opp_table(void);
 
 /**
  * omap_pm_dsp_set_min_opp - receive desired OPP target ID from DSP Bridge

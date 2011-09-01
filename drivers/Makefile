@@ -124,3 +124,4 @@ obj-$(CONFIG_OMAP_DEVICE_HANDLER)	+= dsp/syslink/devh/
 obj-$(CONFIG_OMAP_DEVICE_HANDLER)	+= dsp/syslink/devh/44xx/
 obj-$(CONFIG_DMM_OMAP)		+= media/
 obj-$(CONFIG_TILER_OMAP)		+= media/
+obj-$(CONFIG_MACH_LGE_HUB)      += hub/

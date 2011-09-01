@@ -21,6 +21,9 @@
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
 
+#include <linux/dvs_suite.h>
+#include <linux/delay.h>
+
 #include "power.h"
 
 enum {
@@ -103,6 +106,9 @@ static void early_suspend(struct work_struct *work)
 		pr_info("early_suspend: sync\n");
 
 	sys_sync();
+
+	if(ds_status.flag_run_dvs == 1) ds_status.flag_post_early_suspend = 1;
+
 abort:
 	spin_lock_irqsave(&state_lock, irqflags);
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)
@@ -129,6 +135,9 @@ static void late_resume(struct work_struct *work)
 			pr_info("late_resume: abort, state %d\n", state);
 		goto abort;
 	}
+
+	if(ds_status.flag_run_dvs == 1) ds_status.flag_post_early_suspend = 0;
+
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("late_resume: call handlers\n");
 	list_for_each_entry_reverse(pos, &early_suspend_handlers, link)

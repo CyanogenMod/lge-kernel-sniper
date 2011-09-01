@@ -36,6 +36,8 @@
 
 #include "binder.h"
 
+#include <linux/dvs_suite.h>
+
 static DEFINE_MUTEX(binder_lock);
 static DEFINE_MUTEX(binder_deferred_lock);
 
@@ -1553,6 +1555,134 @@ static void binder_transaction(struct binder_proc *proc,
 	t->buffer->debug_id = t->debug_id;
 	t->buffer->transaction = t;
 	t->buffer->target_node = target_node;
+
+#if 0
+	if(ds_status.flag_run_dvs == 1){
+
+		switch(*(proc->tsk->comm+0)){
+			case 'm':
+				if(
+					*(proc->tsk->comm+1) == 'e' &&
+					*(proc->tsk->comm+2) == 'd' &&
+					*(proc->tsk->comm+3) == 'i' &&
+					*(proc->tsk->comm+4) == 'a' &&
+					*(proc->tsk->comm+5) == 's' &&
+					*(proc->tsk->comm+6) == 'e' &&
+					*(proc->tsk->comm+7) == 'r' &&
+					*(proc->tsk->comm+8) == 'v' &&
+					*(proc->tsk->comm+9) == 'e' &&
+					*(proc->tsk->comm+10) == 'r'
+				)
+				{
+					ds_status.type[t->to_proc->pid] = DS_SRT_CM_TASK;
+					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
+						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec;
+						ds_status.ipc_timeout_usec[t->to_proc->pid] =
+							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
+					}
+					else{
+						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec + 1;
+						ds_status.ipc_timeout_usec[t->to_proc->pid] =
+							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+					}
+				}
+				break;
+			case 's':
+				if(
+					*(proc->tsk->comm+1) == 'y' &&
+					*(proc->tsk->comm+2) == 's' &&
+					*(proc->tsk->comm+3) == 't' &&
+					*(proc->tsk->comm+4) == 'e' &&
+					*(proc->tsk->comm+5) == 'm' &&
+					*(proc->tsk->comm+6) == '_' &&
+					*(proc->tsk->comm+7) == 's' &&
+					*(proc->tsk->comm+8) == 'e' &&
+					*(proc->tsk->comm+9) == 'r' &&
+					*(proc->tsk->comm+10) == 'v' &&
+					*(proc->tsk->comm+11) == 'e' &&
+					*(proc->tsk->comm+12) == 'r'
+				)
+				{
+					ds_status.type[t->to_proc->pid] = DS_SRT_IA_TASK;
+					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
+						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec;
+						ds_status.ipc_timeout_usec[t->to_proc->pid] =
+							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
+					}
+					else{
+						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec + 1;
+						ds_status.ipc_timeout_usec[t->to_proc->pid] =
+							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+					}
+				}
+				break;
+			default:
+				break;
+		}
+
+		switch(*(t->to_proc->tsk->comm+0)){
+			case 'm':
+				if(
+					*(t->to_proc->tsk->comm+1) == 'e' &&
+					*(t->to_proc->tsk->comm+2) == 'd' &&
+					*(t->to_proc->tsk->comm+3) == 'i' &&
+					*(t->to_proc->tsk->comm+4) == 'a' &&
+					*(t->to_proc->tsk->comm+5) == 's' &&
+					*(t->to_proc->tsk->comm+6) == 'e' &&
+					*(t->to_proc->tsk->comm+7) == 'r' &&
+					*(t->to_proc->tsk->comm+8) == 'v' &&
+					*(t->to_proc->tsk->comm+9) == 'e' &&
+					*(t->to_proc->tsk->comm+10) == 'r'
+				)
+				{
+					ds_status.type[proc->pid] = DS_SRT_CM_TASK;
+					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
+						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec;
+						ds_status.ipc_timeout_usec[proc->pid] =
+							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
+					}
+					else{
+						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec + 1;
+						ds_status.ipc_timeout_usec[proc->pid] =
+							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+					}
+				}
+				break;
+			case 's':
+				if(
+					*(t->to_proc->tsk->comm+1) == 'y' &&
+					*(t->to_proc->tsk->comm+2) == 's' &&
+					*(t->to_proc->tsk->comm+3) == 't' &&
+					*(t->to_proc->tsk->comm+4) == 'e' &&
+					*(t->to_proc->tsk->comm+5) == 'm' &&
+					*(t->to_proc->tsk->comm+6) == '_' &&
+					*(t->to_proc->tsk->comm+7) == 's' &&
+					*(t->to_proc->tsk->comm+8) == 'e' &&
+					*(t->to_proc->tsk->comm+9) == 'r' &&
+					*(t->to_proc->tsk->comm+10) == 'v' &&
+					*(t->to_proc->tsk->comm+11) == 'e' &&
+					*(t->to_proc->tsk->comm+12) == 'r'
+				)
+				{
+					ds_status.type[t->to_proc->pid] = DS_SRT_IA_TASK;
+					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
+						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec;
+						ds_status.ipc_timeout_usec[proc->pid] =
+							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
+					}
+					else{
+						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec + 1;
+						ds_status.ipc_timeout_usec[proc->pid] =
+							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+					}
+				}
+				break;
+			default:
+				break;
+		}
+	}
+#endif
+
 	if (target_node)
 		binder_inc_node(target_node, 1, 0, NULL);
 
@@ -1816,6 +1946,11 @@ int binder_thread_write(struct binder_proc *proc, struct binder_thread *thread,
 			    (cmd == BC_INCREFS || cmd == BC_ACQUIRE)) {
 				ref = binder_get_ref_for_node(proc,
 					       binder_context_mgr_node);
+#if defined(CONFIG_MACH_LGE_OMAP3) //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-19, WBT
+				if (ref == NULL) {
+					return -ENOMEM;
+				}
+#endif
 				if (ref->desc != target) {
 					binder_user_error("binder: %d:"
 						"%d tried to acquire "
@@ -2601,6 +2736,13 @@ static unsigned int binder_poll(struct file *filp,
 
 	mutex_lock(&binder_lock);
 	thread = binder_get_thread(proc);
+#if defined(CONFIG_MACH_LGE_OMAP3) //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-19, WBT
+	if (thread == NULL) {
+		printk(KERN_ERR "binder_get_thread failed.\n");
+		mutex_unlock(&binder_lock);
+		return 0;
+	}
+#endif
 
 	wait_for_proc_work = thread->transaction_stack == NULL &&
 		list_empty(&thread->todo) && thread->return_error == BR_OK;

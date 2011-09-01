@@ -531,6 +531,9 @@ void omap_dm_timer_stop(struct omap_dm_timer *timer)
 {
 	u32 l;
 
+	if ( !timer->enabled ) 
+		return;
+
 	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
 	if (l & OMAP_TIMER_CTRL_ST) {
 		l &= ~0x1;

@@ -44,7 +44,8 @@
 #include <plat/control.h>
 
 #include "../../arch/arm/mach-omap2/mux.h"
-
+int console_enabled = 0;
+EXPORT_SYMBOL(console_enabled);
 static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
 
 /* Forward declaration of functions */
@@ -1102,7 +1103,7 @@ serial_omap_console_setup(struct console *co, char *options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 
 	r = uart_set_options(&up->port, co, baud, parity, bits, flow);
-
+	console_enabled = 1;
 	return r;
 }
 

@@ -494,9 +494,16 @@ static int __devinit twl_rtc_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto out1;
 
+#ifdef CONFIG_MACH_LGE_OMAP3
+	ret = request_threaded_irq(irq, NULL, twl_rtc_interrupt,
+			IRQF_TRIGGER_RISING,
+			dev_name(&rtc->dev), rtc);
+#else
 	ret = request_irq(irq, twl_rtc_interrupt,
 				IRQF_TRIGGER_RISING,
 				dev_name(&rtc->dev), rtc);
+#endif // CONFIG_MACH_LGE_OMAP3
+
 	if (ret < 0) {
 		dev_err(&pdev->dev, "IRQ is not free.\n");
 		goto out1;

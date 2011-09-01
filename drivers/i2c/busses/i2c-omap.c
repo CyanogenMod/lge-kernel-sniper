@@ -407,7 +407,13 @@ static int omap_i2c_init(struct omap_i2c_dev *dev)
 			 * REVISIT: Some wkup sources might not be needed.
 			 */
 			dev->westate = OMAP_I2C_WE_ALL;
+ #if 0
 			omap_i2c_write_reg(dev, OMAP_I2C_WE_REG, dev->westate);
+#else
+			if (dev->rev < OMAP_I2C_REV_ON_4430)
+				omap_i2c_write_reg(dev, OMAP_I2C_WE_REG,
+								dev->westate);
+#endif
 		}
 	}
 	omap_i2c_write_reg(dev, OMAP_I2C_CON_REG, 0);
@@ -700,6 +706,8 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 
 	if (r == 0)
 		r = num;
+
+	omap_i2c_wait_for_bb(dev);
 out:
 	disable_irq_nosync(dev->irq);
 	omap_i2c_idle(dev);
@@ -885,9 +893,16 @@ complete:
 		}
 		if (stat & (OMAP_I2C_STAT_ARDY | OMAP_I2C_STAT_NACK |
 					OMAP_I2C_STAT_AL)) {
+ #if 0
 			omap_i2c_ack_stat(dev, stat &
 				(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
 				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
+#else
+			omap_i2c_ack_stat(dev, stat &
+				(OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR |
+				OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR |
+				OMAP_I2C_STAT_ARDY));
+#endif
 			omap_i2c_complete_cmd(dev, err);
 			return IRQ_HANDLED;
 		}
@@ -931,6 +946,9 @@ complete:
 						dev_err(dev->dev,
 							"RDR IRQ while no data"
 								" requested\n");
+					/* 20100909 jugwan.eom@lge.com TI WA: add exception handling [START] */
+					omap_i2c_ack_stat(dev, stat & (OMAP_I2C_STAT_RRDY | OMAP_I2C_STAT_RDR));
+					/* 20100909 jugwan.eom@lge.com TI WA: add exception handling [END] */
 					break;
 				}
 			}
@@ -974,6 +992,10 @@ complete:
 						dev_err(dev->dev,
 							"XDR IRQ while no "
 							"data to send\n");
+					/* 20100909 jugwan.eom@lge.com TI WA: add exception handling [START] */
+					omap_i2c_ack_stat(dev, stat & (OMAP_I2C_STAT_XRDY | OMAP_I2C_STAT_XDR));
+					/* 20100909 jugwan.eom@lge.com TI WA: add exception handling [END] */
+
 					break;
 				}
 

@@ -102,15 +102,19 @@ static int omap_mcbsp_st_read(struct omap_mcbsp *mcbsp, u16 reg)
 /*Stores the context of mcbsp register in reg_cache*/
 static void omap_mcbsp_save_context(struct omap_mcbsp *mcbsp)
 {
+#if !defined(CONFIG_PM_RUNTIME)
 	MCBSP_READ(mcbsp, SYSCON);
+#endif
 }
 
 /*restores the context of mcbsp register from reg_cache to the MCBSP register*/
 static void  omap_mcbsp_restore_context(struct omap_mcbsp *mcbsp)
 {
+#if !defined(CONFIG_PM_RUNTIME)
 	unsigned int w;
 	w = MCBSP_READ_CACHE(mcbsp, SYSCON);
 	MCBSP_WRITE(mcbsp, SYSCON, w);
+#endif
 }
 
 static void omap_mcbsp_dump_reg(u8 id)
@@ -688,8 +692,14 @@ static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
 						HWMOD_IDLEMODE_SMART);
 		} else {
 			omap_hwmod_disable_wakeup(mcbsp->oh[0]);
+// INFORTEC patch 2011.03.30
+#if 0
 			omap_hwmod_set_slave_idlemode(mcbsp->oh[0],
 						HWMOD_IDLEMODE_NO);
+#endif
+			omap_hwmod_set_slave_idlemode(mcbsp->oh[0],
+						HWMOD_IDLEMODE_SMART);
+// INFORTEC patch 2011.03.30			
 		}
 	}
 }
@@ -834,6 +844,43 @@ err_kfree:
 	return err;
 }
 EXPORT_SYMBOL(omap_mcbsp_request);
+
+void omap_mcbsp_disable_fclk(unsigned int id)
+{
+#if !defined(CONFIG_PM_RUNTIME)
+	struct omap_mcbsp *mcbsp;
+// LGE_UPDATE_S	
+	int c;
+// LGE_UPDATE_E
+	if (!omap_mcbsp_check_valid_id(id)) {
+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
+		return;
+	}
+	mcbsp = id_to_mcbsp_ptr(id);
+	
+// LGE_UPDATE_S
+	//c = mcbsp->fclk->usecount;
+	//while (c-- > 0)
+// LGE_UPDATE_E	
+		clk_disable(mcbsp->fclk);
+#endif
+}
+EXPORT_SYMBOL(omap_mcbsp_disable_fclk);
+
+void omap_mcbsp_enable_fclk(unsigned int id)
+{
+#if !defined(CONFIG_PM_RUNTIME)
+	struct omap_mcbsp *mcbsp;
+
+	if (!omap_mcbsp_check_valid_id(id)) {
+		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
+		return;
+	}
+	mcbsp = id_to_mcbsp_ptr(id);
+	clk_enable(mcbsp->fclk);
+#endif
+}
+EXPORT_SYMBOL(omap_mcbsp_enable_fclk);
 
 void omap_mcbsp_free(unsigned int id)
 {
@@ -1822,12 +1869,41 @@ static int __devexit omap_mcbsp_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int omap_mcbsp_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct omap_mcbsp *mcbsp = platform_get_drvdata(pdev);
+
+	if (mcbsp->free)
+		return 0;
+
+	if (cpu_is_omap34xx())
+		omap_hwmod_set_module_autoidle(mcbsp->oh[1], 0);
+	pm_runtime_put_sync(mcbsp->dev);
+
+	return 0;
+}
+
+static int omap_mcbsp_resume(struct platform_device *pdev)
+{
+	struct omap_mcbsp *mcbsp = platform_get_drvdata(pdev);
+
+	if (mcbsp->free)
+		return 0;
+
+	pm_runtime_get_sync(mcbsp->dev);
+	if (cpu_is_omap34xx() && !omap_st_is_enabled(mcbsp->id))
+		omap_hwmod_set_module_autoidle(mcbsp->oh[1], 1);
+
+	return 0;
+}
 static struct platform_driver omap_mcbsp_driver = {
 	.probe		= omap_mcbsp_probe,
 	.remove		= __devexit_p(omap_mcbsp_remove),
 	.driver		= {
 		.name	= "omap-mcbsp",
 	},
+	.suspend	= omap_mcbsp_suspend,
+	.resume		= omap_mcbsp_resume,
 };
 
 int __init omap_mcbsp_init(void)

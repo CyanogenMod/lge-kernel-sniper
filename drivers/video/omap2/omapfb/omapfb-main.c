@@ -33,6 +33,7 @@
 
 #include <plat/display.h>
 #include <plat/vram.h>
+#include <linux/earlysuspend.h>
 #include <plat/vrfb.h>
 #ifdef CONFIG_TILER_OMAP
 #include <mach/tiler.h>
@@ -64,6 +65,18 @@ module_param_named(debug, omapfb_debug, bool, 0644);
 static unsigned int omapfb_test_pattern;
 module_param_named(test, omapfb_test_pattern, bool, 0644);
 #endif
+
+#if defined(CONFIG_MACH_LGE_OMAP3)
+// LGE_UPDATE
+static bool boot_status = false;
+void omapfb_boot_status_set(bool val)
+{
+	boot_status = val;
+}
+EXPORT_SYMBOL(omapfb_boot_status_set);
+// LGE_UPDATE
+#endif
+
 
 static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi);
 static int omapfb_get_recommended_bpp(struct omapfb2_device *fbdev,
@@ -397,7 +410,12 @@ static int fb_mode_to_dss_mode(struct fb_var_screeninfo *var,
 		dssmode = OMAP_DSS_COLOR_RGB24P;
 		break;
 	case 32:
+#if 0
+		dssmode = OMAP_DSS_COLOR_RGB24U;
+#else
+     //          dssmode = OMAP_DSS_COLOR_RGB24U; // for kernel panic message
 		dssmode = OMAP_DSS_COLOR_ARGB32;
+#endif
 		break;
 	default:
 		return -EINVAL;
@@ -1170,9 +1188,14 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 
 	DBG("pan_display(%d)\n", FB2OFB(fbi)->id);
 
-	if (var->xoffset == fbi->var.xoffset &&
-	    var->yoffset == fbi->var.yoffset)
+ #if defined(CONFIG_MACH_LGE_OMAP3)
+	if ( boot_status == false )
 		return 0;
+#endif
+ 
+ //	if (var->xoffset == fbi->var.xoffset &&
+//	    var->yoffset == fbi->var.yoffset)
+//		return 0;
 
 	new_var = fbi->var;
 	new_var.xoffset = var->xoffset;
@@ -1559,10 +1582,12 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			w = fbi->fix.line_length /
 				(fbi->var.bits_per_pixel >> 3);
 			h = size / fbi->fix.line_length;
+#if 1
 			if (fbi->var.bits_per_pixel == 16)
 				err = tiler_alloc(TILFMT_16BIT, w, h,
 							(u32 *)&paddr);
 			else
+#endif
 				err = tiler_alloc(TILFMT_32BIT, w, h,
 							(u32 *)&paddr);
 			if (err != 0x0)
@@ -1651,6 +1676,7 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 	}
 
 	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+#if 1
 		if (bytespp == 2) {
 			fbi->var.bits_per_pixel = 16;
 			bytespp = fbi->var.bits_per_pixel >> 3;
@@ -1659,6 +1685,7 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 			fbi->var.bits_per_pixel = 32;
 			bytespp = fbi->var.bits_per_pixel >> 3;
 		}
+#endif
 	}
 
 	display->driver->get_resolution(display, &w, &h);
@@ -1947,6 +1974,58 @@ err:
 	return r;
 }
 
+#ifdef CONFIG_HAS_EARLYSUSPEND
+struct suspend_info {
+	struct early_suspend early_suspend;
+	struct fb_info *fbi;
+};
+
+void suspend(struct early_suspend *h)
+{
+	struct suspend_info *info = container_of(h, struct suspend_info,
+						early_suspend);
+	struct fb_info *fbi = info->fbi;
+	struct omap_dss_device *display = fb2display(fbi);
+
+
+		if (!cpu_is_omap44xx() && display->driver->suspend)
+			display->driver->suspend(display);
+}
+
+void resume(struct early_suspend *h)
+{
+	struct suspend_info *info = container_of(h, struct suspend_info,
+						early_suspend);
+	struct fb_info *fbi = info->fbi;
+	struct omap_dss_device *display = fb2display(fbi);
+
+	omap_vrfb_restore_context();  
+
+
+		if (!cpu_is_omap44xx() && display->driver->resume)
+			display->driver->resume(display);
+
+		/* TODO : should be checked */
+		/* To prevent display crach, when it wake up */
+		msleep(30);
+		if (display->driver->update) {
+			u16 w, h;
+			display->driver->get_resolution(display, &w, &h);
+			display->driver->update(display, 0, 0, w, h);
+		}
+		/* To prevent display crach, when it wake up */
+		/* TODO : should be checked */
+
+
+}
+
+struct suspend_info suspend_info = {
+	.early_suspend.suspend = suspend,
+	.early_suspend.resume = resume,
+	.early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB,
+};
+#endif
+
 /* initialize fb_info, var, fix to something sane based on the display */
 static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 {
@@ -2052,6 +2131,12 @@ static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 	r = fb_alloc_cmap(&fbi->cmap, 256, 0);
 	if (r)
 		dev_err(fbdev->dev, "unable to allocate color map memory\n");
+#ifdef CONFIG_HAS_EARLYSUSPEND
+	if(!cpu_is_omap44xx()) {
+		suspend_info.fbi = fbi;
+		register_early_suspend(&suspend_info.early_suspend);
+	}
+#endif
 
 err:
 	return r;
@@ -2589,7 +2674,13 @@ static int omapfb_probe(struct platform_device *pdev)
 						OMAP_DSS_UPDATE_MANUAL);
 
 			dssdrv->get_resolution(def_display, &w, &h);
-			def_display->driver->update(def_display, 0, 0, w, h);
+#if defined(CONFIG_MACH_LGE_OMAP3)
+#else
+// LGE_UPDATE /* when omapfb is probing, it doesn't need to call update function.*/
+//			if (def_display->driver->update)
+//			def_display->driver->update(def_display, 0, 0, w, h);
+// LGE_UPDATE /* when omapfb is probing, it doesn't need to call update function.*/
+#endif
 		} else {
 			if (dssdrv->set_update_mode)
 				dssdrv->set_update_mode(def_display,

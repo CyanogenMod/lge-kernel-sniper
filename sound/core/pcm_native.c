@@ -1412,6 +1412,9 @@ static int snd_pcm_drop(struct snd_pcm_substream *substream);
  * After this call, all streams are supposed to be either SETUP or DRAINING
  * (capture only) state.
  */
+/* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
+extern int cur_mode_check;
+/* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
 static int snd_pcm_drain(struct snd_pcm_substream *substream,
 			 struct file *file)
 {
@@ -1485,6 +1488,15 @@ static int snd_pcm_drain(struct snd_pcm_substream *substream,
 		snd_pcm_stream_unlock_irq(substream);
 		up_read(&snd_pcm_link_rwsem);
 		snd_power_unlock(card);
+/* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
+	//	if ((cur_mode_check==11)||(cur_mode_check==10))
+//		if((pcm_hw_enable)||(cur_mode_check==11)||(cur_mode_check==10))
+		if(cur_mode_check == 0)
+		{
+			tout = schedule_timeout(1 * HZ);
+		}
+		else
+/* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
 		tout = schedule_timeout(10 * HZ);
 		snd_power_lock(card);
 		down_read(&snd_pcm_link_rwsem);

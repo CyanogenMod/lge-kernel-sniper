@@ -65,9 +65,16 @@ obj-$(CONFIG_USB_G_MULTI)	+= g_multi.o
 obj-$(CONFIG_USB_G_NOKIA)	+= g_nokia.o
 obj-$(CONFIG_USB_G_WEBCAM)	+= g_webcam.o
 obj-$(CONFIG_USB_ANDROID)	+= android.o
-obj-$(CONFIG_USB_ANDROID_ACM)	+= f_acm.o u_serial.o
-obj-$(CONFIG_USB_ANDROID_ADB)	+= f_adb.o
-obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= f_mass_storage.o
-obj-$(CONFIG_USB_ANDROID_MTP)	+= f_mtp.o
+# LGE_UPDATE_S 20110124 jaejoong.kim@lge.com usb porting B-Project GB
+# RNDIS / ACM / DIAG / NMEA / UMS / ADB
 obj-$(CONFIG_USB_ANDROID_RNDIS)	+= f_rndis.o u_ether.o
+obj-$(CONFIG_USB_ANDROID_ACM)	+= f_acm.o u_serial.o
+obj-$(CONFIG_LGE_ANDROID_USB_CDC_ECM)	+= f_ecm.o u_ether.o
+obj-$(CONFIG_LGE_ANDROID_USB_DIAG)	+= f_serial.o
+obj-$(CONFIG_LGE_ANDROID_USB_NMEA)	+= f_nmea.o
+obj-$(CONFIG_USB_ANDROID_MASS_STORAGE)	+= f_mass_storage.o
+obj-$(CONFIG_USB_ANDROID_ADB)	+= f_adb.o
+obj-$(CONFIG_USB_ANDROID_MTP)	+= f_mtp.o
+# LGE_UPDATE_S 20110124 jaejoong.kim@lge.com usb porting B-Project GB
+# LGE_UPDATE_E
 

@@ -51,6 +51,7 @@ struct omap_mcbsp_data {
 	unsigned int			bus_id;
 	struct omap_mcbsp_reg_cfg	regs;
 	unsigned int			fmt;
+	int				clk_id;
 	/*
 	 * Flags indicating is the bus already activated and configured by
 	 * another substream
@@ -235,8 +236,10 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
 	int bus_id = mcbsp_data->bus_id;
 	int err = 0;
 
-	if (!cpu_dai->active)
+	if (!cpu_dai->active) {
 		err = omap_mcbsp_request(bus_id);
+		cpu_dai->active = 1;
+	}
 
 	/*
 	 * OMAP3 McBSP FIFO is word structured.
@@ -445,8 +448,16 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	if (channels == 2 && (format == SND_SOC_DAIFMT_I2S ||
 			      format == SND_SOC_DAIFMT_LEFT_J)) {
 		/* Use dual-phase frames */
+#if 0 //soyoung77.park(mono recording)
 		regs->rcr2	|= RPHASE;
 		regs->xcr2	|= XPHASE;
+#else 
+		if(substream->stream)	
+		regs->rcr2	|= RPHASE;
+		else
+		regs->xcr2	|= XPHASE;
+#endif
+
 		/* Set 1 word per (McBSP) frame for phase1 and phase2 */
 		wpf--;
 		regs->rcr2	|= RFRLEN2(wpf - 1);
@@ -456,6 +467,17 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	regs->rcr1	|= RFRLEN1(wpf - 1);
 	regs->xcr1	|= XFRLEN1(wpf - 1);
 
+//soyoung77.park(mono recording)
+	if (channels == 1 && (format == SND_SOC_DAIFMT_I2S)){
+		if(substream->stream)
+		{
+			  regs->xcr2  |= XPHASE;	
+			  regs->rcr2  |= RFRLEN2(wpf - 1);
+			  regs->xcr2  |= XFRLEN2(wpf - 1);
+		}
+		regs->rcr1	|= RFRLEN1(wpf - 1);
+		regs->xcr1	|= XFRLEN1(wpf - 1);
+	}
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
 		/* Set word lengths */
@@ -739,6 +761,7 @@ static int omap_mcbsp_dai_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 		}
 	case OMAP_MCBSP_SYSCLK_CLKS_EXT:
 		err = omap_mcbsp_dai_set_clks_src(mcbsp_data, clk_id);
+		mcbsp_data->clk_id = clk_id;
 		break;
 
 	case OMAP_MCBSP_SYSCLK_CLKX_EXT:
@@ -758,6 +781,34 @@ static int omap_mcbsp_dai_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 	}
 
 	return err;
+}
+
+#define to_mcbsp(priv)  container_of((priv), struct omap_mcbsp_data, bus_id)
+
+int omap_mcbsp_dai_suspend(struct snd_soc_dai *cpu_dai)
+{
+	 struct omap_mcbsp_data *mcbsp_data = snd_soc_dai_get_drvdata(cpu_dai);
+
+	if (cpu_dai->active) {
+		omap_mcbsp_dai_set_clks_src(mcbsp_data,
+			OMAP_MCBSP_SYSCLK_CLKS_FCLK);
+		omap_mcbsp_disable_fclk(mcbsp_data->bus_id);
+	}
+
+	return 0;
+}
+
+int omap_mcbsp_dai_resume(struct snd_soc_dai *cpu_dai)
+{
+	 struct omap_mcbsp_data *mcbsp_data = snd_soc_dai_get_drvdata(cpu_dai);
+
+	if (cpu_dai->active) {
+		omap_mcbsp_enable_fclk(mcbsp_data->bus_id);
+		omap_mcbsp_config(mcbsp_data->bus_id, &mcbsp_data->regs);
+		omap_mcbsp_dai_set_clks_src(mcbsp_data, mcbsp_data->clk_id);
+	}
+
+	return 0;
 }
 
 static struct snd_soc_dai_ops mcbsp_dai_ops = {
@@ -793,6 +844,8 @@ static struct snd_soc_dai_driver omap_mcbsp_dai =
 		.rates = OMAP_MCBSP_RATES,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
 	},
+	.suspend = omap_mcbsp_dai_suspend,
+	.resume = omap_mcbsp_dai_resume,
 	.ops = &mcbsp_dai_ops,
 };
 

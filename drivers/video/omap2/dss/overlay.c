@@ -59,7 +59,9 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 	int i, r;
 	struct omap_overlay_manager *mgr = NULL;
 	struct omap_overlay_manager *old_mgr;
+#ifdef CONFIG_ARCH_OMAP4
 	struct omap_overlay_info info;
+#endif
 	int len = size;
 
 	if (buf[size-1] == '\n')
@@ -88,6 +90,7 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 	if (mgr == ovl->manager)
 		return size;
 
+#ifdef CONFIG_ARCH_OMAP4
 	if (mgr && sysfs_streq(mgr->name, "tv")) {
 		ovl->get_overlay_info(ovl, &info);
 		if (mgr->device->panel.timings.x_res < info.out_width ||
@@ -96,6 +99,7 @@ static ssize_t overlay_manager_store(struct omap_overlay *ovl, const char *buf,
 			return -EINVAL;
 		}
 	}
+#endif
 
 	old_mgr = ovl->manager;
 
@@ -211,17 +215,25 @@ static ssize_t overlay_output_size_show(struct omap_overlay *ovl, char *buf)
 static ssize_t overlay_output_size_store(struct omap_overlay *ovl,
 		const char *buf, size_t size)
 {
-	int r, out_width, out_height;
+	int r;
+#ifdef CONFIG_ARCH_OMAP4
+	int out_width, out_height;
+#endif
 	char *last;
 	struct omap_overlay_info info;
 
 	ovl->get_overlay_info(ovl, &info);
 
+#ifdef CONFIG_ARCH_OMAP4
 	out_width = simple_strtoul(buf, &last, 10);
+#else
+	info.out_width = simple_strtoul(buf, &last, 10);
+#endif
 	++last;
 	if (last - buf >= size)
 		return -EINVAL;
 
+#ifdef CONFIG_ARCH_OMAP4
 	out_height = simple_strtoul(last, &last, 10);
 
 	if (sysfs_streq(ovl->manager->name, "tv")) {
@@ -233,6 +245,9 @@ static ssize_t overlay_output_size_store(struct omap_overlay *ovl,
 
 	info.out_width = out_width;
 	info.out_height = out_height;
+#else
+	info.out_height = simple_strtoul(last, &last, 10);
+#endif
 
 	r = ovl->set_overlay_info(ovl, &info);
 	if (r)

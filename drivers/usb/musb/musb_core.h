@@ -514,6 +514,10 @@ extern void phy_clk_set(struct musb *musb, u8 on);
 #define phy_clk_set(m, x)			do {} while (0)
 #endif
 
+// LGE_UPDATE_S 20110311 [jaejoong.kim@lge.com] modify for usb interrupt bug
+void musb_save_context(struct musb *musb);
+// LGE_UPDATE_S 20110311 [jaejoong.kim@lge.com] modify for usb interrupt bug
+
 static inline void musb_set_vbus(struct musb *musb, int is_on)
 {
 	musb->board_set_vbus(musb, is_on);

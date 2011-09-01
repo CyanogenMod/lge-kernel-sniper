@@ -163,6 +163,33 @@ config MACH_OMAP_ZOOM3
 	select SERIAL_CORE_CONSOLE
 	select SERIAL_8250_CONSOLE
 
+config MACH_LGE_OMAP3
+	bool "LGE OMAP3"
+	depends on ARCH_OMAP3
+	default y
+	select OMAP_PACKAGE_CBP
+
+config MACH_LGE_HUB
+	bool "LGE Hub Board & Hub variation Board"
+	depends on MACH_LGE_OMAP3
+	select OMAP_PACKAGE_CBP
+	choice
+		prompt "Choose the LGE Hub board revision"
+		depends on MACH_LGE_HUB
+		default MACH_LGE_HUB_REV_A
+
+		config MACH_LGE_HUB_REV_A
+	        	bool "Revision A "
+	endchoice
+
+config LGE_LAB3_BOARD
+	bool "LGE LAB3 Board"
+	depends on MACH_LGE_OMAP3
+	default n
+	---help---
+		Support for LAB3 Device ( Tunning Value, GPIO, etc )
+
+
 config MACH_CM_T35
 	bool "CompuLab CM-T35 module"
 	depends on ARCH_OMAP3

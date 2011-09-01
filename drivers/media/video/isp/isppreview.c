@@ -275,8 +275,10 @@ out_config_shadow:
 	if (ISP_ABS_PREV_GAMMABYPASS & config->flag) {
 		isppreview_enable_gammabypass(isp_prev, 1);
 		params->features |= PREV_GAMMA_BYPASS;
-	} else {
+	} else if ((params->features & PREV_GAMMA_BYPASS) == PREV_GAMMA_BYPASS){
 		isppreview_enable_gammabypass(isp_prev, 0);
+		params->features &= ~PREV_GAMMA_BYPASS;
+	}else{
 		params->features &= ~PREV_GAMMA_BYPASS;
 	}
 
@@ -443,8 +445,7 @@ static int isppreview_tables_update(struct isp_prev_device *isp_prev,
 			goto err_copy_from_user;
 		}
 		isp_prev->rg_update = 1;
-	} else
-		isp_prev->rg_update = 0;
+	}
 
 	if (ISP_ABS_TBL_GREENGAMMA & isptables_struct->update) {
 		if (copy_from_user(greengamma_table,
@@ -452,8 +453,7 @@ static int isppreview_tables_update(struct isp_prev_device *isp_prev,
 				   sizeof(greengamma_table)))
 			goto err_copy_from_user;
 		isp_prev->gg_update = 1;
-	} else
-		isp_prev->gg_update = 0;
+	}
 
 	if (ISP_ABS_TBL_BLUEGAMMA & isptables_struct->update) {
 		if (copy_from_user(bluegamma_table,
@@ -462,8 +462,7 @@ static int isppreview_tables_update(struct isp_prev_device *isp_prev,
 			goto err_copy_from_user;
 		}
 		isp_prev->bg_update = 1;
-	} else
-		isp_prev->bg_update = 0;
+	}
 
 	if (ISP_ABS_PREV_CFA & isptables_struct->update) {
 		struct ispprev_cfa cfa;
@@ -1574,13 +1573,8 @@ int isppreview_try_pipeline(struct isp_prev_device *isp_prev,
 			    struct isp_node *pipe)
 {
 	struct device *dev = to_device(isp_prev);
-	struct isp_device *isp = to_isp_device(isp_prev);
 	u32 div = 0;
 	int max_out;
-	unsigned int wanted_width;
-	unsigned int wanted_height;
-	unsigned int left_boundary;
-	unsigned int right_boundary;
 
 	if (pipe->in.image.width < 32 || pipe->in.image.height < 32) {
 		dev_err(dev, "preview does not support "
@@ -1601,8 +1595,6 @@ int isppreview_try_pipeline(struct isp_prev_device *isp_prev,
 		max_out = ISPPRV_MAXOUTPUT_WIDTH_ES2;
 	}
 
-	wanted_width = pipe->out.image.width;
-	wanted_height = pipe->out.image.height;
 	pipe->out.image.width = pipe->in.image.width;
 	pipe->out.image.height = pipe->in.image.height;
 
@@ -1613,51 +1605,59 @@ int isppreview_try_pipeline(struct isp_prev_device *isp_prev,
 	pipe->in.crop.height = pipe->in.image.height;
 
 	pipe->out.crop.left = 0;
-	pipe->out.crop.width = pipe->in.image.width -
-			       ISPPRV_MAX_FILTERS_SPEND_PIXELS;
+	pipe->out.crop.width = pipe->out.image.width;
 	pipe->out.crop.top = 0;
-	pipe->out.crop.height = pipe->in.image.height -
-				ISPPRV_MAX_FILTERS_SPEND_LINES;
+	pipe->out.crop.height = pipe->out.image.height;
 
 	/* Set crop depend on horizontal median filter */
-	if (!isp_prev->hmed_en) {
-		pipe->in.crop.left += 2;
-		pipe->in.crop.width -= 2;
-	}
+	if (isp_prev->hmed_en)
+		pipe->out.crop.width -= 4;
+	else
+		pipe->in.crop.left += 4;
 
 	/* Set crop depend on noise filter */
-	if (!isp_prev->nf_en) {
-		pipe->in.crop.left += 2;
-		pipe->in.crop.width -= 2;
-		pipe->in.crop.top += 2;
-		pipe->in.crop.height -= 2;
+	if (isp_prev->nf_en) {
+		pipe->out.crop.width -= 4;
+		pipe->out.crop.height -= 4;
+	} else {
+		pipe->in.crop.left += 4;
+		pipe->in.crop.top += 4;
 	}
 
 	/* Set crop depend on CFA format */
-	switch (!isp_prev->cfafmt) {
+	switch (isp_prev->cfafmt) {
 	case CFAFMT_BAYER:
 	case CFAFMT_SONYVGA:
-		if (!isp_prev->cfa_en) {
-			pipe->in.crop.left += 2;
-			pipe->in.crop.width -= 2;
-			pipe->in.crop.top += 2;
-			pipe->in.crop.height -= 2;
+		if (isp_prev->cfa_en) {
+			pipe->out.crop.width -= 4;
+			pipe->out.crop.height -= 4;
+		} else {
+			pipe->in.crop.left += 4;
+			pipe->in.crop.top += 4;
 		}
 		break;
 	case CFAFMT_RGBFOVEON:
 	case CFAFMT_RRGGBBFOVEON:
 	case CFAFMT_DNSPL:
 	case CFAFMT_HONEYCOMB:
-		if (!isp_prev->cfa_en) {
-			pipe->in.crop.top += 1;
-			pipe->in.crop.height -= 1;
-		}
+		if (isp_prev->cfa_en)
+			pipe->out.crop.height -= 2;
+		else
+			pipe->in.crop.top += 2;
 		break;
 	};
 
 	/* Set crop depend on color suppression or luminance enhancement */
-	if (!isp_prev->yenh_en && !isp_prev->csup_en)
-		pipe->in.crop.width -= 2;
+	if (isp_prev->yenh_en || isp_prev->csup_en)
+		pipe->out.crop.width -= 2;
+	else
+		pipe->in.crop.left += 2;
+
+	/* Start at the correct row/column by skipping
+	 * a Sensor specific amount.
+	 */
+	pipe->out.crop.width -= pipe->in.crop.left;
+	pipe->out.crop.height -= pipe->in.crop.top;
 
 	div = DIV_ROUND_UP(pipe->in.image.width, max_out);
 	if (div == 1) {
@@ -1673,24 +1673,6 @@ int isppreview_try_pipeline(struct isp_prev_device *isp_prev,
 		pipe->out.crop.width /= 8;
 	} else {
 		return -EINVAL;
-	}
-
-	/* output width must be even */
-	pipe->out.crop.width &= ~1;
-
-	if (isp_get_used_modules(isp) == (OMAP_ISP_CCDC | OMAP_ISP_PREVIEW)) {
-		left_boundary = ALIGN(pipe->out.crop.width - 0x20, 0x20);
-		right_boundary = ALIGN(pipe->out.crop.width, 0x20);
-		if (wanted_width >= left_boundary &&
-				wanted_width <= right_boundary){
-			pipe->out.image.width = ALIGN(wanted_width, 0x20);
-			pipe->out.image.height = wanted_height;
-		} else {
-			pipe->out.image.width = right_boundary;
-			pipe->out.image.height = pipe->out.crop.height;
-		}
-	} else {
-		pipe->out.image.width &= ~0x1f;
 	}
 
 	pipe->out.image.bytesperline = ALIGN(pipe->out.image.width *

@@ -29,6 +29,8 @@
 #include <linux/completion.h>
 #include <linux/mutex.h>
 
+#include <linux/dvs_suite.h>
+
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
 
@@ -647,6 +649,37 @@ static ssize_t show_scaling_setspeed(struct cpufreq_policy *policy, char *buf)
 	return policy->governor->show_setspeed(policy, buf);
 }
 
+static ssize_t store_turn_on_lg_dvfs(struct cpufreq_policy *policy, const char *buf,
+                        size_t count)
+{
+    int value;
+
+    sscanf(buf, "%x", &value);
+
+    if(value == 1){
+        printk(KERN_WARNING "[LG-DVFS] LG-DVFS was turned on.\n");
+		ds_configuration.on_dvs = 1;
+    }
+    else if(value == 0){
+        printk(KERN_WARNING "[LG-DVFS] LG-DVFS was turned off.\n");
+		ds_configuration.on_dvs = 0;
+		ds_status.flag_run_dvs = 0;
+    }
+    else{
+        printk(KERN_ERR "store_turn_on_lg_dvfs: Invalid value\n");
+        return -EINVAL;
+    }
+
+
+    return count;
+}
+
+static ssize_t show_turn_on_lg_dvfs(struct cpufreq_policy *policy, char *buf)
+{
+    return sprintf(buf, "%x\n", ds_configuration.on_dvs);
+}
+
+
 /**
  * show_scaling_driver - show the current cpufreq HW/BIOS limitation
  */
@@ -676,6 +709,7 @@ cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
+cpufreq_freq_attr_rw(turn_on_lg_dvfs);
 
 static struct attribute *default_attrs[] = {
 	&cpuinfo_min_freq.attr,
@@ -689,6 +723,7 @@ static struct attribute *default_attrs[] = {
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,
+	&turn_on_lg_dvfs.attr,
 	NULL
 };
 
@@ -1522,6 +1557,9 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 			    unsigned int relation)
 {
 	int retval = -EINVAL;
+
+	if(ds_status.flag_run_dvs == 1)
+        if(ds_status.flag_correct_cpu_op_update_path == 0) return 0;
 
 	dprintk("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
 		target_freq, relation);

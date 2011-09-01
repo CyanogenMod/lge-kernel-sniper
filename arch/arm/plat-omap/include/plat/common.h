@@ -27,6 +27,8 @@
 #ifndef __ARCH_ARM_MACH_OMAP_COMMON_H
 #define __ARCH_ARM_MACH_OMAP_COMMON_H
 
+#include <linux/notifier.h>
+
 #include <plat/i2c.h>
 
 struct sys_timer;
@@ -93,5 +95,18 @@ extern struct device *omap2_get_mpuss_device(void);
 extern struct device *omap2_get_iva_device(void);
 extern struct device *omap2_get_l3_device(void);
 extern struct device *omap4_get_dsp_device(void);
+
+#if 1
+
+#define OMAP_IDLE_START	1
+#define OMAP_IDLE_END	2
+
+/* idle notifications late in the idle path (atomic, interrupts disabled) */
+extern void omap_idle_notifier_register(struct notifier_block *n);
+extern void omap_idle_notifier_unregister(struct notifier_block *n);
+extern void omap_idle_notifier_start(void);
+extern void omap_idle_notifier_end(void);
+
+#endif
 
 #endif /* __ARCH_ARM_MACH_OMAP_COMMON_H */

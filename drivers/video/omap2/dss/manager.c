@@ -455,7 +455,12 @@ struct manager_cache_data {
 
 static struct {
 	spinlock_t lock;
+
+#if defined(CONFIG_ARCH_OMAP3)
+	struct overlay_cache_data overlay_cache[3];
+#else
 	struct overlay_cache_data overlay_cache[4];
+#endif
 	struct manager_cache_data manager_cache[3];
 	struct writeback_cache_data writeback_cache;
 
@@ -1321,8 +1326,11 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	DSSDBG("omap_dss_mgr_apply(%s)\n", mgr->name);
 
 	if (!dss_get_mainclk_state()) {
+#if defined(CONFIG_MACH_LGE_OMAP3)
+#else
 		DSSERR("mainclk disabled while trying"
 			"mgr_apply, returning\n");
+#endif			
 		return 0;
 	}
 

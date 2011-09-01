@@ -358,6 +358,12 @@ static void warn_no_thread(unsigned int irq, struct irqaction *action)
 	       "but no thread function available.", irq, action->name);
 }
 
+// LGE_UPDATE_S
+#if defined(CONFIG_WAKE_IRQ_PRINT)
+extern void wakeup_irq_record_one(unsigned int irq);
+#endif
+// LGE_UPDATE_E
+
 /**
  * handle_IRQ_event - irq action chain handler
  * @irq:	the interrupt number
@@ -370,8 +376,16 @@ irqreturn_t handle_IRQ_event(unsigned int irq, struct irqaction *action)
 	irqreturn_t ret, retval = IRQ_NONE;
 	unsigned int status = 0;
 
+//	if (!(action->flags & IRQF_DISABLED))
+//		local_irq_enable_in_hardirq();
+
 	do {
 		trace_irq_handler_entry(irq, action);
+// LGE_UPDATE_S
+#if defined(CONFIG_WAKE_IRQ_PRINT)
+		wakeup_irq_record_one(irq);
+#endif
+// LGE_UPDATE_E
 		ret = action->handler(irq, action->dev_id);
 		trace_irq_handler_exit(irq, action, ret);
 

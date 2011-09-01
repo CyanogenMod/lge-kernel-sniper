@@ -107,6 +107,11 @@ struct mmc_data {
 #define MMC_DATA_WRITE	(1 << 8)
 #define MMC_DATA_READ	(1 << 9)
 #define MMC_DATA_STREAM	(1 << 10)
+/*LGE_CHANGE_S sunggyun.yu@lge.com for MMC 4.4 DDR support*/
+#if 1
+#define MMC_DDR_MODE	(1 << 11)
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for MMC 4.4 DDR support*/
 
 	unsigned int		bytes_xfered;
 

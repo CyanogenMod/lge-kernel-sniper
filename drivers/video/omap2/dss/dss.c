@@ -685,8 +685,14 @@ int dss_init(struct platform_device *pdev)
 	int r = 0, dss_irq;
 	u32 rev;
 	struct resource *dss_mem;
-	bool skip_init = false;
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
+	// LGE_UPDATE /* to prevent LG logo blinking, it doesn't need to execute below section.*/
+	bool skip_init = true;
+	// LGE_UPDATE /* to prevent LG logo blinking, it doesn't need to execute below section.*/
+#else
+	bool skip_init = false;
+#endif
 	dss.pdata = pdev->dev.platform_data;
 	dss.pdev = pdev;
 	if (cpu_is_omap44xx())
@@ -709,10 +715,13 @@ int dss_init(struct platform_device *pdev)
 	dss_clk_enable(DSS_CLK_ICK | DSS_CLK_FCK1 | DSS_CLK_FCK2 | DSS_CLK_54M | DSS_CLK_96M);
 	dss_mainclk_enable();
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
+#else
 #ifdef CONFIG_FB_OMAP_BOOTLOADER_INIT
 	/* DISPC_CONTROL */
 	if (omap_readl(0x48050440) & 1)	/* LCD enabled? */
 		skip_init = true;
+#endif
 #endif
 
 	if (!skip_init) {

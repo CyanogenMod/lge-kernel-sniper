@@ -26,6 +26,7 @@ cat << EOF > $2/Makefile
 
 VERSION = $3
 PATCHLEVEL = $4
+SUBLEVEL = $5
 
 lastword = \$(word \$(words \$(1)),\$(1))
 makedir := \$(dir \$(call lastword,\$(MAKEFILE_LIST)))

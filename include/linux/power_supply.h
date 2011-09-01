@@ -18,6 +18,10 @@
 #include <linux/workqueue.h>
 #include <linux/leds.h>
 
+//LGE_CHANGE_S, DCM, 2011-04-21, TESTCODE ON/OFF
+//#define TESTCODE	1
+//LGE_CHANGE_E, DCM, 2011-04-21, TESTCODE ON/OFF
+
 /*
  * All voltages, currents, charges, energies, time and temperatures in uV,
  * µA, µAh, µWh, seconds and tenths of degree Celsius unless otherwise
@@ -116,6 +120,11 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
 	POWER_SUPPLY_PROP_TIME_TO_FULL_AVG,
 	POWER_SUPPLY_PROP_TYPE, /* use power_supply.type instead */
+//LGE_CHANGE_E, DCM, 2011-04-21, TESTCODE
+#ifdef TESTCODE 
+	POWER_SUPPLY_PROP_PSEUDO_BATT, 
+#endif
+//LGE_CHANGE_E, DCM, 2011-04-21, TESTCODE
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,

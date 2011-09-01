@@ -377,6 +377,7 @@ struct input_absinfo {
 
 #define KEY_WIMAX		246
 #define KEY_RFKILL		247	/* Key that controls all radios */
+#define KEY_HOOK                248     /* Hub */
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
@@ -598,6 +599,8 @@ struct input_absinfo {
 
 #define KEY_CAMERA_FOCUS	0x210
 #define KEY_WPS_BUTTON		0x211	/* WiFi Protected Setup key */
+
+#define KEY_REJECT			0x220
 
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0

@@ -161,9 +161,7 @@ func_cont:
 			 * mode
 			 */
 			if (pdata->dsp_set_min_opp)
-				(*pdata->dsp_set_min_opp)
-					(&omap_dspbridge_dev->dev,
-					pdata->mpu_min_speed);
+				(*pdata->dsp_set_min_opp)(pdata->mpu_min_speed);
 
 			status = 0;
 		}
@@ -298,7 +296,7 @@ func_cont:
 			 * Set the OPP to low level before moving to OFF mode
 			 */
 			if (pdata->dsp_set_min_opp)
-				(*pdata->dsp_set_min_opp) (VDD1_OPP1);
+				(*pdata->dsp_set_min_opp)(pdata->mpu_min_speed);
 		}
 #endif /* CONFIG_BRIDGE_DVFS */
 	}

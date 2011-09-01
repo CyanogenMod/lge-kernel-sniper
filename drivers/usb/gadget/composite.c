@@ -88,6 +88,9 @@ static ssize_t enable_store(
 	struct usb_composite_driver	*driver = f->config->cdev->driver;
 	int value;
 
+
+	printk("usb enable_store, f : %s, enable_function : %p\n",f->name, driver->enable_function);
+	
 	sscanf(buf, "%d", &value);
 	if (driver->enable_function)
 		driver->enable_function(f, value);
@@ -101,6 +104,8 @@ static DEVICE_ATTR(enable, S_IRUGO | S_IWUSR, enable_show, enable_store);
 
 void usb_function_set_enabled(struct usb_function *f, int enabled)
 {
+	printk("usb usb_function_set_enabled function: %s, enabled: %d\n", f->name, enabled);
+
 	f->disabled = !enabled;
 	kobject_uevent(&f->dev->kobj, KOBJ_CHANGE);
 }
@@ -119,7 +124,7 @@ void usb_composite_force_reset(struct usb_composite_dev *cdev)
 		spin_unlock_irqrestore(&cdev->lock, flags);
 
 		usb_gadget_disconnect(cdev->gadget);
-		msleep(10);
+		msleep(50); 
 		usb_gadget_connect(cdev->gadget);
 	} else {
 		spin_unlock_irqrestore(&cdev->lock, flags);

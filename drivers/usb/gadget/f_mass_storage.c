@@ -1206,6 +1206,7 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[5] = 0;		/* No special options */
 	buf[6] = 0;
 	buf[7] = 0;
+	
 	memcpy(buf + 8, common->inquiry_string, sizeof common->inquiry_string);
 	return 36;
 }
@@ -1793,7 +1794,8 @@ static int send_status(struct fsg_common *common)
 		status = USB_STATUS_PHASE_ERROR;
 		sd = SS_INVALID_COMMAND;
 	} else if (sd != SS_NO_SENSE) {
-		DBG(common, "sending command-failure status\n");
+		// LGE_UPDATE 20110217 [jaejoong.kim@lge.com] remove f_mass_storage debug message
+		// DBG(common, "sending command-failure status\n");
 		status = USB_STATUS_FAIL;
 		VDBG(common, "  sense data: SK x%02x, ASC x%02x, ASCQ x%02x;"
 				"  info x%x\n",
@@ -1879,11 +1881,10 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 		 * be 6 as well.
 		 */
 		if (cmnd_size <= common->cmnd_size) {
-			DBG(common, "%s is buggy! Expected length %d "
-			    "but we got %d\n", name,
-			    cmnd_size, common->cmnd_size);
+
 			cmnd_size = common->cmnd_size;
 		} else {
+			DBG(common, "check_command(): fail verify the length of the CMD\n");
 			common->phase_error = 1;
 			return -EINVAL;
 		}
@@ -2615,6 +2616,8 @@ static int fsg_main_thread(void *common_)
 	 * that expects a __user pointer and it will work okay. */
 	set_fs(get_ds());
 
+
+	printk("ums nlun:%d\n", common->nluns);
 	/* The main loop */
 	while (common->state != FSG_STATE_TERMINATED) {
 		if (exception_in_progress(common) || signal_pending(current)) {
@@ -3100,6 +3103,8 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 
 	fsg->common               = common;
 
+	fsg->function.disabled = 0;
+	
 	/* Our caller holds a reference to common structure so we
 	 * don't have to be worry about it being freed until we return
 	 * from this function.  So instead of incrementing counter now

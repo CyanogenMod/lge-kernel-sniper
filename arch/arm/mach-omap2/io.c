@@ -40,6 +40,7 @@
 
 #include <plat/omap-pm.h>
 #include <plat/powerdomain.h>
+#include "pm.h"
 #include "powerdomains.h"
 
 #include <plat/clockdomain.h>
@@ -261,6 +262,7 @@ static void __init _omap2_map_common_io(void)
 	omapfb_reserve_sdram();
 	omap_vram_reserve_sdram();
 	dspbridge_reserve_sdram();
+	pm_alloc_secure_ram();
 
 #ifdef CONFIG_TF_MSHIELD
 	tf_allocate_workspace();

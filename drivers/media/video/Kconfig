@@ -344,6 +344,31 @@ config VIDEO_IMX046
 	  IMX046 camera.  It is currently working with the TI OMAP3
 	  camera controller.
 
+config VIDEO_IMX046
+	tristate "Sony IMX046 sensor driver (8MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Sony
+	  IMX046 camera.  It is currently working with the TI OMAP3
+	  camera controller.
+
+config VIDEO_IMX072
+	tristate "Sony IMX072 sensor driver (5MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Sony
+	  IMX072 camera.  It is currently working with the TI OMAP3
+          camera controller.
+
+config VIDEO_YACD5B1S
+	tristate "Hynix YACD5B1S sensor driver (2MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Hynix
+	  YACD5B1S camera.  It is currently working with the TI OMAP3
+          camera controller.
+          
+
 config VIDEO_LV8093
 	tristate "Piezo Actuator Lens driver for LV8093"
 	depends on I2C && VIDEO_V4L2

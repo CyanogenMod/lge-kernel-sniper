@@ -32,11 +32,17 @@
 #include <asm/cacheflush.h>
 #include <plat/iovmm.h>
 
+#include <media/v4l2-dev.h>
+#include <media/v4l2-ioctl.h>
+#include <media/v4l2-common.h>
+#include <media/v4l2-device.h>
+#include <plat/vrfb.h>
+
 #include "isp.h"
 #include "ispreg.h"
 #include "ispresizer.h"
 #include <linux/ispdss.h>
-
+#include "../omap/omap_voutdef.h"
 /**
  * WA: Adjustment operation speed of ISP Resizer engine
  */
@@ -226,6 +232,7 @@ int ispdss_begin(struct isp_node *pipe, u32 input_buffer_index,
 	unsigned int output_size;
 	struct isp_device *isp = dev_get_drvdata(dev_ctx.isp);
 	struct isp_res_device *isp_res = &isp->isp_res;
+	u32 speed_val = 0;
 
 	if (output_buffer_index >= dev_ctx.num_video_buffers) {
 		dev_err(dev_ctx.isp,
@@ -294,12 +301,24 @@ int ispdss_begin(struct isp_node *pipe, u32 input_buffer_index,
 	/* All settings are done.Enable the resizer */
 	init_completion(&dev_ctx.compl_isr);
 
-	isp_start(dev_ctx.isp);
+//	isp_start(dev_ctx.isp);
+	/* Only for 720p case*/
+	if (use_isp_resizer_decoder){
+		/*decoder */
+		speed_val = 0;
+
+	}else{
+		/* encoder */
+		speed_val = 8;
+
+	}
 
 	/* WA: Slowdown ISP Resizer to reduce used memory bandwidth */
 	isp_reg_and_or(dev_ctx.isp, OMAP3_ISP_IOMEM_SBL, ISPSBL_SDR_REQ_EXP,
 		       ~ISPSBL_SDR_REQ_RSZ_EXP_MASK,
-		       ISPDSS_RSZ_EXPAND_720p << ISPSBL_SDR_REQ_RSZ_EXP_SHIFT);
+//		       ISPDSS_RSZ_EXPAND_720p << ISPSBL_SDR_REQ_RSZ_EXP_SHIFT);
+				speed_val << ISPSBL_SDR_REQ_RSZ_EXP_SHIFT);
+	isp_start(dev_ctx.isp);
 
 	ispresizer_enable(isp_res, 1);
 

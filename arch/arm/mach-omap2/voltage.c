@@ -45,8 +45,10 @@
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
 
+#include <linux/dvs_suite.h>
+
 #define VP_IDLE_TIMEOUT		200
-#define VP_TRANXDONE_TIMEOUT	400
+#define VP_TRANXDONE_TIMEOUT	300 /* need to check TI */
 
 /* Settling Time for ABB Transition in us */
 #define ABB_TRANXDONE_TIMEOUT  30
@@ -793,6 +795,9 @@ static void __init omap3_init_voltagecontroller(void)
 	u8 impu, icore;
 	impu = omap_vdd_id("mpu");
 	icore = omap_vdd_id("core");
+
+	prm_clear_mod_reg_bits(OMAP3430_SEL_OFF_MASK, OMAP3430_GR_MOD,
+				OMAP3_PRM_POLCTRL_OFFSET);
 
 	voltage_write_reg(OMAP3_PRM_VC_SMPS_SA_OFFSET,
 			(vdd_info[impu].pmic->i2c_addr <<
@@ -1946,7 +1951,11 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
+    if(ds_status.mutex_lock_on_clock_state_cnt != 0) return 0;
+    ds_status.mutex_lock_on_clock_state_cnt ++;
+    ds_status.flag_mutex_lock_on_clock_state = 1;
 	mutex_lock(&vdd->scaling_mutex);
+    ds_status.flag_mutex_lock_on_clock_state = 0;
 
 	plist_for_each_entry(user, &vdd->user_list, node) {
 		if (user->dev == dev) {
@@ -1974,6 +1983,7 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 	*volt = node->prio;
 
 	mutex_unlock(&vdd->scaling_mutex);
+	ds_status.mutex_lock_on_clock_state_cnt --;
 
 	return 0;
 }
@@ -2380,7 +2390,11 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
+    if(ds_status.mutex_lock_on_clock_state_cnt != 0) return 0;
+    ds_status.mutex_lock_on_clock_state_cnt ++;
+    ds_status.flag_mutex_lock_on_clock_state = 1;
 	mutex_lock(&vdd->scaling_mutex);
+    ds_status.flag_mutex_lock_on_clock_state = 0;
 
 	curr_volt = omap_voltage_get_nom_volt(voltdm);
 
@@ -2424,6 +2438,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	omap_smartreflex_enable(voltdm);
 
 	mutex_unlock(&vdd->scaling_mutex);
+	ds_status.mutex_lock_on_clock_state_cnt --;
 
     /* calculate the voltages for dependent vdd's */
 	if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {

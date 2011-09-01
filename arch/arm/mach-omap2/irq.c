@@ -14,6 +14,8 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
+#include <linux/notifier.h>
+#include <plat/common.h>
 #include <mach/hardware.h>
 #include <asm/mach/irq.h>
 
@@ -34,6 +36,10 @@
 #define INTC_PENDING_IRQ0	0x0098
 /* Number of IRQ state bits in each MIR register */
 #define IRQ_BITS_PER_REG	32
+#if 1
+/*To check the NIRQ PHI before going to OFF */
+#define INTC_NIRQ	(0x1 << 7)
+#endif
 
 /*
  * OMAP2 has a number of different interrupt controllers, each interrupt
@@ -187,6 +193,24 @@ int omap_irq_pending(void)
 	return 0;
 }
 
+static int omap3_intc_idle_notifier(struct notifier_block *n,
+				      unsigned long val,
+				      void *p)
+{
+	if (val == OMAP_IDLE_START)
+		/* Disable autoidle as it can stall interrupt controller */
+		intc_bank_write_reg(0, &irq_banks[0], INTC_SYSCONFIG);
+	else
+		/* Re-enable autoidle */
+		intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
+
+	return 0;
+}
+
+static struct notifier_block omap3_intc_notifier = {
+	.notifier_call = omap3_intc_idle_notifier,
+};
+
 void __init omap_init_irq(void)
 {
 	unsigned long nr_of_irqs = 0;
@@ -225,6 +249,9 @@ void __init omap_init_irq(void)
 		set_irq_handler(i, handle_level_irq);
 		set_irq_flags(i, IRQF_VALID);
 	}
+
+	if (cpu_is_omap34xx())
+		omap_idle_notifier_register(&omap3_intc_notifier);
 }
 
 #ifdef CONFIG_ARCH_OMAP3
@@ -244,10 +271,23 @@ void omap_intc_save_context(void)
 		for (i = 0; i < INTCPS_NR_IRQS; i++)
 			intc_context[ind].ilr[i] =
 				intc_bank_read_reg(bank, (0x100 + 0x4*i));
+#if 0
 		for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
 			intc_context[ind].mir[i] =
 				intc_bank_read_reg(&irq_banks[0], INTC_MIR0 +
 				(0x20 * i));
+#else
+		for (i = 0; i < INTCPS_NR_MIR_REGS; i++){
+			intc_context[ind].mir[i] = intc_bank_read_reg(&irq_banks[0], INTC_MIR0 + (0x20 * i));
+			/* System some times goes to OFF mode keeping the NIRQ Disabled, So some customer HW */
+			/*  cannot wakeup by key press, So we are checking & enabling the NIRQ before goes to */
+			/*  OFF mode, This is purely a custum FIX. Need further analyis...*/
+			if ((i == 0 ) && ((intc_context[ind].mir[i] & (INTC_NIRQ) )) ){
+				intc_bank_write_reg(INTC_NIRQ, &irq_banks[0], INTC_MIR_CLEAR0 + (0x20 * i));
+				intc_context[ind].mir[i] = intc_bank_read_reg(&irq_banks[0], INTC_MIR0 + (0x20 * i));
+			}
+		}
+#endif
 	}
 }
 
@@ -283,6 +323,7 @@ void omap3_intc_suspend(void)
 	omap_ack_irq(0);
 }
 
+#if 0
 void omap3_intc_prepare_idle(void)
 {
 	/* Disable autoidle as it can stall interrupt controller */
@@ -294,4 +335,5 @@ void omap3_intc_resume_idle(void)
 	/* Re-enable autoidle */
 	intc_bank_write_reg(1, &irq_banks[0], INTC_SYSCONFIG);
 }
+#endif
 #endif /* CONFIG_ARCH_OMAP3 */

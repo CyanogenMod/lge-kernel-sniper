@@ -205,40 +205,6 @@ static struct isp_freq_devider isp_ratio_factor[] = {
 };
 
 /**
- * isp_validate_errata_i421 - Check errata i421
- **/
-static int isp_validate_errata_i421(struct device *dev,
-				struct isph3a_aewb_config *aewb_cfg,
-				struct af_paxel *af_cfg)
-{
-	int i, num_cycles;
-	int aewb_width, aewb_cnt, af_width, af_cnt;
-
-	aewb_cnt = aewb_cfg->hor_win_count;
-	aewb_width = aewb_cfg->win_width;
-
-	/* Restore interface differences with AEWB interface */
-	af_cnt = af_cfg->hz_cnt + 1;
-	af_width = (af_cfg->width + 1) * 2;
-
-	for (i = 0; i <= af_cnt; i++) {
-		num_cycles = ((i + 1) * af_width) + 2;
-		num_cycles += af_cfg->hz_start - aewb_cfg->hor_win_start;
-
-		if ((num_cycles % aewb_width) == 0) {
-			dev_err(dev, "Preventing errata i421..."
-				     " Invalid AF paxel size, index %d\n", i);
-			return -EINVAL;
-		}
-
-		if ((num_cycles / aewb_width) >= aewb_cnt)
-			break;
-	}
-
-	return 0;
-}
-
-/**
  * isp_get_upscale_ratio - Return ratio releated to the current crop.
  * @dev: Device pointer specific to the OMAP3 ISP.
  */
@@ -457,6 +423,10 @@ static void isp_adjust_bandwidth(struct device *dev)
 
 		/* Calculate devider and clamp result between 0 and 64 */
 		if (l3_ick && pixelclk) {
+
+			if (pixelclk == 0)
+				pixelclk = l3_ick / 2;
+
 			div = clamp_t(unsigned long, l3_ick / pixelclk, 2,
 				      (ISPCCDC_FMTCFG_VPIF_FRQ_MASK >>
 				      ISPCCDC_FMTCFG_VPIF_FRQ_SHIFT) + 1);
@@ -1365,7 +1335,7 @@ static int __isp_disable_modules(struct device *dev, int suspend)
 {
 	struct isp_device *isp = dev_get_drvdata(dev);
 	unsigned long timeout = jiffies + ISP_STOP_TIMEOUT;
-	int reset = 0;
+	int reset = 1;
 
 	/* We need to disble the first LSC module */
 	timeout = jiffies + ISP_STOP_TIMEOUT;
@@ -1378,8 +1348,12 @@ static int __isp_disable_modules(struct device *dev, int suspend)
 		}
 		msleep(1);
 	}
-	/* We can disable lsc now */
-	ispccdc_enable_lsc(&isp->isp_ccdc, 0);
+	/* We can disable lsc now, If an error ocured during
+	 * stopping of the LSC sw reset the isp */
+	if (ispccdc_enable_lsc(&isp->isp_ccdc, 0) < 0){
+
+		reset = 1;
+	}
 
 	/*
 	 * We need to stop all the modules after CCDC or they'll
@@ -1600,12 +1574,7 @@ static int isp_try_pipeline(struct device *dev,
 			pipe->ccdc_in = CCDC_RAW_GBRG;
 		pipe->ccdc_out = CCDC_OTHERS_VP;
 		pipe->prv.in.path = PRV_RAW_CCDC;
-		if ((pix_output->width == 1280) &&
-		    (pix_output->height == 720)) {
-			pipe->modules = OMAP_ISP_PREVIEW |
-					OMAP_ISP_CCDC;
-			pipe->prv.out.path = PREVIEW_MEM;
-		} else {
+		
 			pipe->modules = OMAP_ISP_PREVIEW |
 					OMAP_ISP_RESIZER |
 					OMAP_ISP_CCDC;
@@ -1616,7 +1585,6 @@ static int isp_try_pipeline(struct device *dev,
 				pipe->prv.out.path = PREVIEW_RSZ;
 				pipe->rsz.in.path = RSZ_OTFLY_YUV;
 			}
-		}
 	} else {
 		pipe->modules = OMAP_ISP_CCDC;
 		if (pix_input->pixelformat == V4L2_PIX_FMT_SGRBG10 ||
@@ -2401,14 +2369,6 @@ int isp_handle_private(struct device *dev, struct mutex *vdev_mutex, int cmd,
 		mutex_lock(vdev_mutex);
 		rval = isph3a_aewb_config(&isp->isp_h3a, params);
 		mutex_unlock(vdev_mutex);
-		if (rval)
-			return rval;
-
-		/* Check errata i421 */
-		if (isp->isp_af.enabled && params && params->aewb_enable) {
-			rval = isp_validate_errata_i421(dev, params,
-					&isp->isp_af.config.paxel_config);
-		}
 	}
 		break;
 	case VIDIOC_PRIVATE_ISP_AEWB_REQ: {
@@ -2438,15 +2398,6 @@ int isp_handle_private(struct device *dev, struct mutex *vdev_mutex, int cmd,
 		mutex_lock(vdev_mutex);
 		rval = isp_af_config(&isp->isp_af, params);
 		mutex_unlock(vdev_mutex);
-		if (rval)
-			return rval;
-
-		/* Check errata i421 */
-		if (isp->isp_h3a.enabled && params && params->af_config) {
-			rval = isp_validate_errata_i421(dev,
-					&isp->isp_h3a.aewb_config_local,
-					&params->paxel_config);
-		}
 	}
 		break;
 	case VIDIOC_PRIVATE_ISP_AF_REQ: {

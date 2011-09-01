@@ -334,6 +334,251 @@ out:
 }
 EXPORT_SYMBOL(twl4030_madc_conversion);
 
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+static int madc_init_done = 0;
+int get_madc_probe_done(void)
+{
+	return madc_init_done;
+}
+static void set_madc_probe_done(int done)
+{
+	extern void set_charging_current(void);
+
+	madc_init_done = !!done;
+	set_charging_current();
+	return; 
+}
+
+static int usb_type = NO_INIT_CABLE;
+int get_ext_pwr_type(void)
+{
+	return usb_type;
+}
+
+#define CONV_VOLTAGE(value) ((value * 2500) / (1023))
+
+extern int get_external_power_status(void);
+
+int lge_usb_acc_detect(void)
+{
+	int ret;
+	u8 reg_val;
+	u8 reg_backup[2];
+	unsigned int data;
+	int is_normal;
+	int is_short;
+	struct twl4030_madc_request ch_req;
+	int adc_channel = 4;  /* ADCIN4 */
+
+	printk("[charging_msg] %s, start\n", __FUNCTION__);
+
+	if( !get_madc_probe_done() )
+		return 0;
+	
+	if( !get_external_power_status() ) {
+		usb_type = NO_CABLE;
+		return 0;
+	}
+
+#if 0 // XXX_mbk
+	/*
+	 * USB ID check
+	 */
+
+	/* LGE_CHANGE [VX20000:FW:iteus@lge.com] 2009-06-10, 
+	 * For use ADC, have to power on t2_vusb3v1 and t2_vintana2 
+	 * vx20000 always enable(power on) adc port for BATT_THRM */
+	vx20000_twl4030madc_power_init();
+
+	if( t2_vusb_3v1_acc == NULL )
+		t2_vusb_3v1_acc = resource_get("T2_USB_ACC_DETECT", "t2_vusb3v1");
+	if( t2_vusb_1v8_acc == NULL )
+		t2_vusb_1v8_acc = resource_get("T2_USB_ACC_DETECT", "t2_vusb1v8");
+	if( t2_vusb_1v5_acc == NULL )
+		t2_vusb_1v5_acc = resource_get("T2_USB_ACC_DETECT", "t2_vusb1v5");
+
+	resource_request(t2_vusb_3v1_acc, T2_VUSB3V1_3V1);
+	resource_request(t2_vusb_1v5_acc, T2_VUSB1V5_1V5);
+	resource_request(t2_vusb_1v8_acc, T2_VUSB1V8_1V8);
+
+	twl4030_i2c_access(1);
+#endif 
+
+#if 0
+	if (on_init) {
+		ret = twl5030_acc_adc_read(&data);
+		if (ret)
+			printk(KERN_ERR "%s: twl5030_acc_adc_read() failed.\n", __func__);
+	} else {
+#endif
+		ch_req.channels = (1 << adc_channel);
+		ch_req.do_avg	= 1; /* par.average; */
+		ch_req.method	= TWL4030_MADC_SW1;
+		ch_req.func_cb	= NULL;
+
+		twl4030_madc_conversion(&ch_req);
+
+		data = (u16)ch_req.rbuf[adc_channel];
+#if 0
+	}
+#endif
+
+	printk("[charging_msg] %s: USB ID level = %d mV (0x%03X)\n",
+		__func__, CONV_VOLTAGE(data), data);
+
+/* LGE_CHANGE [VX20000:SYS:dobi77@lge.com] 2009-04-03
+ change an range of LT to support old cable (0xE1 ~ 0xFF ==> 0xA8 ~ 0xFF) */
+	/* if (data > 0x0A7 && data < 0x100) { */ /* XXX_mbk */
+	if (data > 0x080 && data < 0x100) {
+	//if (data > 0x140 && data < 0x160) { /* 1A Cable 0x15B or 0x15C */
+		usb_type = LT_CABLE;
+		printk(KERN_DEBUG "[charging_msg] %s: Connected to a LT cable.\n", __func__);
+		return 0;
+	} else if (data > 0x1F0 && data < 0x218) {
+		is_normal = 1;
+		printk(KERN_DEBUG "[charging_msg] %s: Cable ID is valid for TA/USB.\n", __func__);
+		usb_type = TA_CABLE; // XXX_mbk
+	} else {
+		is_normal = 0;
+		printk(KERN_DEBUG "[charging_msg] %s: Cable ID is un-valid.\n", __func__);
+		usb_type = FORGED_TA_CABLE; // XXX_mbk
+	}
+
+#if 0 // XXX_mbk
+	/* 
+	 * USB D+, D- short check 
+	 */
+	/* PHY power up */
+	twl4030_i2c_read_u8(TWL4030_MODULE_USB, &reg_val, PHY_PWR_CTRL);
+	reg_val &= ~PHY_PWR_PHYPWD;
+	ret = twl_i2c_write_u8(TWL4030_MODULE_USB, reg_val, PHY_PWR_CTRL);
+	if (ret)
+		goto err_short_chk1;
+	/* ULPI register clock gating is enable */
+	ret = twl4030_i2c_read_u8(TWL4030_MODULE_USB, &reg_backup[0], PHY_CLK_CTRL);
+	if (ret)
+		goto err_short_chk2;
+
+	ret = twl_i2c_write_u8(TWL4030_MODULE_USB,
+			reg_backup[0] | PHY_CLK_CTRL_CLOCKGATING_EN, PHY_CLK_CTRL);
+	if (ret)
+		goto err_short_chk2;
+
+	ret = twl_i2c_write_u8(TWL4030_MODULE_USB,
+			FUNC_CTRL_XCVRSELECT_MASK | FUNC_CTRL_OPMODE_MASK, FUNC_CTRL_CLR);
+	if (ret)
+		goto err_short_chk3;
+
+	/* Disable D+, D- pulldown */
+	ret = twl_i2c_write_u8(TWL4030_MODULE_USB,
+			OTG_CTRL_DMPULLDOWN | OTG_CTRL_DPPULLDOWN, OTG_CTRL_CLR);
+	if (ret)
+		goto err_short_chk4;
+
+	/* Set D+ to high, D- to low */
+	ret = twl4030_i2c_read_u8(TWL4030_MODULE_USB, &reg_val, OTHER_FUNC_CTRL);
+	if (ret)
+		goto err_short_chk5;
+
+	reg_backup[1] = reg_val & ~(DM_PULLUP | DP_PULLUP);
+	ret = twl_i2c_write_u8(TWL4030_MODULE_USB,
+			reg_backup[1] | DP_PULLUP, OTHER_FUNC_CTRL);
+	if (ret)
+		goto err_short_chk5;
+
+	/* Check D- line */
+	ret = twl4030_i2c_read_u8(TWL4030_MODULE_USB, &reg_val, OTHER_INT_STS);
+	if (ret)
+		goto err_short_chk6;
+
+	/* Set to default */
+	twl_i2c_write_u8(TWL4030_MODULE_USB, reg_backup[1], OTHER_FUNC_CTRL);
+	twl_i2c_write_u8(TWL4030_MODULE_USB,
+			OTG_CTRL_DMPULLDOWN | OTG_CTRL_DPPULLDOWN, OTG_CTRL_SET);
+	twl_i2c_write_u8(TWL4030_MODULE_USB,
+			FUNC_CTRL_XCVRSELECT_MASK | FUNC_CTRL_OPMODE_MASK, FUNC_CTRL_SET);
+#if 0
+	twl_i2c_write_u8(TWL4030_MODULE_USB, reg_backup[0], PHY_CLK_CTRL);	/* ULPI register clock gating is disble */
+	/* LGE_CHANGE_S [VX20000:FW:iteus@lge.com] 2009-06-08, XXX_mbk_ADC_VBATT_THRM 
+	 * If below code is not present in TA Cable asserted, 
+	 * we can not set SEL_MADC_MCPC to 1 in ther CARKIT_ANA_CTRL
+	 * I don't know why......*/ 
+#if 1
+/*#define REG_CARKIT_ANA_CTRL		0xBB */
+
+	ret = twl4030_i2c_read_u8(TWL4030_MODULE_USB,
+			&data_temp,
+			REG_CARKIT_ANA_CTRL);
+	if (ret) {
+		printk(KERN_ERR "%s: BUSY flag.\n", __func__);
+	}
+#endif
+	/* LGE_CHANGE_E [VX20000:FW:iteus@lge.com] / 2009-06-08 */
+#endif
+
+	twl_i2c_write_u8(TWL4030_MODULE_USB, PHY_PWR_PHYPWD, PHY_PWR_CTRL);	/* PHY power down */
+
+	twl4030_i2c_access(0);
+	resource_release(t2_vusb_3v1_acc);
+	resource_release(t2_vusb_1v5_acc);
+	resource_release(t2_vusb_1v8_acc);
+
+	if ((reg_val & 0x60) == 0x60)
+		is_short = 1;
+	else
+		is_short = 0;
+
+	DBG(KERN_DEBUG "%s: D+ and D- lines are %s\n", __func__, is_short? "short":"open");
+
+	/*
+ 	 * Current setting
+	 */
+	if (is_short) {
+		if (is_normal) {
+			chg_current_set(1);	/* Normal TA 600mA */
+			usb_type = TA_CABLE;
+			DBG(KERN_DEBUG "%s: Connected to a TA.\n", __func__);
+		} else {
+			chg_current_set(3);	/* Abnormal TA 400mA */
+			usb_type = FORGED_TA_CABLE;
+			DBG(KERN_DEBUG "%s: Connected to a Forged TA.\n", __func__);
+		}
+		return 0;
+	} else {
+		/* for USB, charger current set will be done at usbcon_check(),
+		   so do nothing here to current set */
+		usb_type = USB_CABLE;
+		DBG(KERN_DEBUG "%s: Connected to an USB.\n", __func__);
+	}
+
+#endif
+	return 0;
+
+#if 0 // XXX_mbk
+err_short_chk6:
+	twl_i2c_write_u8(TWL4030_MODULE_USB, reg_backup[1], OTHER_FUNC_CTRL);
+err_short_chk5:
+	twl_i2c_write_u8(TWL4030_MODULE_USB,
+			OTG_CTRL_DMPULLDOWN | OTG_CTRL_DPPULLDOWN, OTG_CTRL_SET);
+err_short_chk4:
+	twl_i2c_write_u8(TWL4030_MODULE_USB,
+			FUNC_CTRL_XCVRSELECT_MASK | FUNC_CTRL_OPMODE_MASK, FUNC_CTRL_SET);
+err_short_chk3:
+	twl_i2c_write_u8(TWL4030_MODULE_USB, reg_backup[0], PHY_CLK_CTRL);
+err_short_chk2:
+	twl_i2c_write_u8(TWL4030_MODULE_USB, PHY_PWR_PHYPWD, PHY_PWR_CTRL);
+err_short_chk1:
+	twl4030_i2c_access(0);
+
+	resource_release(t2_vusb_3v1_acc);
+	resource_release(t2_vusb_1v5_acc);
+	resource_release(t2_vusb_1v8_acc);
+
+	return ret;
+#endif
+}
+#endif 
+
 static int twl4030_madc_set_current_generator(struct twl4030_madc_data *madc,
 		int chan, int on)
 {
@@ -481,6 +726,10 @@ static int __devinit twl4030_madc_probe(struct platform_device *pdev)
 	INIT_WORK(&madc->ws, twl4030_madc_work);
 
 	the_madc = madc;
+
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+	set_madc_probe_done(1);
+#endif 
 
 	return 0;
 

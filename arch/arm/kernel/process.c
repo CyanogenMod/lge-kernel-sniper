@@ -361,8 +361,9 @@ void __show_regs(struct pt_regs *regs)
 		printk("Control: %08x%s\n", ctrl, buf);
 	}
 #endif
-
+#if 0
 	show_extra_register_data(regs, 128);
+#endif
 }
 
 void show_regs(struct pt_regs * regs)

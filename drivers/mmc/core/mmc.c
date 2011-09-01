@@ -21,6 +21,8 @@
 #include "bus.h"
 #include "mmc_ops.h"
 
+#define CONFIG_EMMC_V4_41_SUPPORT
+
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
 	0,		0,		0,		0
@@ -114,17 +116,31 @@ static int mmc_decode_cid(struct mmc_card *card)
 static int mmc_decode_csd(struct mmc_card *card)
 {
 	struct mmc_csd *csd = &card->csd;
+#ifdef CONFIG_EMMC_V4_41_SUPPORT
+	unsigned int e, m;
+#else
 	unsigned int e, m, csd_struct;
+#endif
 	u32 *resp = card->raw_csd;
 
 	/*
 	 * We only understand CSD structure v1.1 and v1.2.
 	 * v1.2 has extra information in bits 15, 11 and 10.
+	 * also support the for eMMC v4.4 & v4.41. LGE_CHANGE sunggyun.yu@lge.com for eMMC v4.41 support
 	 */
+#ifdef CONFIG_EMMC_V4_41_SUPPORT
+	csd->structure = UNSTUFF_BITS(resp, 126, 2);
+	if (csd->structure == 0) {
+#else
 	csd_struct = UNSTUFF_BITS(resp, 126, 2);
 	if (csd_struct > 3) {
+#endif
 		printk(KERN_ERR "%s: unrecognised CSD structure version %d\n",
+#ifdef CONFIG_EMMC_V4_41_SUPPORT
+			mmc_hostname(card->host), csd->structure);
+#else
 			mmc_hostname(card->host), csd_struct);
+#endif
 		return -EINVAL;
 	}
 
@@ -207,11 +223,30 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 		goto out;
 	}
 
+#ifdef CONFIG_EMMC_V4_41_SUPPORT
+	/* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
+	if (card->csd.structure == 3) {
+		int ext_csd_struct = ext_csd[EXT_CSD_STRUCTURE];
+		if (ext_csd_struct > 2) {
+			printk(KERN_ERR "%s: unrecognised EXT_CSD structure "
+				"version %d\n", mmc_hostname(card->host),
+				ext_csd_struct);
+			err = -EINVAL;
+			goto out;
+		}
+	}
+#endif
+
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
 	if (card->ext_csd.rev > 5) {
+#ifdef CONFIG_EMMC_V4_41_SUPPORT
+		printk(KERN_ERR "%s: unrecognised EXT_CSD revision %d\n",
+			mmc_hostname(card->host), card->ext_csd.rev);
+#else
 		printk(KERN_ERR "%s: unrecognised EXT_CSD structure "
 			"version %d\n", mmc_hostname(card->host),
 			card->ext_csd.rev);
+#endif
 		err = -EINVAL;
 		goto out;
 	}
@@ -222,7 +257,12 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 			ext_csd[EXT_CSD_SEC_CNT + 1] << 8 |
 			ext_csd[EXT_CSD_SEC_CNT + 2] << 16 |
 			ext_csd[EXT_CSD_SEC_CNT + 3] << 24;
+#if 1
+		/* Cards with density > 2GiB are sector addressed */
+		if (card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512)
+#else
 		if (card->ext_csd.sectors)
+#endif
 			mmc_card_set_blockaddr(card);
 	}
 
@@ -253,6 +293,7 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 		printk(KERN_WARNING "%s: card is mmc v4 but doesn't "
 			"support any high-speed modes.\n",
 			mmc_hostname(card->host));
+		goto out;
 	}
 
 	if (card->ext_csd.rev >= 3) {
@@ -320,6 +361,9 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	struct mmc_card *card;
 	int err, ddr = 0;
 	u32 cid[4];
+#if 1
+	u32 rocr; /* Add to select card access mode */
+#endif
 	unsigned int max_dtr;
 
 	BUG_ON(!host);
@@ -334,7 +378,11 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	mmc_go_idle(host);
 
 	/* The extra bit indicates that we support high capacity */
+#if 1
+	err = mmc_send_op_cond(host, ocr | (1 << 30), &rocr); /* Add to select card access mode */
+#else
 	err = mmc_send_op_cond(host, ocr | (1 << 30), NULL);
+#endif
 	if (err)
 		goto err;
 
@@ -422,6 +470,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		err = mmc_read_ext_csd(card);
 		if (err)
 			goto free_card;
+
+#if 1
+		/* Add to select card access mode */
+		if (rocr & MMC_ACCESS_MODE)	/* If higher than 2GB */
+			mmc_card_set_blockaddr(card);
+		/* Add to select card access mode */
+#endif
 	}
 
 	/*
@@ -464,10 +519,12 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	if (mmc_card_highspeed(card)) {
 		if ((card->ext_csd.card_type & EXT_CSD_CARD_TYPE_DDR_1_8V)
 			&& (host->caps & (MMC_CAP_1_8V_DDR)))
-				ddr = 1;
+//				ddr = 1;
+				ddr = MMC_1_8V_DDR_MODE;
 		else if ((card->ext_csd.card_type & EXT_CSD_CARD_TYPE_DDR_1_2V)
 			&& (host->caps & (MMC_CAP_1_2V_DDR)))
-				ddr = 1;
+//				ddr = 1;
+				ddr = MMC_1_2V_DDR_MODE;
 	}
 
 	/*
@@ -503,13 +560,24 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			       1 << bus_width, ddr);
 			err = 0;
 		} else {
+#if 0
 			mmc_card_set_ddr_mode(card);
+#else
+			if (ddr)
+				mmc_card_set_ddr_mode(card);
+			else
+				ddr = MMC_SDR_MODE;
+#endif
 			mmc_set_bus_width_ddr(card->host, bus_width, ddr);
 		}
 	}
 
 	if (!oldcard)
 		host->card = card;
+
+#if 1
+	mdelay(10); /* wait 10ms */
+#endif
 
 	return 0;
 

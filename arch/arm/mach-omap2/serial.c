@@ -193,6 +193,9 @@ static inline void omap_uart_disable_rtspullup(struct omap_uart_state *uart)
 	if (!uart->rts_padconf || !uart->rts_override)
 		return;
 
+	omap_ctrl_writew(uart->rts_padvalue, uart->rts_padconf);
+	uart->rts_override = 0;
+
 	if (cpu_is_omap44xx()) {
 		/* FIXME: should this be done atomically? */
 		u16 offset = uart->rts_padconf & ~0x3; /* 32-bit align */
@@ -208,6 +211,10 @@ static inline void omap_uart_enable_rtspullup(struct omap_uart_state *uart)
 {
 	if (!uart->rts_padconf || uart->rts_override)
 		return;
+
+	uart->rts_padvalue = omap_ctrl_readw(uart->rts_padconf);
+	omap_ctrl_writew(0x118 | 0x7, uart->rts_padconf);
+	uart->rts_override = 1;
 
 	if (cpu_is_omap44xx()) {
 		/* FIXME: should this be done atomically? */
@@ -511,6 +518,9 @@ void omap_uart_resume_idle(int num)
 		if (num == uart->num) {
 			pdata = uart->pdev->dev.platform_data;
 			omap_uart_enable_clocks(uart);
+			//TESTBT	
+			//omap_uart_disable_rtspullup(uart);
+			if (uart->num != 1)
 			omap_uart_disable_rtspullup(uart);
 
 			/* Check for IO pad wakeup */
@@ -528,10 +538,26 @@ void omap_uart_resume_idle(int num)
 			if (uart->wk_st && uart->wk_mask)
 				if (__raw_readl(uart->wk_st) & uart->wk_mask)
 					omap_uart_block_sleep(uart);
+			//TESTBT
+			if (uart->num == 1)
+				omap_uart_block_sleep(uart);
+
 			return;
 		}
 	}
 }
+
+void omap_uart_disable_rtspullup_exported(unsigned int num)
+{
+	struct omap_uart_state *uart;
+	list_for_each_entry(uart, &uart_list, node) {
+		if (num == uart->num)
+		{
+			omap_uart_disable_rtspullup( uart );
+		}
+	}
+}
+EXPORT_SYMBOL(omap_uart_disable_rtspullup_exported);
 
 void omap_uart_prepare_suspend(void)
 {
@@ -684,7 +710,7 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 			padconf = 0x182;
 			break;
 		case 1:
-			wk_mask = OMAP3430_ST_UART2_MASK;
+			wk_mask = 0;//OMAP3430_ST_UART2_MASK;//TESTBT
 			padconf = 0x17a;
 			break;
 		case 2:

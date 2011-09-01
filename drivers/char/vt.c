@@ -111,6 +111,8 @@
 #define CON_DRIVER_FLAG_INIT   2
 #define CON_DRIVER_FLAG_ATTR   4
 
+#define VT_BUF_VRAM_ONLY
+
 struct con_driver {
 	const struct consw *con;
 	const char *desc;

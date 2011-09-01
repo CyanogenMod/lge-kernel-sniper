@@ -45,6 +45,12 @@
 #else
 #include <media/videobuf-dma-contig.h>
 #endif
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+#include <mach/isp_user.h>
+#include <linux/ispdss.h>
+#include "../isp/ispresizer.h"
+#include <linux/omap_resizer.h>
+#endif
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>
 
@@ -66,6 +72,9 @@ MODULE_AUTHOR("Texas Instruments");
 MODULE_DESCRIPTION("OMAP Video for Linux Video out driver");
 MODULE_LICENSE("GPL");
 
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+//#define ORG_GB_ROTATION // Tushar
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
 
 /* Driver Configuration macros */
 #define VOUT_NAME		"omap_vout"
@@ -99,19 +108,28 @@ enum dma_channel_state {
 /* 2048 x 2048 is max res supported by OMAP display controller */
 #define MAX_PIXELS_PER_LINE     2048
 
-#define VRFB_TX_TIMEOUT         1000
-#define VRFB_NUM_BUFS		4
+#define VRFB_TX_TIMEOUT         200   // 1000 - Tushar - Temporarily modified for recording freeze issue caused by audio capture DMA error
+#define VRFB_NUM_BUFS		OMAP_VOUT_MAX_BUFFERS
 
 /* Max buffer size tobe allocated during init */
-#define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*4)
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+//#define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*4)
+#define OMAP_VOUT_MAX_BUF_SIZE (VID_MAX_WIDTH*VID_MAX_HEIGHT*2)
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
 
 #define VDD2_OCP_FREQ_CONST     (cpu_is_omap34xx() ? \
 (cpu_is_omap3630() ? 200000 : 166000) : 0)
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+struct isp_node pipe;
+static int vrfb_configured;
+int use_isp_resizer_decoder = 0;
+#endif
+
 static struct videobuf_queue_ops video_vbq_ops;
 /* Variables configurable through module params*/
-static u32 video1_numbuffers = 3;
-static u32 video2_numbuffers = 3;
+static u32 video1_numbuffers = OMAP_VOUT_MAX_BUFFERS;
+static u32 video2_numbuffers = OMAP_VOUT_MAX_BUFFERS;
 static u32 video1_bufsize = OMAP_VOUT_MAX_BUF_SIZE;
 static u32 video2_bufsize = OMAP_VOUT_MAX_BUF_SIZE;
 static u32 video3_numbuffers = 3;
@@ -292,6 +310,127 @@ static int omap_vout_allocate_vrfb_buffers(struct omap_vout_device *vout,
 	return 0;
 }
 #endif
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+/* This function wakes up the application once
+ * the DMA transfer to VRFB space is completed by the
+ * ISP resizer block
+ */
+void omap_vout_isp_rsz_dma_tx_callback(void *arg)
+{
+	struct omap_vout_device *vout;
+	vout = (struct omap_vout_device *) arg;
+
+	vout->vrfb_dma_tx.tx_status = 1;
+	wake_up_interruptible(&vout->vrfb_dma_tx.wait);
+}
+
+static bool need_isp_rsz(struct omap_vout_device *vout) {
+	if (vout->pix.height * vout->pix.width == VID_MAX_WIDTH * 720)
+		return true;
+
+	return false;
+}
+
+/* This function configures and initializes the ISP resizer*/
+static int init_isp_rsz(struct omap_vout_device *vout)
+{
+	int num_video_buffers = 0;
+	int ret = 0;
+	
+#if 0 // Tushar - ORG-GB-Zoom3
+	if (!vout->use_isp_rsz_for_downscale) {
+		if (need_isp_rsz(vout)) {
+			vout->use_isp_rsz_for_downscale = 1;
+		} else {
+			/* no need to use ISP resizer */
+			return 0;
+		}
+	}
+
+	if (vout->rsz_configured == 1) {
+		/* ISP resizer already configured */
+		return 0;
+	}
+	
+#else // Tushar - Customization for LGE h/w
+
+	if (vout->use_isp_rsz_for_downscale){
+		if (((abs(vout->win.w.width - 800) <= 4) && (abs(vout->win.w.height - 480) <= 4)) || 
+					((abs(vout->win.w.width - 800) <= 4) && (abs(vout->win.w.height - 450) <= 4)
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_05_09, for fixing video rotation issue (OMAPS00238355)
+					|| ((abs(vout->win.w.width - 480) <= 4) && (abs(vout->win.w.height - 270) <= 4))  // Tushar - [] - OMAPS00238355 - Portrait playback issue
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_05_09, for fixing video rotation issue (OMAPS00238355)
+					)
+						){
+					use_isp_resizer_decoder = 1;
+		}else{
+		
+                use_isp_resizer_decoder = 0;
+
+#if 1            //WA by HW.Ku 
+                if (vout->win.w.width == 480 && vout->win.w.height > 480)
+                {
+                    printk("vout->win.w.widt = %d\n\n",vout->win.w.width);
+                    printk("vout->win.w.height = %d\n\n",vout->win.w.height);
+                    vout->win.w.width = 640;
+                    vout->win.w.height = 360;
+                }
+#endif
+
+		}
+	}
+#endif
+
+	/* get the ISP resizer resource and configure it*/
+	if (vout->use_isp_rsz_for_downscale && use_isp_resizer_decoder) 
+	{
+		if (vout->rsz_configured == 0)
+		{
+			ispdss_put_resource();
+			ret = ispdss_get_resource();
+			if (ret) {
+				printk(KERN_ERR "<%s>: <%s> failed to get ISP "
+						"resizer resource = %d\n",
+						__FILE__, __func__, ret);
+				vout->use_isp_rsz_for_downscale = 0;
+				use_isp_resizer_decoder = 0;
+				return ret;
+			}
+
+			/* clear data */
+			memset(&pipe, 0, sizeof(pipe));
+			pipe.in.path = RSZ_MEM_YUV;
+			/* setup source parameters */
+			pipe.in.image = vout->pix;
+			pipe.in.crop.left = 0; pipe.in.crop.top = 0;
+			pipe.in.crop.width = vout->pix.width;
+			pipe.in.crop.height = vout->pix.height;
+			/* setup destination parameters */
+			pipe.out.image.width = vout->win.w.width;
+			pipe.out.image.height = vout->win.w.height;
+
+			num_video_buffers = (vout->vid == OMAP_VIDEO1) ?
+				video1_numbuffers : video2_numbuffers;
+
+			ret = ispdss_configure(&pipe, omap_vout_isp_rsz_dma_tx_callback,
+					num_video_buffers, (void *)vout);
+			if (ret) {
+				printk(KERN_ERR "<%s> failed to configure "
+						"ISP_resizer = %d\n",
+						__func__, ret);
+				ispdss_put_resource(); // Tushar: I think its required here if ISP configuration fails
+				vout->use_isp_rsz_for_downscale = 0;
+				use_isp_resizer_decoder = 0;
+				return ret;
+			}
+			vout->rsz_configured = 1;
+			printk(KERN_INFO "<%s> ISP resizer configured\n", __func__);
+		}
+	}
+
+	return ret;
+}
+#endif
 /*
  * Try format
  */
@@ -445,7 +584,11 @@ static inline int rotate_90_or_270(const struct omap_vout_device *vout)
  */
 static inline int rotation_enabled(const struct omap_vout_device *vout)
 {
-	/* Rotation is enabled by default for OMAP3 in order to use VRFB. */
+	/* rotation needs to be enabled by default for OMAP3 in order
+	 * to use VRFB. ISP resizer also requires VRFB to be used for all
+	 * rotation angles including 0 degree. for OMAP3 this function needs
+	 * to return true even for 0 degree rotation
+	 */
 	if (cpu_is_omap34xx())
 		return 1;
 	else
@@ -492,8 +635,9 @@ static void calc_overlay_window_params(struct omap_vout_device *vout,
 	ovid = &vout->vid_info;
 	ovl = ovid->overlays[0];
 	win = &vout->win;
-
 	timing = &ovl->manager->device->panel.timings;
+//WARN(1, "Tushar rotation: %d win->w.top = %d win->w.left = %d win->w.width = %d win->w.height = %d timing->x_res = %d timing->y_res = %d\n", vout->rotation, win->w.top, win->w.left, win->w.width, win->w.height, timing->x_res, timing->y_res);
+
 	switch (vout->rotation) {
 	case dss_rotation_90_degree:
 	/* Invert the height and width for 90  and 270 degree rotation */
@@ -501,8 +645,19 @@ static void calc_overlay_window_params(struct omap_vout_device *vout,
 		info->out_width = info->out_height;
 		info->out_height = temp;
 #ifndef CONFIG_ARCH_OMAP4
+
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+//#if 1  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
+#ifdef ORG_GB_ROTATION  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+		info->pos_y = win->w.left;
+		info->pos_x = win->w.top;
+#else
+
 		info->pos_y = (timing->y_res - win->w.width) - win->w.left;
 		info->pos_x = win->w.top;
+#endif  // Tushar - ]
+		
 #endif
 		break;
 
@@ -518,9 +673,19 @@ static void calc_overlay_window_params(struct omap_vout_device *vout,
 		info->out_width = info->out_height;
 		info->out_height = temp;
 #ifndef CONFIG_ARCH_OMAP4
+
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+//#if 1  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
+#ifdef ORG_GB_ROTATION  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+		info->pos_y = win->w.left;
+		info->pos_x = win->w.top;
+#else
 		info->pos_y = win->w.left;
 		info->pos_x = (timing->x_res - win->w.height) - win->w.top;
 #endif
+
+#endif  // Tushar - ]
 		break;
 
 	default:
@@ -579,6 +744,7 @@ static int omap_vout_vrfb_buffer_setup(struct omap_vout_device *vout,
 {
 	int i;
 	bool yuv_mode;
+	s32 width, height;
 
 	/* Allocate the VRFB buffers only if the buffers are not
 	 * allocated during init time.
@@ -593,11 +759,28 @@ static int omap_vout_vrfb_buffer_setup(struct omap_vout_device *vout,
 	else
 		yuv_mode = false;
 
-	for (i = 0; i < *count; i++)
+	for (i = 0; i < *count; i++) {
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+		/* TODO: this is temporary disabling of vrfb to test V4L2: needs to be
+		 corrected for future
+		*/
+		if (vout->use_isp_rsz_for_downscale && use_isp_resizer_decoder) {
+			width = vout->win.w.width;
+			height = vout->win.w.height;
+		} else {
+			width = vout->pix.width;
+			height = vout->pix.height;
+		}
+#else
+		width = vout->pix.width;
+		height = vout->pix.height;
+#endif
 		omap_vrfb_setup(&vout->vrfb_context[i],
-				vout->smsshado_phy_addr[i], vout->pix.width,
-				vout->pix.height, vout->bpp, yuv_mode,
+				vout->smsshado_phy_addr[i],
+				width, height,
+				vout->bpp, yuv_mode,
 				vout->rotation);
+	}
 	return 0;
 }
 #else /* ifndef CONFIG_ARCH_OMAP4 */
@@ -724,6 +907,7 @@ static int v4l2_rot_to_dss_rot(int v4l2_rotation,
 	int ret = 0;
 
 	switch (v4l2_rotation) {
+#ifdef ORG_GB_ROTATION	 // Tushar
 	case 90:
 		*rotation = dss_rotation_90_degree;
 		break;
@@ -738,6 +922,22 @@ static int v4l2_rot_to_dss_rot(int v4l2_rotation,
 		break;
 	default:
 		ret = -EINVAL;
+#else
+	case 90:
+		*rotation = dss_rotation_270_degree;
+		break;
+	case 180:
+		*rotation = dss_rotation_180_degree;
+		break;
+	case 270:
+		*rotation = dss_rotation_90_degree;
+		break;
+	case 0:
+		*rotation = dss_rotation_0_degree;
+		break;
+	default:
+		ret = -EINVAL;
+#endif
 	}
 	return ret;
 }
@@ -765,6 +965,14 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout, int idx)
 #else
 	int *cropped_uv_offset = vout->cropped_uv_offset + idx;
 	unsigned long addr = 0, uv_addr = 0;
+#endif
+
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	if (vout->use_isp_rsz_for_downscale && use_isp_resizer_decoder) {
+		struct v4l2_window *win = &(vout->win);
+		crop->height = win->w.height;
+		crop->width = win->w.width;
+	}
 #endif
 
 	ovid = &vout->vid_info;
@@ -800,8 +1008,18 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout, int idx)
 
 	if (rotation_enabled(vout)) {
 		line_length = MAX_PIXELS_PER_LINE;
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+		if (vout->use_isp_rsz_for_downscale && use_isp_resizer_decoder) {
+			ctop = crop->top;
+			cleft = crop->left;
+		} else {
+			ctop = (pix->height - crop->height) - crop->top;
+			cleft = (pix->width - crop->width) - crop->left;
+		}
+#else
 		ctop = (pix->height - crop->height) - crop->top;
 		cleft = (pix->width - crop->width) - crop->left;
+#endif
 	} else {
 		line_length = pix->width;
 	}
@@ -809,8 +1027,14 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout, int idx)
 #ifndef CONFIG_ARCH_OMAP4
 	switch (rotation) {
 	case dss_rotation_90_degree:
+#ifdef ORG_GB_ROTATION // Tushar
 		offset = vout->vrfb_context[0].yoffset *
 			vout->vrfb_context[0].bytespp;
+#else
+    offset = MAX_PIXELS_PER_LINE * vout->vrfb_context[0].yoffset *
+			vout->vrfb_context[0].bytespp;
+#endif
+
 		temp_ps = ps / vr_ps;
 		if (mirroring == 0) {
 			*cropped_offset = offset + line_length *
@@ -837,8 +1061,14 @@ static int omap_vout_calculate_offset(struct omap_vout_device *vout, int idx)
 		}
 		break;
 	case dss_rotation_270_degree:
+#ifdef ORG_GB_ROTATION // Tushar
 		offset = MAX_PIXELS_PER_LINE * vout->vrfb_context[0].xoffset *
 			vout->vrfb_context[0].bytespp;
+#else
+    offset = vout->vrfb_context[0].xoffset *
+			vout->vrfb_context[0].bytespp;
+#endif
+
 		temp_ps = ps / vr_ps;
 		if (mirroring == 0) {
 			*cropped_offset = offset + line_length *
@@ -963,6 +1193,8 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 	int ret = 0;
 	struct omap_overlay_info info;
 	int cropheight, cropwidth, pixheight, pixwidth;
+	s32 tmp_cropwidth, tmp_cropheight, tmp_pixwidth, tmp_pixheight;
+
 
 	if ((ovl->caps & OMAP_DSS_OVL_CAP_SCALE) == 0 &&
 			(outw != vout->pix.width || outh != vout->pix.height)) {
@@ -976,21 +1208,41 @@ int omapvid_setup_overlay(struct omap_vout_device *vout,
 		goto setup_ovl_err;
 	}
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	/* For 720p set the width and height for ISP resizer downscaling*/
+	if (vout->use_isp_rsz_for_downscale && use_isp_resizer_decoder) {
+		tmp_cropwidth = vout->win.w.width;
+		tmp_cropheight = vout->win.w.height;
+		tmp_pixwidth = vout->win.w.width;
+		tmp_pixheight = vout->win.w.height;
+
+	} else {
+		tmp_cropwidth = vout->crop.width;
+		tmp_cropheight = vout->crop.height;
+		tmp_pixwidth = vout->pix.width;
+		tmp_pixheight = vout->pix.height;
+	}
+#else
+	tmp_cropwidth = vout->crop.width;
+	tmp_cropheight = vout->crop.height;
+	tmp_pixwidth = vout->pix.width;
+	tmp_pixheight = vout->pix.height;
+#endif
+
 	/* Setup the input plane parameters according to
 	 * rotation value selected.
 	 */
 	if (rotate_90_or_270(vout)) {
-		cropheight = vout->crop.width;
-		cropwidth = vout->crop.height;
-		pixheight = vout->pix.width;
-		pixwidth = vout->pix.height;
+		cropheight = tmp_cropwidth;
+		cropwidth = tmp_cropheight;
+		pixheight = tmp_pixwidth;
+		pixwidth = tmp_pixheight;
 	} else {
-		cropheight = vout->crop.height;
-		cropwidth = vout->crop.width;
-		pixheight = vout->pix.height;
-		pixwidth = vout->pix.width;
+		cropheight = tmp_cropheight;
+		cropwidth = tmp_cropwidth;
+		pixheight = tmp_pixheight;
+		pixwidth = tmp_pixwidth;
 	}
-
 	ovl->get_overlay_info(ovl, &info);
 	if (addr)
 		info.paddr = addr;
@@ -1508,6 +1760,7 @@ static void omap_vout_free_allbuffers(struct omap_vout_device *vout)
 }
 #endif
 
+#ifdef CONFIG_ARCH_OMAP4
 static u32 omap_tiler_virt_to_phys(void *ptr)
 {
 	pgd_t *pgd = NULL;
@@ -1531,6 +1784,7 @@ static u32 omap_tiler_virt_to_phys(void *ptr)
 
 	return 0;
 }
+#endif
 
 /*
  * This function will be called when VIDIOC_QBUF ioctl is called.
@@ -1584,13 +1838,60 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 		dmabuf->bus_addr = (dma_addr_t) omap_vout_uservirt_to_phys(vb->baddr);
 	}
 
-	if (!rotation_enabled(vout)) {
+	rotation = calc_rotation(vout);
+
 		dmabuf = videobuf_to_dma(q->bufs[vb->i]);
+
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	if (vout->use_isp_rsz_for_downscale && use_isp_resizer_decoder) {
+		int ret = 0;
+		
+		/*Start resizing*/
+		ret = ispdss_begin(&pipe, vb->i, vb->i,
+				MAX_PIXELS_PER_LINE *\
+				vout->bpp * vout->vrfb_bpp,
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#ifdef ORG_GB_ROTATION // Tushar
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+				(u32)vout->vrfb_context[vb->i].\
+				paddr[0],
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#else
+				(u32)vout->vrfb_context[vb->i].\
+				paddr[rotation],
+#endif
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+				vout->buf_phy_addr[vb->i],
+				vout->buffer_size);
+
+		if (ret) {
+			printk(KERN_ERR "<%s> ISP Resizer Failed to resize "
+					"the buffer = %d\n",
+					__func__, ret);
+		} else {
+			/* Store buffers physical address into an array. Addresses
+			 * from this array will be used to configure DSS */
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#ifdef ORG_GB_ROTATION // Tushar
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+			vout->queued_buf_addr[vb->i] = (u8 *) 
+				vout->vrfb_context[vb->i].paddr[rotation];
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#else
+	vout->queued_buf_addr[vb->i] = (u8 *)
+		vout->vrfb_context[vb->i].paddr[0];
+#endif
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+		}
+		return ret;
+	}
+#endif
+
+	if (!rotation_enabled(vout)) {
 		vout->queued_buf_addr[vb->i] = (u8 *) dmabuf->bus_addr;
 		return 0;
 	}
 
-	dmabuf = videobuf_to_dma(q->bufs[vb->i]);
 	/* If rotation is enabled, copy input buffer into VRFB
 	 * memory space using DMA. We are copying input buffer
 	 * into VRFB memory space of desired angle and DSS will
@@ -1622,12 +1923,23 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 			dmabuf->bus_addr, src_element_index, src_frame_index);
 	/*set dma source burst mode for VRFB */
 	omap_set_dma_src_burst_mode(tx->dma_ch, OMAP_DMA_DATA_BURST_16);
-	rotation = calc_rotation(vout);
 
 	/* dest_port required only for OMAP1 */
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#ifdef ORG_GB_ROTATION // Tushar
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
 	omap_set_dma_dest_params(tx->dma_ch, 0, OMAP_DMA_AMODE_DOUBLE_IDX,
 			vout->vrfb_context[vb->i].paddr[0], dest_element_index,
 			dest_frame_index);
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#else
+	omap_set_dma_dest_params(tx->dma_ch, 0, OMAP_DMA_AMODE_DOUBLE_IDX,
+			vout->vrfb_context[vb->i].paddr[rotation], dest_element_index,
+			dest_frame_index);
+
+#endif
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+
 	/*set dma dest burst mode for VRFB */
 	omap_set_dma_dest_burst_mode(tx->dma_ch, OMAP_DMA_DATA_BURST_16);
 	omap_dma_set_global_params(DMA_DEFAULT_ARB_RATE, 0x20, 0);
@@ -1647,16 +1959,27 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 #endif
 
 	omap_start_dma(tx->dma_ch);
-	interruptible_sleep_on_timeout(&tx->wait, VRFB_TX_TIMEOUT);
+	interruptible_sleep_on_timeout(&tx->wait, msecs_to_jiffies(VRFB_TX_TIMEOUT)); // , VRFB_TX_TIMEOUT); - Tushar - Temporarily modified for recording freeze issue caused by audio capture DMA error
 
 	if (tx->tx_status == 0) {
+		printk(KERN_ERR "%s: interruptible_sleep_on_timeout time(%d) out, stopping DMA\n", __func__, VRFB_TX_TIMEOUT);
 		omap_stop_dma(tx->dma_ch);
 		return -EINVAL;
 	}
 	/* Store buffers physical address into an array. Addresses
 	 * from this array will be used to configure DSS */
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#ifdef ORG_GB_ROTATION // Tushar
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
 	vout->queued_buf_addr[vb->i] = (u8 *)
 		vout->vrfb_context[vb->i].paddr[rotation];
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#else
+	vout->queued_buf_addr[vb->i] = (u8 *)
+		vout->vrfb_context[vb->i].paddr[0];
+#endif
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+
 #else	/* TILER to be used */
 
 	/* Here, we need to use the physical addresses given by Tiler:
@@ -1930,6 +2253,21 @@ static int omap_vout_release(struct file *file)
 		v4l2_warn(&vout->vid_dev->v4l2_dev,
 				"Unable to apply changes\n");
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	/* Release the ISP resizer resource if not already done so */
+	if (vout->use_isp_rsz_for_downscale || use_isp_resizer_decoder) {
+		if (vout->rsz_configured == 1) {
+			ispdss_put_resource();
+			vout->rsz_configured = 0;
+			vout->use_isp_rsz_for_downscale = 0;
+			use_isp_resizer_decoder = 0;
+			printk(KERN_INFO "<%s> ISP resizer released\n", __func__);
+		}
+	}
+
+	vrfb_configured = 0;
+#endif
+
 	/* Free all buffers */
 #ifndef CONFIG_ARCH_OMAP4
 	omap_vout_free_allbuffers(vout);
@@ -2190,6 +2528,15 @@ static int vidioc_s_fmt_vid_out(struct file *file, void *fh,
 	vout->bpp = bpp;
 	vout->pix = f->fmt.pix;
 	vout->vrfb_bpp = 1;
+
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	/*check for 720p format*/
+	if (need_isp_rsz(vout))
+		vout->use_isp_rsz_for_downscale = 1;
+	else // Tushar [ - omaps00233506
+		vout->use_isp_rsz_for_downscale = 0; // Tushar ]
+#endif
+
 	ovl->info.field = dev_buf_type;
 	ovl->info.pic_height = f->fmt.pix.height;
 
@@ -2248,24 +2595,35 @@ static int vidioc_s_fmt_vid_overlay(struct file *file, void *fh,
 	ovid = &vout->vid_info;
 	ovl = ovid->overlays[0];
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	if (vout->use_isp_rsz_for_downscale && use_isp_resizer_decoder) {
+		/* align the output width to 16 bytes
+		 * ISP resizer requires the output width to be
+		 * aligned to 16 bytes.
+		 */
+		win->w.width = ((win->w.width + 0x0f) & ~0x0f);
+	}
+#endif
 	/* flip the x,y coordinates to properly validate the video size against
 	rotated FB coordinates nad to properly center the video when <x,y)
 	is anything orher than (0,0)*/
+#if 0 // Tushar
 	if (rotate_90_or_270(vout)) {
 		temp = win->w.left;
 		win->w.left = win->w.top;
 		win->w.top = temp;
 	}
-
+#endif
 	ret = omap_vout_new_window(&vout->crop, &vout->win, &vout->fbuf, win);
 	if (!ret) {
+#if 0 // Tushar
 		/*Flip the x, y coordinates to back to dss coordinates*/
 		if (rotate_90_or_270(vout)) {
 			temp = vout->win.w.left;
 			vout->win.w.left = vout->win.w.top;
 			vout->win.w.top = temp;
 		}
-
+#endif
 		/* Video1 plane does not support global alpha for OMAP 2/3 */
 		if ((cpu_is_omap24xx() || cpu_is_omap34xx()) &&
 			    ovl->id == OMAP_DSS_VIDEO1)
@@ -2438,9 +2796,22 @@ static int vidioc_s_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 		vout->fbuf.fmt.width = timing->x_res;
 	}
 
-	if (crop->type == V4L2_BUF_TYPE_VIDEO_OUTPUT)
+	if (crop->type == V4L2_BUF_TYPE_VIDEO_OUTPUT) {
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+		/* omap_vout_new_corp sets the use_isp_rsz_for_downscale
+		 * flag based on whether there is a need for scaling beyond
+		 * 4x. ISP resizer is used for downscaling beyond 1/4x as DSS
+		 * doesn't support it.
+		 */
 		ret = omap_vout_new_crop(&vout->pix, &vout->crop, &vout->win,
-				&vout->fbuf, &crop->c);
+				&vout->fbuf, &crop->c,
+				&vout->use_isp_rsz_for_downscale);
+#else
+		ret = omap_vout_new_crop(&vout->pix, &vout->crop, &vout->win,
+				&vout->fbuf, &crop->c,
+				NULL);
+#endif
+	}
 
 s_crop_err:
 	mutex_unlock(&vout->lock);
@@ -2635,6 +3006,13 @@ static int vidioc_reqbufs(struct file *file, void *fh,
 		goto reqbuf_err;
 	}
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	/*check for 720p format*/
+	if (need_isp_rsz(vout))
+		vout->use_isp_rsz_for_downscale = 1;
+
+	vout->rsz_configured = 0;
+#endif
 	/* If buffers are already allocated free them */
 	if (q->bufs[0] && (V4L2_MEMORY_MMAP == q->bufs[0]->memory)) {
 		if (vout->mmap_count) {
@@ -2706,6 +3084,7 @@ static int vidioc_qbuf(struct file *file, void *fh,
 {
 	struct omap_vout_device *vout = fh;
 	struct videobuf_queue *q = &vout->vbq;
+	unsigned int count;
 	int ret = -EINVAL;
 	int qempty = list_empty(&vout->dma_queue);
 
@@ -2729,6 +3108,29 @@ static int vidioc_qbuf(struct file *file, void *fh,
 		v4l2_warn(&vout->vid_dev->v4l2_dev,
 				"DMA Channel not allocated for Rotation\n");
 		goto err;
+	}
+#endif
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	//START, ryan-yoon, 720P content is broken issue.
+	if (!vout->use_isp_rsz_for_downscale)	/*check for 720p format*/
+	{
+		if (need_isp_rsz(vout))
+			vout->use_isp_rsz_for_downscale = 1;
+	}
+	//END, ryan-yoon
+	
+	/* initialize the ISP resizer */
+	ret = init_isp_rsz(vout);
+	if (ret)
+		return ret;
+
+	/* setup the vrfb so that the first frames are also setup
+	* correctly in the vrfb
+	*/
+	if (vrfb_configured == 0) {
+		count = vout->buffer_allocated;
+		omap_vout_vrfb_buffer_setup(vout, &count, 0);
+		vrfb_configured = 1;
 	}
 #endif
 
@@ -2841,6 +3243,12 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 		goto streamon_err1;
 	}
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	/*check for 720p format*/
+	if (need_isp_rsz(vout))
+		vout->use_isp_rsz_for_downscale = 1;
+#endif
+
 	/* Get the next frame from the buffer queue */
 	vout->next_frm = vout->cur_frm = list_entry(vout->dma_queue.next,
 			struct videobuf_buffer, queue);
@@ -2917,7 +3325,7 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 
 streamon_err1:
 	if (ret)
-		vidioc_streamoff(file, fh, i);
+		vidioc_streamoff(file, fh, i); // Tushar - #gerrit 12604 - videobuf_streamoff(q);
 streamon_err:
 	mutex_unlock(&vout->lock);
 	return ret;
@@ -2968,6 +3376,20 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 		v4l2_err(&vout->vid_dev->v4l2_dev, "failed to change mode in"
 				" streamoff\n");
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	/* release resizer now */
+	if (vout->use_isp_rsz_for_downscale  && use_isp_resizer_decoder) {
+		if (vout->rsz_configured == 1) {
+			ispdss_put_resource();
+			vout->rsz_configured = 0;
+			vout->use_isp_rsz_for_downscale = 0;
+			use_isp_resizer_decoder = 0;
+			printk(KERN_INFO "<%s> ISP resizer released\n", __func__);
+		}
+	}
+
+	vrfb_configured = 0;
+#endif
 #ifdef CONFIG_PM
 	if (pdata->set_min_bus_tput)
 		pdata->set_min_bus_tput(
@@ -3165,6 +3587,9 @@ static int __init omap_vout_setup_video_data(struct omap_vout_device *vout)
 	vout->control[2].id = V4L2_CID_HFLIP;
 	vout->control[2].value = 0;
 	vout->vrfb_bpp = 2;
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	vout->use_isp_rsz_for_downscale = 0;
+#endif
 
 	control[1].id = V4L2_CID_BG_COLOR;
 	control[1].value = 0;
@@ -3286,7 +3711,7 @@ static int __init omap_vout_setup_video_bufs(struct platform_device *pdev,
 	/* Allocate VRFB buffers if selected through bootargs */
 	static_vrfb_allocation = (vid_num == 0) ?
 		vid1_static_vrfb_alloc : vid2_static_vrfb_alloc;
-
+	static_vrfb_allocation = 1;
 	/* statically allocated the VRFB buffer is done through
 	   commands line aruments */
 	if (static_vrfb_allocation) {
@@ -3542,7 +3967,11 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 		if (def_display) {
 			struct omap_dss_driver *dssdrv = def_display->driver;
 
+// LGE_UPDATE_S /* to avoid unnecessary display enable, before the display block initialization is completed.*/
+			if (def_display->state == OMAP_DSS_DISPLAY_DISABLED) {
 			ret = omapdss_display_enable(def_display);
+			}
+// LGE_UPDATE_E /* to avoid unnecessary display enable, before the display block initialization is completed.*/
 			if (ret) {
 				dev_err(&pdev->dev,
 					"Failed to enable '%s' display\n",
@@ -3581,6 +4010,8 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 	ret = omap_vout_create_video_devices(pdev);
 	if (ret)
 		goto probe_err2;
+// LGE_UPDATE_S /* to avoid unnecessary display enable, before the display block initialization is completed.*/
+#if 0//defined (CONFIG_MACH_LGE_HUB)
 
 	for (i = 0; i < vid_dev->num_displays; i++) {
 		struct omap_dss_device *display = vid_dev->displays[i];
@@ -3593,6 +4024,8 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 						display->panel.timings.x_res,
 						display->panel.timings.y_res);
 	}
+#endif
+// LGE_UPDATE_E /* to avoid unnecessary display enable, before the display block initialization is completed.*/
 	return 0;
 
 probe_err2:

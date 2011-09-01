@@ -94,6 +94,17 @@ config PM_SLEEP
 	depends on SUSPEND || HIBERNATION || XEN_SAVE_RESTORE
 	default y
 
+# LGE_UPDATE_S
+config WAKE_IRQ_PRINT
+	bool "Print IRQ when resuming..."
+	depends on PM_DEBUG
+	depends on PM_SLEEP
+	depends on MACH_LGE_OMAP3
+	default y
+	---help---
+	This enables to print irqs when waking up from suspend..
+# LGE_UPDATE_E
+
 config PM_SLEEP_ADVANCED_DEBUG
 	bool
 	depends on PM_ADVANCED_DEBUG

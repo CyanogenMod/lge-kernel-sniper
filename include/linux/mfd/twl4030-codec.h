@@ -264,6 +264,56 @@ enum twl4030_codec_res {
 	TWL4030_CODEC_RES_APLL,
 	TWL4030_CODEC_RES_MAX,
 };
+ #if defined(CONFIG_MACH_LGE_HUB)  
+typedef enum {
+	TWL4030_AUDIO_MODE,
+	TWL4030_HEADSET_CALL_MODE,
+	TWL4030_SPEAKER_CALL_MODE,
+	TWL4030_RECEIVER_CALL_MODE,
+	TWL4030_HEADPHONE_CALL_MODE
+}voice_mode_enum;
+
+typedef enum
+{
+	TWL4030_CMD,
+	TWL4030_DELAY,
+	TWL4030_END_SEQ
+} twl_reg_control_type;
+
+typedef struct
+{
+	twl_reg_control_type irc;
+	u8 address;
+	int data;
+} twl_reg_type;
+
+int voice_get_curmode(void);
+void voice_configure_path(voice_mode_enum mode);
+void twl4030_set_mic_switch(int mic); //jongik2.kim 20101220 add mic2 control
+// 20100426 junyeop.kim@lge.com Add the mic mute [START_LGE]
+typedef enum {
+	TWL4030_OFF_MIC_MODE,
+	TWL4030_RESTORE_MIC_MODE
+}mic_mode_enum;
+
+int mic_get_curmode(void);
+void mic_configure_path(voice_mode_enum mode);
+
+// 20100426 junyeop.kim@lge.com Add the mic mute [END_LGE]
+
+// 20100521 junyeop.kim@lge.com call recording path [START_LGE]
+typedef enum {
+	TWL4030_CALLREC_BUILTIN_MODE,
+	TWL4030_CALLREC_HEADSET_MODE,
+	TWL4030_CALLREC_OFF_MODE		
+}callrec_mode_enum;
+
+int callrec_get_curmode(void);
+void callrec_configure_path(callrec_mode_enum mode);
+// 20100521 junyeop.kim@lge.com call recording path [END_LGE]
+#endif /* LGE_CHANGE_E [iggikim@lge.com]*/
+
+///////////////////////////////////////////////////// [END]
 
 int twl4030_codec_disable_resource(unsigned id);
 int twl4030_codec_enable_resource(enum twl4030_codec_res id);

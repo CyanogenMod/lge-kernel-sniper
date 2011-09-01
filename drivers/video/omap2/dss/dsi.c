@@ -252,8 +252,10 @@ static struct dsi_struct
 
 	struct dsi_clock_info current_cinfo;
 
+#if defined(CONFIG_MACH_LGE_HUB)
+#else
 	struct regulator *vdds_dsi_reg;
-
+#endif
 	struct {
 		enum dsi_vc_mode mode;
 		struct omap_dss_device *dssdev;
@@ -334,6 +336,8 @@ static inline u32 dsi_read_reg(enum omap_dsi_index ix,
 	else
 		return __raw_readl(dsi2.base + idx.idx);
 }
+
+extern int lcd_off_boot;
 
 
 void dsi_save_context(void)
@@ -545,6 +549,8 @@ static void schedule_error_recovery(enum omap_dsi_index ix)
 {
 	struct dsi_struct *p_dsi;
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
+
+	if(lcd_off_boot)	return;
 
 	if (p_dsi->recover.enabled && !p_dsi->recover.recovering)
 		schedule_work(&p_dsi->recover.recovery_work);
@@ -1320,9 +1326,12 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 	dsi_enable_pll_clock(ix, 1);
 
 	if (!cpu_is_omap44xx()) {
+#if defined(CONFIG_MACH_LGE_HUB)
+#else
 		r = regulator_enable(dsi1.vdds_dsi_reg);
 		if (r)
 			goto err0;
+#endif
 	}
 
 	/* XXX PLL does not come out of reset without this... */
@@ -1357,8 +1366,11 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 
 	return 0;
 err1:
+#if defined(CONFIG_MACH_LGE_HUB)
+#else
 	if (!cpu_is_omap44xx())
 		regulator_disable(dsi1.vdds_dsi_reg);
+#endif
 err0:
 	enable_clocks(0);
 	dsi_enable_pll_clock(ix, 0);
@@ -1375,8 +1387,11 @@ void dsi_pll_uninit(enum omap_dsi_index ix)
 
 	p_dsi->pll_locked = 0;
 	dsi_pll_power(ix, DSI_PLL_POWER_OFF);
+#if defined(CONFIG_MACH_LGE_HUB)
+#else
 	if (!cpu_is_omap44xx())
 		regulator_disable(dsi1.vdds_dsi_reg);
+#endif
 	DSSDBG("PLL uninit done\n");
 }
 
@@ -2669,6 +2684,76 @@ int dsi_vc_set_max_rx_packet_size(enum omap_dsi_index ix,
 }
 EXPORT_SYMBOL(dsi_vc_set_max_rx_packet_size);
 
+int dsi_vc_generic_write(int channel, u8 cmd, u8 *data, int len)
+{
+    int r;
+
+    r = dsi_vc_send_long(0, channel, cmd, data, len, 0);
+    if (r)
+        return r;
+    
+    r = dsi_vc_send_bta_sync(0, channel);
+    return r;
+}
+EXPORT_SYMBOL(dsi_vc_generic_write);
+
+int dsi_vc_generic_write_short(int channel, u8 cmd, u8 *data, int len)
+{
+    int r;
+
+    if( len == 1) {
+        r = dsi_vc_send_short(0, channel, cmd, data[0], 0);
+    } else {
+        r = dsi_vc_send_short(0, channel, cmd, data[0] | (data[1] << 8), 0);
+    }
+    if (r)
+        return r;
+       
+    r = dsi_vc_send_bta_sync(0, channel);
+        return r;
+}
+EXPORT_SYMBOL(dsi_vc_generic_write_short);
+int dsi_vc_write(enum omap_dsi_index ix, int channel, u8 cmd, u8 *data, int len)
+{
+	int r = -1;
+
+#if 1
+	switch (cmd) {
+	case 0x03:
+	case 0x13:
+	case 0x23:
+		r = dsi_vc_generic_write_short(channel, cmd, data, len);
+		break;
+	case 0x29:
+		r = dsi_vc_generic_write(channel, cmd, data, len);
+		break;
+	case 0x05:
+	case 0x15:
+	case 0x39:
+		r = dsi_vc_dcs_write(ix, channel, data, len);
+		break;
+	default:
+		printk("wrong dsi vc write cmd!");
+	}
+#else
+	if (len < 3) {
+		if (len == 1)
+			r = dsi_vc_send_short(ix, channel, cmd, data[0], 0);
+		else
+			r = dsi_vc_send_short(ix, channel, cmd, data[0] | (data[1] << 8), 0);
+	}			
+	else
+		r = dsi_vc_send_long(ix, channel, cmd, data, len, 0);
+
+	if (r)
+		return r;
+
+	r = dsi_vc_send_bta_sync(ix, channel);
+#endif
+	return r;
+}
+EXPORT_SYMBOL(dsi_vc_write);
+
 static void dsi_set_lp_rx_timeout(enum omap_dsi_index ix, unsigned ticks,
 			bool x4, bool x16)
 {
@@ -3167,8 +3252,15 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 
 	dsi_perf_mark_start(ix);
 
+/* LGE_UPDATE_S - to prevent DSI framedone timeout. */	
+#if defined(CONFIG_MACH_LGE_OMAP3)
+	r = queue_delayed_work(p_dsi->workqueue, &p_dsi->framedone_timeout_work,
+			msecs_to_jiffies(1000));
+#else
 	r = queue_delayed_work(p_dsi->workqueue, &p_dsi->framedone_timeout_work,
 			msecs_to_jiffies(250));
+#endif
+/* LGE_UPDATE_E -to prevent DSI framedone timeout. */	
 	BUG_ON(r == 0);
 
 	dss_start_update(dssdev);
@@ -3487,6 +3579,9 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 	struct dsi_struct *p_dsi;
 	enum omap_dsi_index ix;
 
+
+	if (lcd_off_boot) return 0;
+
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
@@ -3553,8 +3648,10 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 			.vsw		= 1,
 			.vfp		= 0,
 			.vbp		= 0,
-			.x_res		= 864,
-			.y_res		= 480,
+			//.x_res		= 864,
+			.x_res		= 480,
+//			.y_res		= 480, baskar commented are original
+			.y_res		= 800,
 		};
 
 		dispc_set_lcd_timings(dssdev->channel, &timings);
@@ -3796,6 +3893,12 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 	if (r)
 		goto err1;
 
+#if 1
+	if(lcd_off_boot == 1){
+		goto err1;
+	}
+#endif
+
 	r = dsi_display_init_dsi(dssdev);
 	if (r)
 		goto err2;
@@ -3827,6 +3930,10 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
+#if 0
+	if(lcd_off_boot) return;
+#endif
+
 	DSSDBG("dsi_display_disable\n");
 
 	WARN_ON(!dsi_bus_is_locked(ix));
@@ -3835,10 +3942,12 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 
 	dsi_display_uninit_dispc(dssdev);
 
+	if(!lcd_off_boot){
 	dsi_display_uninit_dsi(dssdev);
 
 	enable_clocks(0);
 	dsi_enable_pll_clock(ix, 0);
+	}
 
 	omap_dss_stop_device(dssdev);
 
@@ -4040,8 +4149,12 @@ int dsi_init(struct platform_device *pdev)
 	dsi1.recover.dssdev = 0;
 	dsi1.recover.enabled = false;
 	dsi1.recover.recovering = false;
+
+	if(lcd_off_boot == 0){
 	INIT_WORK(&dsi1.recover.recovery_work,
 		dsi_error_recovery_worker);
+	}
+
 #ifdef DSI_CATCH_MISSING_TE
 	init_timer(&dsi1.te_timer);
 	dsi1.te_timer.function = dsi_te_timeout;
@@ -4061,6 +4174,8 @@ int dsi_init(struct platform_device *pdev)
 	}
 
 	if (!cpu_is_omap44xx()) {
+#if defined(CONFIG_MACH_LGE_HUB)
+#else
 		dsi1.vdds_dsi_reg = dss_get_vdds_dsi();
 		if (IS_ERR(dsi1.vdds_dsi_reg)) {
 			iounmap(dsi1.base);
@@ -4068,6 +4183,7 @@ int dsi_init(struct platform_device *pdev)
 			r = PTR_ERR(dsi1.vdds_dsi_reg);
 			goto err2;
 		}
+#endif
 	}
 
 	enable_clocks(1);
@@ -4133,8 +4249,12 @@ int dsi2_init(struct platform_device *pdev)
 	dsi2.recover.dssdev = 0;
 	dsi2.recover.enabled = false;
 	dsi2.recover.recovering = false;
+
+	if(lcd_off_boot == 0){
 	INIT_WORK(&dsi2.recover.recovery_work,
 		dsi_error_recovery_worker);
+	}
+
 #ifdef DSI_CATCH_MISSING_TE
 	init_timer(&dsi2.te_timer);
 	dsi2.te_timer.function = dsi2_te_timeout;

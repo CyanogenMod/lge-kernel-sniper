@@ -354,6 +354,527 @@ static struct {
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
 } dispc;
+#ifdef CONFIG_GAMMA_TUNING
+/*static unsigned long int GammaTable[] =	
+{	
+	0x00000000, 
+	0x00010101, 
+	0x00010101, 
+	0x00020202,
+	0x00030303, 
+	0x00040304, 
+	0x00040404, 
+	0x00050505, 
+	0x00060606, 
+	0x00060607, 
+	0x00070707, 
+	0x00080708, 
+	0x00090809, 
+	0x0009090A, 
+	0x000A090A, 
+	0x000B0A0B,							
+	0x000C0B0C, 
+	0x000C0B0D, 
+	0x000D0C0D, 
+	0x000E0D0E,
+	0x000E0D0F, 
+	0x000F0E10, 
+	0x00100F10, 
+	0x00110F11, 
+	0x00111012, 
+	0x00121113, 
+	0x00131114, 
+	0x00141214, 
+	0x00151315, 
+	0x00151316, 
+	0x00161417, 
+	0x00171517,
+	0x00181618, 
+	0x00181619, 
+	0x0019171A, 
+	0x001A181B,
+	0x001B181C, 
+	0x001C191C, 
+	0x001C1A1D, 
+	0x001D1B1E, 
+	0x001E1B1F, 
+	0x001F1C20, 
+	0x00201D21, 
+	0x00211E22, 
+	0x00211E22, 
+	0x00221F23, 
+	0x00232024, 
+	0x00242125,
+	0x00252226, 
+	0x00262227, 
+	0x00272328, 
+	0x00272429,
+	0x0028252A, 
+	0x0029262A, 
+	0x002A262B, 
+	0x002B272C, 
+	0x002C282D, 
+	0x002D292E, 
+	0x002E2A2F, 
+	0x002F2B30, 
+	0x00302C31, 
+	0x00312C32, 
+	0x00322D33, 
+	0x00332E34,
+	0x00342F35, 
+	0x00353036, 
+	0x00353137, 
+	0x00363238,
+	0x00373339, 
+	0x0038343A, 
+	0x0039343B, 
+	0x003A353C, 
+	0x003B363D, 
+	0x003D373E, 
+	0x003E383F, 
+	0x003F3940, 
+	0x00403A41, 
+	0x00413B43, 
+	0x00423C44, 
+	0x00433D45,
+	0x00443E46, 
+	0x00453F47, 
+	0x00464048, 
+	0x00474149,
+	0x0048424A, 
+	0x0049434B, 
+	0x004A444D, 
+	0x004B454E, 
+	0x004D464F, 
+	0x004E4750, 
+	0x004F4851, 
+	0x00504952, 
+	0x00514A53, 
+	0x00524B55, 
+	0x00534C56, 
+	0x00554D57,
+	0x00564E58, 
+	0x00574F59, 
+	0x0058505B, 
+	0x0059515C,
+	0x005A525D, 
+	0x005C545E, 
+	0x005D555F, 
+	0x005E5661, 
+	0x005F5762, 
+	0x00605863, 
+	0x00625964, 
+	0x00635A66, 
+	0x00645B67, 
+	0x00655C68, 
+	0x00665D69, 
+	0x00685F6B,
+	0x0069606C, 
+	0x006A616D, 
+	0x006B626E, 
+	0x006D6370,
+	0x006E6471, 
+	0x006F6572, 
+	0x00706673, 
+	0x00716875, 
+	0x00736976, 
+	0x00746A77, 
+	0x00756B79, 
+	0x00766C7A, 
+	0x00786D7B, 
+	0x00796E7C, 
+	0x007A707E, 
+	0x007B717F,
+	0x007D7280, 
+	0x007E7382, 
+	0x007F7483, 
+	0x00817584,
+	0x00827786, 
+	0x00837887, 
+	0x00857988, 
+	0x00867A8A, 
+	0x00877B8B, 
+	0x00887D8C, 
+	0x008A7E8E, 
+	0x008B7F8F, 
+	0x008C8090, 
+	0x008E8192, 
+	0x008F8393, 
+	0x00908495,
+	0x00928596, 
+	0x00938697, 
+	0x00948799, 
+	0x0096889A,
+	0x00978A9B, 
+	0x00988B9D, 
+	0x00998C9E, 
+	0x009B8D9F, 
+	0x009C8EA1, 
+	0x009D90A2, 
+	0x009F91A3, 
+	0x00A092A4, 
+	0x00A193A6, 
+	0x00A294A7, 
+	0x00A495A8, 
+	0x00A597AA,
+	0x00A698AB, 
+	0x00A799AC, 
+	0x00A99AAE, 
+	0x00AA9BAF,
+	0x00AB9CB0, 
+	0x00AC9DB1, 
+	0x00AE9FB3, 
+	0x00AFA0B4, 
+	0x00B0A1B5, 
+	0x00B1A2B7, 
+	0x00B3A3B8, 
+	0x00B4A4B9, 
+	0x00B5A5BA, 
+	0x00B6A6BC, 
+	0x00B7A7BD, 
+	0x00B9A8BE,
+	0x00BAAABF, 
+	0x00BBABC0, 
+	0x00BCACC2, 
+	0x00BDADC3,
+	0x00BFAEC4, 
+	0x00C0AFC5, 
+	0x00C1B0C6, 
+	0x00C2B1C8, 
+	0x00C3B2C9, 
+	0x00C4B3CA, 
+	0x00C5B4CB, 
+	0x00C7B5CC, 
+	0x00C8B6CD, 
+	0x00C9B7CF, 
+	0x00CAB8D0, 
+	0x00CBB9D1,
+	0x00CCBAD2, 
+	0x00CDBBD3, 
+	0x00CEBCD4, 
+	0x00CFBDD5,
+	0x00D0BED6, 
+	0x00D1BFD8, 
+	0x00D2C0D9, 
+	0x00D4C1DA, 
+	0x00D5C2DB, 
+	0x00D6C3DC, 
+	0x00D7C4DD, 
+	0x00D8C5DE, 
+	0x00D9C6DF, 
+	0x00DAC7E0, 
+	0x00DBC8E1, 
+	0x00DCC9E2,
+	0x00DDC9E3, 
+	0x00DECAE4, 
+	0x00DFCBE5, 
+	0x00E0CCE6,
+	0x00E1CDE7, 
+	0x00E2CEE8, 
+	0x00E3CFE9, 
+	0x00E4D0EA, 
+	0x00E5D1EB, 
+	0x00E5D1EC, 
+	0x00E6D2ED, 
+	0x00E7D3EE, 
+	0x00E8D4EF, 
+	0x00E9D5F0, 
+	0x00EAD6F1, 
+	0x00EBD7F2,
+	0x00ECD7F3, 
+	0x00EDD8F4, 
+	0x00EED9F5, 
+	0x00EFDAF6,
+	0x00F0DBF7, 
+	0x00F0DBF7, 
+	0x00F1DCF8, 
+	0x00F2DDF9, 
+	0x00F3DEFA, 
+	0x00F4DFFB, 
+	0x00F5E0FC, 
+	0x00F6E0FD, 
+	0x00F7E1FE, 
+	0x00F8E2FF, 
+	0x00F8E3FF, 
+	0x00F9E3FF,
+	0x00FAE4FF, 
+	0x00FBE5FF, 
+	0x00FCE6FF, 
+	0x00FDE7FF,
+	0x00FEE7FF, 
+	0x00FEE8FF, 
+	0x00FFE9FF, 
+	0x00FFEAFF, 
+	0x00FFEAFF, 
+	0x00FFEBFF, 
+	0x00FFECFF, 
+	0x00FFEDFF, 
+	0x00FFEEFF, 
+	0x00FFEEFF, 
+	0x00FFEFFF, 
+	0x00FFF0FF
+};
+*/
+
+	volatile unsigned long int GammaTable[] =	{	
+	0x00000000, 
+	0x00010101, 
+	0x00010101, 
+	0x00020202,
+	0x00030303, 
+	0x00040304, 
+	0x00040404, 
+	0x00050505, 
+	0x00060506, 
+	0x00060607, 
+	0x00070707, 
+	0x00080708, 
+	0x00090809, 
+	0x0009090A, 
+	0x000A090A, 
+	0x000B0A0B, 						
+	0x000C0A0C, 
+	0x000C0B0D, 
+	0x000D0C0D, 
+	0x000E0D0E,
+	0x000E0D0F, 
+	0x000F0E10, 
+	0x00100F10, 
+	0x00110F11, 
+	0x00111012, 
+	0x00121113, 
+	0x00131113, 
+	0x00141214, 
+	0x00141315, 
+	0x00151316, 
+	0x00161417, 
+	0x00171517,
+	0x00181518, 
+	0x00181619, 
+	0x0019171A, 
+	0x001A181B,
+	0x001B181B, 
+	0x001C191C, 
+	0x001C1A1D, 
+	0x001D1B1E, 
+	0x001E1B1F, 
+	0x001F1C20, 
+	0x00201D21, 
+	0x00201E21, 
+	0x00211E22, 
+	0x00221F23, 
+	0x00232024, 
+	0x00242125,
+	0x00252126, 
+	0x00262227, 
+	0x00262327, 
+	0x00272428,
+	0x00282529, 
+	0x0029252A, 
+	0x002A262B, 
+	0x002B272C, 
+	0x002C282D, 
+	0x002D292E, 
+	0x002E2A2F, 
+	0x002E2A30, 
+	0x002F2B31, 
+	0x00302C32, 
+	0x00312D33, 
+	0x00322E34,
+	0x00332F35, 
+	0x00343036, 
+	0x00353037, 
+	0x00363138,
+	0x00373239, 
+	0x0038333A, 
+	0x0039343B, 
+	0x003A353C, 
+	0x003B363D, 
+	0x003C373E, 
+	0x003D383F, 
+	0x003E3940, 
+	0x003F3941, 
+	0x00403A42, 
+	0x00413B43, 
+	0x00423C44,
+	0x00433D45, 
+	0x00443E46, 
+	0x00453F47, 
+	0x00464048,
+	0x00474149, 
+	0x0048424A, 
+	0x0049434C, 
+	0x004B444D, 
+	0x004C454E, 
+	0x004D464F, 
+	0x004E4750, 
+	0x004F4851, 
+	0x00504952, 
+	0x00514A54, 
+	0x00524B55, 
+	0x00534C56,
+	0x00554D57, 
+	0x00564E58, 
+	0x00574F59, 
+	0x0058505B,
+	0x0059515C, 
+	0x005A525D, 
+	0x005B535E, 
+	0x005D545F, 
+	0x005E5660, 
+	0x005F5762, 
+	0x00605863, 
+	0x00615964, 
+	0x00625A65, 
+	0x00645B67, 
+	0x00655C68, 
+	0x00665D69,
+	0x00675E6A, 
+	0x00685F6B, 
+	0x006A606D, 
+	0x006B616E,
+	0x006C636F, 
+	0x006D6470, 
+	0x006E6572, 
+	0x00706673, 
+	0x00716774, 
+	0x00726875, 
+	0x00736977, 
+	0x00756A78, 
+	0x00766B79, 
+	0x00776D7A, 
+	0x00786E7C, 
+	0x00796F7D,
+	0x007B707E, 
+	0x007C717F, 
+	0x007D7281, 
+	0x007E7382,
+	0x007F7483, 
+	0x00807584, 
+	0x00827685, 
+	0x00837787, 
+	0x00847888, 
+	0x00857989, 
+	0x00867A8A, 
+	0x00877C8B, 
+	0x00897D8D, 
+	0x008A7E8E, 
+	0x008B7F8F, 
+	0x008C8090,
+	0x008D8191, 
+	0x008E8293, 
+	0x00908394, 
+	0x00918495,
+	0x00928596, 
+	0x00938697, 
+	0x00948799, 
+	0x0095889A, 
+	0x0097899B, 
+	0x00988A9C, 
+	0x00998C9D, 
+	0x009A8D9F, 
+	0x009B8EA0, 
+	0x009C8FA1, 
+	0x009E90A2, 
+	0x009F91A3,
+	0x00A092A5, 
+	0x00A193A6, 
+	0x00A294A7, 
+	0x00A395A8,
+	0x00A596A9, 
+	0x00A697AB, 
+	0x00A798AC, 
+	0x00A899AD, 
+	0x00A99AAE, 
+	0x00AA9BAF, 
+	0x00AB9DB0, 
+	0x00AD9EB2, 
+	0x00AE9FB3, 
+	0x00AFA0B4, 
+	0x00B0A1B5, 
+	0x00B1A2B6,
+	0x00B2A3B8, 
+	0x00B4A4B9, 
+	0x00B5A5BA, 
+	0x00B6A6BB,
+	0x00B7A7BC, 
+	0x00B8A8BD, 
+	0x00B9A9BF, 
+	0x00BAAAC0, 
+	0x00BBABC1, 
+	0x00BDACC2, 
+	0x00BEADC3, 
+	0x00BFAEC4, 
+	0x00C0AFC6, 
+	0x00C1B0C7, 
+	0x00C2B1C8, 
+	0x00C3B2C9,
+	0x00C4B3CA, 
+	0x00C6B4CB, 
+	0x00C7B5CC, 
+	0x00C8B6CE,
+	0x00C9B7CF, 
+	0x00CAB8D0, 
+	0x00CBB9D1, 
+	0x00CCBAD2, 
+	0x00CDBBD3, 
+	0x00CEBCD4, 
+	0x00CFBDD5, 
+	0x00D0BED7, 
+	0x00D2BFD8, 
+	0x00D3C0D9, 
+	0x00D4C1DA, 
+	0x00D5C2DB,
+	0x00D6C3DC, 
+	0x00D7C4DD, 
+	0x00D8C5DE, 
+	0x00D9C6DF,
+	0x00DAC7E0, 
+	0x00DBC7E1, 
+	0x00DBC8E2, 
+	0x00DCC9E3, 
+	0x00DDCAE4, 
+	0x00DECBE5, 
+	0x00DFCCE6, 
+	0x00E0CCE7, 
+	0x00E1CDE7, 
+	0x00E2CEE8, 
+	0x00E3CFE9, 
+	0x00E4D0EA,
+	0x00E5D1EB, 
+	0x00E6D2EC, 
+	0x00E7D2ED, 
+	0x00E8D3EE,
+	0x00E9D4EF, 
+	0x00EAD5F0, 
+	0x00EBD6F1, 
+	0x00ECD7F2, 
+	0x00EDD8F3, 
+	0x00EED9F5, 
+	0x00EFDAF6, 
+	0x00F0DBF7, 
+	0x00F1DCF8, 
+	0x00F2DDF9, 
+	0x00F3DEFA, 
+	0x00F4DFFB,
+	0x00F5E0FC, 
+	0x00F6E1FE, 
+	0x00F7E2FF, 
+	0x00F9E3FF,
+	0x00FAE4FF, 
+	0x00FBE5FF, 
+	0x00FCE6FF, 
+	0x00FDE7FF, 
+	0x00FEE8FF, 
+	0x00FFE9FF, 
+	0x00FFEAFF, 
+	0x00FFEBFF, 
+	0x00FFECFF, 
+	0x00FFEEFF, 
+	0x00FFEFFF, 
+	0x00FFF0FF};
+
+#endif
 
 static void _omap_dispc_set_irqs(void);
 
@@ -2360,7 +2881,7 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	if (color_mode == OMAP_DSS_COLOR_YUV2 ||
 			color_mode == OMAP_DSS_COLOR_UYVY) {
 		int vidrot = 0;
-
+#ifdef ORG_GB_ROTATION // Tushar
 		switch (rotation) {
 		case OMAP_DSS_ROT_0:
 			vidrot = 0;
@@ -2375,7 +2896,39 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 			vidrot = mirroring ? 1 : 3;
 			break;
 		}
-
+#else
+    if (mirroring) {
+			switch (rotation) {
+			case OMAP_DSS_ROT_0:
+				vidrot = 2;
+				break;
+			case OMAP_DSS_ROT_90:
+				vidrot = 3;
+				break;
+			case OMAP_DSS_ROT_180:
+				vidrot = 0;
+				break;
+			case OMAP_DSS_ROT_270:
+				vidrot = 1;
+				break;
+			}
+		} else {
+			switch (rotation) {
+			case OMAP_DSS_ROT_0:
+				vidrot = 0;
+				break;
+			case OMAP_DSS_ROT_90:
+				vidrot = 3;
+				break;
+			case OMAP_DSS_ROT_180:
+				vidrot = 2;
+				break;
+			case OMAP_DSS_ROT_270:
+				vidrot = 1;
+				break;
+			}
+		}
+#endif
 		REG_FLD_MOD(dispc_reg_att[plane], vidrot, 13, 12);
 
 		if (!cpu_is_omap44xx()) {
@@ -2750,6 +3303,23 @@ static void calc_dma_rotation_offset(u8 rotation, bool mirror,
 	}
 }
 
+// Tushar
+u32 dispc_get_output_size(enum omap_channel channel)
+{
+	u32 val;
+
+	enable_clocks(1);
+	if (cpu_is_omap44xx() && channel == OMAP_DSS_CHANNEL_LCD2)
+		val = dispc_read_reg(DISPC_SIZE_LCD2);
+	else if (channel == OMAP_DSS_CHANNEL_DIGIT)
+		val = dispc_read_reg(DISPC_SIZE_DIG);
+	else
+		val = dispc_read_reg(DISPC_SIZE_LCD);
+	enable_clocks(0);
+
+	return val;
+}
+
 static unsigned long calc_fclk_five_taps(enum omap_channel channel,
 		u16 width, u16 height, u16 out_width, u16 out_height,
 		enum omap_color_mode color_mode)
@@ -2760,7 +3330,8 @@ static unsigned long calc_fclk_five_taps(enum omap_channel channel,
 
 	if (height > out_height) {
 		/* FIXME get real display PPL */
-		unsigned int ppl = 800;
+		unsigned int out_size = dispc_get_output_size(channel);
+		unsigned int ppl = FLD_VAL(out_size, 10, 0) + 1 ; // Tushar - 800;
 
 		tmp = pclk * height * out_width;
 		do_div(tmp, 2 * out_height * ppl);
@@ -2918,6 +3489,7 @@ int dispc_scaling_decision(u16 width, u16 height,
 			out_height < in_height / maxdownscale)
 			goto loop;
 
+#if 0		
 		/* Must use 3-tap filter */
 		*three_tap = false;
 		if (!cpu_is_omap44xx())
@@ -2927,7 +3499,15 @@ int dispc_scaling_decision(u16 width, u16 height,
 
 		/* Also use 3-tap if downscaling by 2 or less */
 		*three_tap |= out_height * 2 >= in_height;
+    		*three_tap = 0; // Tushar - omapdss DISPC error: failed to set up scaling, required fclk rate = 109333332 Hz, current fclk rate = 82000000 Hz
+#else 
+/*
+[   76.191894]  fclk =  213333332 Hz
+[   76.196014]  current fclk =  160000000 Hz
+*/
+	*three_tap = width > 1024;
 
+#endif
 		/*
 		 * Predecimation on OMAP4 still fetches the whole lines
 		 * :TODO: How does it affect the required clock speed?
@@ -2947,10 +3527,11 @@ int dispc_scaling_decision(u16 width, u16 height,
 		/* Use 3-tap if 5-tap clock requirement is too high */
 		*three_tap |= fclk5 > fclk_max;
 
+#if 1
 		/* for now we always use 5-tap unless 3-tap is required */
-		if (!*three_tap)
+			if ((!*three_tap) && (fclk5 != 0))
 			fclk = fclk5;
-
+#endif
 		/* OMAP2/3 has a scaler size limitation */
 		if (!cpu_is_omap44xx() && in_width > (1024 << *three_tap))
 			goto loop;
@@ -4162,6 +4743,8 @@ void dispc_dump_regs(struct seq_file *s)
 	DUMPREG(DISPC_VID_POSITION(1));
 	DUMPREG(DISPC_VID_SIZE(1));
 	DUMPREG(DISPC_VID_ATTRIBUTES(1));
+	
+	if (cpu_is_omap44xx()) {
 	DUMPREG(DISPC_VID_V3_WB_ATTRIBUTES(1));
 	DUMPREG(DISPC_VID_V3_WB_ACCU0(1));
 	DUMPREG(DISPC_VID_V3_WB_ACCU1(1));
@@ -4226,6 +4809,7 @@ void dispc_dump_regs(struct seq_file *s)
 	DUMPREG(DISPC_VID_V3_WB_CONV_COEF(1, 2));
 	DUMPREG(DISPC_VID_V3_WB_CONV_COEF(1, 3));
 	DUMPREG(DISPC_VID_V3_WB_CONV_COEF(1, 4));
+	}
 
 	DUMPREG(DISPC_VID_FIFO_THRESHOLD(1));
 	DUMPREG(DISPC_VID_FIFO_SIZE_STATUS(1));
@@ -5033,6 +5617,13 @@ int dispc_init(struct platform_device *pdev)
 	printk(KERN_INFO "OMAP DISPC rev %d.%d\n",
 		   FLD_GET(rev, 7, 4), FLD_GET(rev, 3, 0));
 
+#ifdef CONFIG_GAMMA_TUNING
+	dispc_write_reg(DISPC_GFX_TABLE_BA , virt_to_phys(GammaTable));
+	//DISPC_CONFIG - PALETTEGAMMATABLE = 1 
+	//DISPC_CONFIG - LOADMODE = 1
+	REG_FLD_MOD(DISPC_CONFIG, 0, 2, 1);
+	REG_FLD_MOD(DISPC_CONFIG, 1, 3, 3);
+#endif
 	enable_clocks(0);
 
 	return 0;

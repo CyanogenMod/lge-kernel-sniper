@@ -668,6 +668,9 @@ struct omap_dss_device {
 				u16 lck_div;
 				u16 pck_div;
 			} div;
+
+			bool ext_te;
+			u8 ext_te_gpio;
 		} dsi;
 
 		struct {
@@ -903,6 +906,9 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 
 int omapdss_dsi_display_enable(struct omap_dss_device *dssdev);
 void omapdss_dsi_display_disable(struct omap_dss_device *dssdev);
+
+void omapdss_dsi_display_suspend(struct omap_dss_device *dssdev);
+
 bool omap_dsi_recovery_state(enum omap_dsi_index ix);
 
 int omapdss_dpi_display_enable(struct omap_dss_device *dssdev);

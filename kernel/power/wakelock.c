@@ -54,6 +54,8 @@ static struct wake_lock deleted_wake_locks;
 static ktime_t last_sleep_time_update;
 static int wait_for_wakeup;
 
+int suspend_resume_statecheck=1; // LGE_Change
+
 int get_expired_time(struct wake_lock *lock, ktime_t *expire_time)
 {
 	struct timespec ts;
@@ -274,7 +276,9 @@ static void suspend(struct work_struct *work)
 	sys_sync();
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("suspend: enter suspend\n");
+	suspend_resume_statecheck = 0; // LGE_change
 	ret = pm_suspend(requested_suspend_state);
+	suspend_resume_statecheck = 1; // LGE_change
 	if (debug_mask & DEBUG_EXIT_SUSPEND) {
 		struct timespec ts;
 		struct rtc_time tm;
@@ -306,7 +310,9 @@ static void expire_wake_locks(unsigned long data)
 	if (debug_mask & DEBUG_EXPIRE)
 		pr_info("expire_wake_locks: done, has_lock %ld\n", has_lock);
 	if (has_lock == 0)
+	{
 		queue_work(suspend_work_queue, &suspend_work);
+	}
 	spin_unlock_irqrestore(&list_lock, irqflags);
 }
 static DEFINE_TIMER(expire_timer, expire_wake_locks, 0, 0);
@@ -458,8 +464,10 @@ static void wake_lock_internal(
 					pr_info("wake_lock: %s, stop expire timer\n",
 						lock->name);
 			if (expire_in == 0)
+			{
 				queue_work(suspend_work_queue, &suspend_work);
 		}
+	}
 	}
 	spin_unlock_irqrestore(&list_lock, irqflags);
 }
@@ -506,7 +514,7 @@ void wake_unlock(struct wake_lock *lock)
 				queue_work(suspend_work_queue, &suspend_work);
 		}
 		if (lock == &main_wake_lock) {
-			if (debug_mask & DEBUG_SUSPEND)
+			//if (debug_mask & DEBUG_SUSPEND)
 				print_active_locks(WAKE_LOCK_SUSPEND);
 #ifdef CONFIG_WAKELOCK_STAT
 			update_sleep_wait_stats_locked(0);

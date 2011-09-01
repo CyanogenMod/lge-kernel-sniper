@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2005, 2006 Nokia Corporation
  * Author:	Samuel Ortiz <samuel.ortiz@nokia.com> and
- *		Juha Yrjölä <juha.yrjola@nokia.com>
+ *		Juha Yrjola <juha.yrjola@nokia.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -96,7 +96,7 @@ struct omap2_mcspi_dma {
 /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
  * cache operations; better heuristics consider wordsize and bitrate.
  */
-#define DMA_MIN_BYTES			160
+#define DMA_MIN_BYTES			160 /* LGE_CHANGE_S, jisil.park@lge.com, 8 -> 160 */
 
 struct omap2_mcspi {
 	struct work_struct	work;
@@ -295,6 +295,27 @@ static void omap2_mcspi_force_cs(struct spi_device *spi, int cs_active)
 	mcspi_write_chconf0(spi, l);
 }
 
+/* LGE_CHANGE_S, jisil.park@lge.com, Merged */
+// ebs      
+#ifndef TEDCHO_IPC
+
+static void omap2_mcspi_set_dma_req_both(const struct spi_device *spi,
+		int is_read, int enable)
+{
+	u32 l, rw;
+
+	l = mcspi_cached_chconf0(spi);
+	
+	rw = OMAP2_MCSPI_CHCONF_DMAR | OMAP2_MCSPI_CHCONF_DMAW;	
+
+	MOD_REG_BIT(l, rw, enable);
+	mcspi_write_chconf0(spi, l);
+
+}
+#endif
+
+// ebs      
+/* LGE_CHANGE_E, jisil.park@lge.com, Merged */
 static int omap2_mcspi_set_txfifo(const struct spi_device *spi, int buf_size,
 					int enable)
 {
@@ -565,16 +586,54 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 				mcspi_write_cs_reg(spi, OMAP2_MCSPI_TX0, 0);
 		}
 	}
+/* LGE_CHANGE_S, jisil.park@lge.com */
+// ebs      
+#ifndef TEDCHO_IPC
+if( (tx != NULL) && (rx != NULL) )
+{
+	//omap_start_dma_pre(mcspi_dma->dma_tx_channel);
+	//omap_start_dma_pre(mcspi_dma->dma_rx_channel);	
+	//omap_start_dma_post(mcspi_dma->dma_tx_channel, mcspi_dma->dma_rx_channel);	
+
+
+	omap_start_dma(mcspi_dma->dma_tx_channel);
+	omap_start_dma(mcspi_dma->dma_rx_channel);
+	
+	//omap2_mcspi_set_dma_req(spi, 1, 1);
+	//omap2_mcspi_set_dma_req(spi, 0, 1);
+	omap2_mcspi_set_dma_req_both(spi, 1, 1);
+
+	
+}
+else        
+{       // Merged by jisil finish
+	if (tx != NULL) {
+		omap_start_dma(mcspi_dma->dma_tx_channel);
+		omap2_mcspi_set_dma_req(spi, 0, 1);
+	}
 
 	if (rx != NULL) {
 		omap_start_dma(mcspi_dma->dma_rx_channel);
 		omap2_mcspi_set_dma_req(spi, 1, 1);
 	}
-
+}       // Merged by jisil start
+#else
 	if (tx != NULL) {
 		omap_start_dma(mcspi_dma->dma_tx_channel);
 		omap2_mcspi_set_dma_req(spi, 0, 1);
 	}
+
+	if (rx != NULL) {
+		omap_start_dma(mcspi_dma->dma_rx_channel);
+		omap2_mcspi_set_dma_req(spi, 1, 1);
+	}
+#endif
+// ebs      
+/* LGE_CHANGE_E, jisil.park@lge.com */
+#ifdef CONFIG_LGE_SPI
+	if (mcspi->mcspi_mode == OMAP2_MCSPI_SLAVE)
+		spi->slave_ready(spi, 1);
+#endif
 
 	if (tx != NULL) {
 		wait_for_completion(&mcspi_dma->dma_tx_completion);
@@ -649,6 +708,10 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 			       /* word_len <= 32 */ 4;
 		}
 		omap2_mcspi_set_enable(spi, 1);
+#ifdef CONFIG_LGE_SPI
+	if (mcspi->mcspi_mode == OMAP2_MCSPI_SLAVE)
+		spi->slave_ready(spi, 0);
+#endif
 	}
 	return count;
 }
@@ -706,6 +769,10 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
 					dev_err(&spi->dev, "RXS timed out\n");
 					goto out;
 				}
+//
+				if (c == 0 && tx == NULL)		// M by jisil
+					mcspi_write_chconf0(spi, l);
+//
 
 				if (c == 1 && tx == NULL &&
 				    (l & OMAP2_MCSPI_CHCONF_TURBO)) {
@@ -760,6 +827,10 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
 					goto out;
 				}
 
+//
+				if (c == 0 && tx == NULL)		// M by jisil
+					mcspi_write_chconf0(spi, l);
+//
 				if (c == 2 && tx == NULL &&
 				    (l & OMAP2_MCSPI_CHCONF_TURBO)) {
 					omap2_mcspi_set_enable(spi, 0);
@@ -812,6 +883,11 @@ omap2_mcspi_txrx_pio(struct spi_device *spi, struct spi_transfer *xfer)
 					dev_err(&spi->dev, "RXS timed out\n");
 					goto out;
 				}
+
+//
+				if (c == 0 && tx == NULL)		// M by jisil
+					mcspi_write_chconf0(spi, l);
+//
 
 				if (c == 4 && tx == NULL &&
 				    (l & OMAP2_MCSPI_CHCONF_TURBO)) {

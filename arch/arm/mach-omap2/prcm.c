@@ -55,6 +55,7 @@ struct omap3_prcm_regs {
 	u32 per_cm_clksel;
 	u32 emu_cm_clksel;
 	u32 emu_cm_clkstctrl;
+	u32 pll_cm_autoidle;	// 4 off-mode
 	u32 pll_cm_autoidle2;
 	u32 pll_cm_clksel4;
 	u32 pll_cm_clksel5;
@@ -527,7 +528,15 @@ void omap_prcm_arch_reset(char mode, const char *cmd)
 		u32 l;
 
 		prcm_offs = OMAP3430_GR_MOD;
+#if defined(CONFIG_MACH_LGE_OMAP3)
+		{
+			extern char reset_mode;
+			//l = ('B' << 24) | ('M' << 16) | (reset_mode << 8) | mode;
+			l = ('B' << 24) | ('M' << 16) | (reset_mode << 8) | (cmd ? (u8)*cmd : 0);
+		}
+#else
 		l = ('B' << 24) | ('M' << 16) | (cmd ? (u8)*cmd : 0);
+#endif
 		/* Reserve the first word in scratchpad for communicating
 		 * with the boot ROM. A pointer to a data structure
 		 * describing the boot process can be stored there,
@@ -783,6 +792,9 @@ void omap3_prcm_save_context(void)
 			 cm_read_mod_reg(OMAP3430_EMU_MOD, CM_CLKSEL1);
 	prcm_context.emu_cm_clkstctrl =
 			 cm_read_mod_reg(OMAP3430_EMU_MOD, OMAP2_CM_CLKSTCTRL);
+	/* 4 off-mode	*/
+	prcm_context.pll_cm_autoidle =
+			 cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE1);
 	prcm_context.pll_cm_autoidle2 =
 			 cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE2);
 	prcm_context.pll_cm_clksel4 =
@@ -937,6 +949,9 @@ void omap3_prcm_restore_context(void)
 					 CM_CLKSEL1);
 	cm_write_mod_reg(prcm_context.emu_cm_clkstctrl, OMAP3430_EMU_MOD,
 					 OMAP2_CM_CLKSTCTRL);
+	/* 4 off-mode */
+	cm_write_mod_reg(prcm_context.pll_cm_autoidle, PLL_MOD,
+					 CM_AUTOIDLE1);
 	cm_write_mod_reg(prcm_context.pll_cm_autoidle2, PLL_MOD,
 					 CM_AUTOIDLE2);
 	cm_write_mod_reg(prcm_context.pll_cm_clksel4, PLL_MOD,

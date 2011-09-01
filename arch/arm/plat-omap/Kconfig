@@ -184,7 +184,7 @@ config OMAP_REMOTE_PROC
           support for DSP, IVA, Tesla and Ducati (OMAP2/3/4).
 
 config OMAP_IOMMU
-	tristate
+	tristate "OMAP iommu"
 
 config OMAP_USER_DMM
 	tristate

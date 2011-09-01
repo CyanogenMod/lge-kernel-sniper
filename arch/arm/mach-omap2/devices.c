@@ -494,11 +494,19 @@ static int omap_mcspi_init(struct omap_hwmod *oh, void *user)
 		pdata->force_cs_mode = 1;
 		break;
 	case 1:
+#ifdef CONFIG_LGE_SPI_SLAVE
+		pdata->num_cs = 2;
+		pdata->mode = OMAP2_MCSPI_SLAVE;
+		pdata->dma_mode = 1;
+		pdata->force_cs_mode = 0;
+		pdata->fifo_depth = 16;
+#else
 		pdata->num_cs = 2;
 		pdata->mode = OMAP2_MCSPI_MASTER;
 		pdata->dma_mode = 1;
 		pdata->force_cs_mode = 0;
 		pdata->fifo_depth = 0;
+#endif /*CONFIG_LGE_SPI_SLAVE*/
 		break;
 	case 2:
 		pdata->num_cs = 2;
@@ -684,6 +692,7 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 	}
 
 	if (cpu_is_omap34xx()) {
+		u32 dev_conf = 0, v_shift = 0;
 		if (controller_nr == 0) {
 			omap_mux_init_signal("sdmmc1_clk",
 				OMAP_PIN_INPUT_PULLUP);
@@ -711,6 +720,8 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				omap_mux_init_signal("sdmmc1_dat7",
 					OMAP_PIN_INPUT_PULLUP);
 			}
+			dev_conf = OMAP2_CONTROL_DEVCONF0;
+			v_shift = OMAP2_MMCSDIO1ADPCLKISEL;
 		}
 		if (controller_nr == 1) {
 			/* MMC2 */
@@ -745,11 +756,22 @@ static inline void omap2_mmc_mux(struct omap_mmc_platform_data *mmc_controller,
 				omap_mux_init_signal("sdmmc2_dat7.sdmmc2_dat7",
 					OMAP_PIN_INPUT_PULLUP);
 			}
+			dev_conf = OMAP343X_CONTROL_DEVCONF1;
+			v_shift = OMAP2_MMCSDIO2ADPCLKISEL;
 		}
 
 		/*
 		 * For MMC3 the pins need to be muxed in the board-*.c files
 		 */
+		/*
+		 * Use internal loop-back in MMC/SDIO Module Input Clock
+		 * selection
+		 */
+		if (mmc_controller->slots[0].internal_clock && dev_conf) {
+			u32 v = omap_ctrl_readl(dev_conf);
+			v |= (1 << v_shift);
+			omap_ctrl_writel(v, dev_conf);
+		}
 	}
 }
 

@@ -71,9 +71,11 @@ struct powerdomain *mpu_pd, *core_pd;
  */
 static struct cpuidle_params cpuidle_params_table[] = {
 	/* C1 */
-	{1, 2, 2, 5},
+	{1, 2, 12, 20},
+	//{1, 2, 2, 5},
 	/* C2 */
-	{1, 10, 10, 30},
+	{1, 2, 18, 25},
+	//{1, 10, 10, 30},
 	/* C3 */
 	{1, 50, 50, 300},
 	/* C4 */
@@ -136,7 +138,7 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 	if (omap_irq_pending() || need_resched())
 		goto return_sleep_time;
 
-	if (cx->type == OMAP3_STATE_C1) {
+	if (cx->type == OMAP3_STATE_C1 || cx->type == OMAP3_STATE_C2) {
 		pwrdm_for_each_clkdm(mpu_pd, _cpuidle_deny_idle);
 		pwrdm_for_each_clkdm(core_pd, _cpuidle_deny_idle);
 	}
@@ -144,7 +146,7 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 	/* Execute ARM wfi */
 	omap_sram_idle();
 
-	if (cx->type == OMAP3_STATE_C1) {
+	if (cx->type == OMAP3_STATE_C1 || cx->type == OMAP3_STATE_C2) {
 		pwrdm_for_each_clkdm(mpu_pd, _cpuidle_allow_idle);
 		pwrdm_for_each_clkdm(core_pd, _cpuidle_allow_idle);
 	}

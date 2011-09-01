@@ -286,6 +286,12 @@ int clk_register(struct clk *clk)
 }
 EXPORT_SYMBOL(clk_register);
 
+struct list_head *mg_omap_clk_clocks_list_head(void)
+{                                                   
+	    return &clocks;                                 
+}                                                   
+EXPORT_SYMBOL(mg_omap_clk_clocks_list_head);        
+
 void clk_unregister(struct clk *clk)
 {
 	if (clk == NULL || IS_ERR(clk))

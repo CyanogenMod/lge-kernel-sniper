@@ -33,6 +33,11 @@
 #endif
 #define MAX_MANAGERS	3
 
+#define OMAP_VOUT_MAX_BUFFERS    6
+/*
+ * Currently VRFB BUF context and Data Buffers are mapped 1:1
+ */
+#define OMAP_VOUT_MAX_VRFB_CTXT        OMAP_VOUT_MAX_BUFFERS
 /* TI Private V4L2 ioctls */
 #define V4L2_CID_TI_DISPC_OVERLAY	(V4L2_CID_PRIVATE_BASE + 0)
 
@@ -97,6 +102,11 @@ struct omap_vout_device {
 	int vid;
 	int opened;
 
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+	u32 rsz_configured;
+	u32 use_isp_rsz_for_downscale;
+#endif
+
 	/* we don't allow to change image fmt/size once buffer has
 	 * been allocated
 	 */
@@ -145,9 +155,9 @@ struct omap_vout_device {
 	int vrfb_bpp; /* bytes per pixel with respect to VRFB */
 
 	struct vid_vrfb_dma vrfb_dma_tx;
-	unsigned int smsshado_phy_addr[MAC_VRFB_CTXS];
-	unsigned int smsshado_virt_addr[MAC_VRFB_CTXS];
-	struct vrfb vrfb_context[MAC_VRFB_CTXS];
+  	unsigned int smsshado_phy_addr[OMAP_VOUT_MAX_VRFB_CTXT];
+	unsigned int smsshado_virt_addr[OMAP_VOUT_MAX_VRFB_CTXT];
+	struct vrfb vrfb_context[OMAP_VOUT_MAX_VRFB_CTXT];
 	bool vrfb_static_allocation;
 	unsigned int smsshado_size;
 	unsigned char pos;
@@ -182,4 +192,9 @@ struct vout_platform_data {
 	void (*set_max_mpu_wakeup_lat)(struct device *dev, long t);
 	void (*set_cpu_freq)(unsigned long f);
 };
+
+#ifdef CONFIG_OMAP3_ISP_RESIZER
+extern int use_isp_resizer_decoder;
+#endif
+
 #endif	/* ifndef OMAP_VOUTDEF_H */

@@ -178,6 +178,20 @@ obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom3.o \
 					   board-zoom-display.o \
 					   hsmmc.o \
 					   board-zoom-debugboard.o
+obj-$(CONFIG_MACH_LGE_HUB)		+= board-hub.o \
+					   board-hub-peripherals.o \
+					   board-hub-camera.o \
+					   board-hub-panel.o \
+					   board-hub-wifi.o \
+					   board-hub-debug.o \
+					   board-hub-ers.o \
+					   board-sniper-mmc.o \
+					   hsmmc.o
+# LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-03-26, Modify for AT%FBOOT & AT%SWVCHECK.
+#110111 dongjin.sim@lge.com %SWV AP [START]
+obj-$(CONFIG_MACH_LGE_HUB)		+= lge_emmc_direct_access.o					   
+#110111 dongjin.sim@lge.com %SWV AP [END]
+# LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-03-26, Modify for AT%FBOOT & AT%SWVCHECK.
 obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   board-zoom-peripherals.o \
 					   board-zoom2-camera.o \
@@ -195,10 +209,10 @@ obj-$(CONFIG_MACH_OMAP4_PANDA)		+= board-omap4panda.o \
 					   hsmmc.o
 
 ifeq ($(CONFIG_ARCH_OMAP4),y)
-obj-$(CONFIG_TIWLAN_SDIO)		+= board-4430sdp-wifi.o
+#obj-$(CONFIG_TIWLAN_SDIO)		+= board-4430sdp-wifi.o
 endif
 ifeq ($(CONFIG_ARCH_OMAP3),y)
-obj-$(CONFIG_TIWLAN_SDIO)		+= board-zoom2-wifi.o
+#obj-$(CONFIG_TIWLAN_SDIO)		+= board-zoom2-wifi.o
 endif
 
 obj-$(CONFIG_MACH_OMAP3517EVM)		+= board-am3517evm.o

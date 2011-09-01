@@ -38,7 +38,18 @@
 #include "omap-mcbsp.h"
 #include "omap-pcm.h"
 
+#define ZOOM2_BT_MCBSP_GPIO		164
 #define ZOOM2_HEADSET_MUX_GPIO		(OMAP_MAX_GPIO_LINES + 15)
+#define ZOOM2_HEADSET_EXTMUTE_GPIO      153
+
+static struct snd_soc_dai_link zoom2_dai[];
+static int zoom2_hifi_playback_state;
+static int zoom2_voice_state;
+static int zoom2_capture_state;
+
+struct snd_soc_pcm_runtime *g_rtd;
+
+extern int twl4030_set_ext_clock(struct snd_soc_codec *codec, int enable);
 
 static int zoom2_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
@@ -76,12 +87,72 @@ static int zoom2_hw_params(struct snd_pcm_substream *substream,
 		return ret;
 	}
 
+	/* enable 256 FS clk for HDMI */
+
+	 ret = twl4030_set_ext_clock(codec_dai->codec, 1);
+	 if (ret < 0) {
+		printk(KERN_ERR "can't set 256 FS clock\n");
+		return ret;
+	 }
+
+	/* Use external clock for mcBSP2 */
+	ret = snd_soc_dai_set_sysclk(cpu_dai, OMAP_MCBSP_SYSCLK_CLKS_EXT,
+			0, SND_SOC_CLOCK_OUT);
+	if (ret < 0) {
+		printk(KERN_ERR "can't set cpu_dai system clock\n");
+		return ret;
+	}
+
+	/*
+	 * Set headset EXTMUTE signal to ON to make sure we
+	 * get correct headset status
+	 */
+	gpio_direction_output(ZOOM2_HEADSET_EXTMUTE_GPIO, 1);
+
 	return 0;
 }
 
 static struct snd_soc_ops zoom2_ops = {
 	.hw_params = zoom2_hw_params,
 };
+
+/* Audio Sampling frequences supported by Triton */
+static const char *audio_sample_rates_txt[] = {
+	"8000", "11025", "12000", "16000", "22050",
+	"24000", "32000", "44100", "48000", "96000"
+	};
+
+/*
+ * APLL_RATE defined in CODEC_MODE register, which corresponds
+ * to the sampling rates defined above
+ */
+static const unsigned int audio_sample_rates_apll[] = {
+	0x0, 0x1, 0x2, 0x4, 0x5,
+	0x6, 0x8, 0x9, 0xa, 0xe
+	};
+
+/* Voice Sampling rates supported by Triton */
+static const char *voice_sample_rates_txt[] = {
+	"8000", "16000"
+	};
+
+/*
+ * SEL_16K defined in CODEC_MODE register, which corresponds
+ * to the voice sample rates defined above
+ */
+static const unsigned int voice_sample_rates_sel_16k[] = {
+	0x0, 0x1
+	};
+
+static const struct soc_enum twl4030_audio_sample_rates_enum =
+	SOC_VALUE_ENUM_SINGLE(TWL4030_REG_CODEC_MODE, 4, 0xf,
+			ARRAY_SIZE(audio_sample_rates_txt),
+			audio_sample_rates_txt, audio_sample_rates_apll);
+
+static const struct soc_enum twl4030_voice_sample_rates_enum =
+	SOC_VALUE_ENUM_SINGLE(TWL4030_REG_CODEC_MODE, 3, 0x1,
+			ARRAY_SIZE(voice_sample_rates_txt),
+			voice_sample_rates_txt, voice_sample_rates_sel_16k);
 
 static int zoom2_hw_voice_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
@@ -159,10 +230,146 @@ static const struct snd_soc_dapm_route audio_map[] = {
 	{"Aux In", NULL, "AUXR"},
 };
 
+static int zoom2_get_hifi_playback_state(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = zoom2_hifi_playback_state;
+	return 0;
+}
+
+static int zoom2_set_hifi_playback_state(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dapm_widget *widget = snd_kcontrol_chip(kcontrol);
+	int ret;
+
+	if (zoom2_hifi_playback_state == ucontrol->value.integer.value[0])
+		return 0;
+
+	if (ucontrol->value.integer.value[0]) {
+		/* this info is in the twl4030_dai ... */
+		ret = snd_soc_dapm_stream_event(g_rtd, 1, "HiFi Playback",
+			SND_SOC_DAPM_STREAM_START);
+	} else {
+	       ret = snd_soc_dapm_stream_event(g_rtd, 1, "HiFi Playback",
+			SND_SOC_DAPM_STREAM_STOP);
+	}
+
+	if (ret != 0) {
+		printk(KERN_ERR "failed to set hifi playback state\n");
+		return 0;
+	}
+
+	zoom2_hifi_playback_state = ucontrol->value.integer.value[0];
+	return 1;
+}
+
+static int zoom2_get_voice_state(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = zoom2_voice_state;
+	return 0;
+}
+
+static int zoom2_set_voice_state(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+	struct snd_soc_codec *codec = snd_kcontrol_chip(kcontrol);
+
+	if (zoom2_voice_state == ucontrol->value.integer.value[0])
+		return 0;
+
+	if (ucontrol->value.integer.value[0]) {
+		ret = snd_soc_dapm_stream_event(g_rtd, 1, "Voice Playback",
+			SND_SOC_DAPM_STREAM_START);
+
+		/* Enable voice digital filters */
+		snd_soc_update_bits(codec, TWL4030_REG_OPTION,
+			TWL4030_ARXL1_VRX_EN, 0x10);
+	} else {
+	       ret = snd_soc_dapm_stream_event(g_rtd, 1, "Voice Playback",
+			SND_SOC_DAPM_STREAM_STOP);
+
+		/* Disable voice digital filters */
+		snd_soc_update_bits(codec, TWL4030_REG_OPTION,
+			TWL4030_ARXL1_VRX_EN, 0x0);
+	}
+
+	if (ret != 0) {
+		printk(KERN_ERR "failed to set voice playback state\n");
+		return 0;
+	}
+
+	zoom2_voice_state = ucontrol->value.integer.value[0];
+	return 1;
+}
+
+static int zoom2_get_capture_state(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = zoom2_capture_state;
+	return 0;
+}
+
+static int zoom2_set_capture_state(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	int ret;
+
+	if (zoom2_capture_state == ucontrol->value.integer.value[0])
+		return 0;
+
+	if (ucontrol->value.integer.value[0]) {
+		ret = snd_soc_dapm_stream_event(g_rtd, 1, "Capture",
+			SND_SOC_DAPM_STREAM_START);
+	} else {
+	       ret = snd_soc_dapm_stream_event(g_rtd, 1, "Capture",
+			SND_SOC_DAPM_STREAM_STOP);
+	}
+
+	if (ret != 0) {
+		printk(KERN_ERR "failed to set capture state\n");
+		return 0;
+	}
+
+	zoom2_capture_state = ucontrol->value.integer.value[0];
+	return 1;
+}
+
+static const char *path_control[] = {"Off", "On"};
+
+static const struct soc_enum zoom2_enum[] = {
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(path_control), path_control),
+};
+
+static const struct snd_kcontrol_new zoom2_controls[] = {
+	SOC_ENUM_EXT("HIFI Playback Control", zoom2_enum[0],
+		zoom2_get_hifi_playback_state, zoom2_set_hifi_playback_state),
+	SOC_ENUM_EXT("Voice Control", zoom2_enum[0],
+		zoom2_get_voice_state, zoom2_set_voice_state),
+	SOC_ENUM_EXT("Capture Control", zoom2_enum[0],
+		zoom2_get_capture_state, zoom2_set_capture_state),
+	SOC_ENUM_EXT("Audio Sample Rate", twl4030_audio_sample_rates_enum,
+		snd_soc_get_value_enum_double, snd_soc_put_value_enum_double),
+	SOC_ENUM_EXT("Voice Sample Rate", twl4030_voice_sample_rates_enum,
+		snd_soc_get_value_enum_double, snd_soc_put_value_enum_double),
+	SOC_SINGLE("256FS CLK Control Switch", TWL4030_REG_AUDIO_IF, 1, 1, 0),
+};
+
 static int zoom2_twl4030_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_codec *codec = rtd->codec;
 	int ret;
+	unsigned short reg;
+
+	g_rtd = rtd;
+
+	/* Add ZOOM2 specific controls */
+	ret = snd_soc_add_controls(codec, zoom2_controls,
+			ARRAY_SIZE(zoom2_controls));
+	if (ret)
+		return ret;
 
 	/* Add Zoom2 specific widgets */
 	ret = snd_soc_dapm_new_controls(codec->dapm, zoom2_twl4030_dapm_widgets,
@@ -172,6 +379,10 @@ static int zoom2_twl4030_init(struct snd_soc_pcm_runtime *rtd)
 
 	/* Set up Zoom2 specific audio path audio_map */
 	snd_soc_dapm_add_routes(codec->dapm, audio_map, ARRAY_SIZE(audio_map));
+
+	reg = codec->driver->read(codec, TWL4030_REG_VOICE_IF);
+	reg |= TWL4030_VIF_DIN_EN | TWL4030_VIF_DOUT_EN | TWL4030_VIF_EN;
+	codec->driver->write(codec, TWL4030_REG_VOICE_IF, reg);
 
 	/* Zoom2 connected pins */
 	snd_soc_dapm_enable_pin(codec->dapm, "Ext Mic");
@@ -184,6 +395,9 @@ static int zoom2_twl4030_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_nc_pin(codec->dapm, "CARKITMIC");
 	snd_soc_dapm_nc_pin(codec->dapm, "DIGIMIC0");
 	snd_soc_dapm_nc_pin(codec->dapm, "DIGIMIC1");
+
+	snd_soc_dapm_nc_pin(codec->dapm, "OUTL");
+	snd_soc_dapm_nc_pin(codec->dapm, "OUTR");
 	snd_soc_dapm_nc_pin(codec->dapm, "EARPIECE");
 	snd_soc_dapm_nc_pin(codec->dapm, "PREDRIVEL");
 	snd_soc_dapm_nc_pin(codec->dapm, "PREDRIVER");
@@ -199,11 +413,90 @@ static int zoom2_twl4030_voice_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_codec *codec = rtd->codec;
 	unsigned short reg;
+	int     ret = 0;
 
 	/* Enable voice interface */
 	reg = codec->driver->read(codec, TWL4030_REG_VOICE_IF);
 	reg |= TWL4030_VIF_DIN_EN | TWL4030_VIF_DOUT_EN | TWL4030_VIF_EN;
 	codec->driver->write(codec, TWL4030_REG_VOICE_IF, reg);
+
+	/* hifi state */
+
+	ret = snd_soc_dapm_stream_event(rtd,
+			1,
+			"Capture",
+			SND_SOC_DAPM_STREAM_START);
+
+	/* voice state */
+	/* this is not dynamic, so ignore dir */
+	ret = snd_soc_dapm_stream_event(rtd,
+			1,
+			"TWL4030 Voice",
+			SND_SOC_DAPM_STREAM_START);
+
+		/* Enable voice digital filters */
+	snd_soc_update_bits(codec, TWL4030_REG_OPTION,
+			TWL4030_ARXL1_VRX_EN, 0x10);
+
+	ret = snd_soc_dapm_stream_event(rtd,
+			1,
+			"TWL4030 Voice",
+			SND_SOC_DAPM_STREAM_START);
+
+	/* reinit defaults */
+
+	snd_soc_update_bits(codec, 1, 1, 0);
+	snd_soc_update_bits(codec, 17, 63, 50);
+	snd_soc_update_bits(codec, 16, 63, 50);
+
+	snd_soc_update_bits(codec, 19, 63, 45);
+	snd_soc_update_bits(codec, 18, 63, 45);
+
+	snd_soc_update_bits(codec, 17, 192, 128);
+	snd_soc_update_bits(codec, 16, 192, 128);
+	snd_soc_update_bits(codec, 19, 192, 128);
+	snd_soc_update_bits(codec, 18, 192, 128);
+
+	snd_soc_update_bits(codec, 25, 248, 0);
+	snd_soc_update_bits(codec, 26, 248, 0);
+
+	snd_soc_update_bits(codec, 27, 248, 32);
+	snd_soc_update_bits(codec, 28, 248, 32);
+
+	snd_soc_update_bits(codec, 25, 2, 0);
+	snd_soc_update_bits(codec, 26, 2, 0);
+	snd_soc_update_bits(codec, 27, 2, 2);
+	snd_soc_update_bits(codec, 28, 2, 2);
+
+	snd_soc_update_bits(codec, 20, 63, 36);
+
+	snd_soc_update_bits(codec, 68, 2, 0);
+
+	snd_soc_update_bits(codec, 37, 48, 16);
+	snd_soc_update_bits(codec, 37, 48, 16);
+
+	snd_soc_update_bits(codec, 38, 48, 16);
+
+	snd_soc_update_bits(codec, 35, 15, 5);
+
+	snd_soc_update_bits(codec, 39, 48, 16);
+	snd_soc_update_bits(codec, 40, 48, 16);
+
+	snd_soc_update_bits(codec, 33, 48, 16);
+
+	snd_soc_update_bits(codec, 10, 31, 23);
+	snd_soc_update_bits(codec, 11, 31, 23);
+	snd_soc_update_bits(codec, 12, 31, 23);
+	snd_soc_update_bits(codec, 13, 31, 23);
+
+	snd_soc_update_bits(codec, 72, 63, 27);
+
+	snd_soc_update_bits(codec, 7, 4, 0);
+
+	snd_soc_update_bits(codec, 36, 28, 12);
+
+	snd_soc_update_bits(codec, 69, 32, 0);
+	snd_soc_update_bits(codec, 69, 2, 0);
 
 	return 0;
 }
@@ -221,10 +514,20 @@ static struct snd_soc_dai_link zoom2_dai[] = {
 		.ops = &zoom2_ops,
 	},
 	{
-		.name = "TWL4030 PCM",
+		.name = "TWL4030 VOICE",
 		.stream_name = "TWL4030 Voice",
 		.cpu_dai_name = "omap-mcbsp-dai.2",
 		.codec_dai_name = "twl4030-voice",
+		.platform_name = "omap-pcm-audio",
+		.codec_name = "twl4030-codec",
+		.init = zoom2_twl4030_voice_init,
+		.ops = &zoom2_voice_ops,
+	},
+	{
+		.name = "TWL4030_PCM",
+		.stream_name = "TWL4030 Clock",
+		.cpu_dai_name = "omap-mcbsp-dai.3",
+		.codec_dai_name = "twl4030-clock",
 		.platform_name = "omap-pcm-audio",
 		.codec_name = "twl4030-codec",
 		.init = zoom2_twl4030_voice_init,
@@ -238,6 +541,28 @@ static struct snd_soc_card snd_soc_zoom2 = {
 	.long_name = "Zoom2 (twl4030)",
 	.dai_link = zoom2_dai,
 	.num_links = ARRAY_SIZE(zoom2_dai),
+};
+
+/* EXTMUTE callback function */
+void zoom2_set_hs_extmute(int mute)
+{
+	gpio_set_value(ZOOM2_HEADSET_EXTMUTE_GPIO, mute);
+}
+
+struct twl4030_setup_data {
+	unsigned int ramp_delay_value;
+	unsigned int sysclk;
+	unsigned int hs_extmute:1;
+	void (*set_hs_extmute)(int mute);
+};
+
+/* twl4030 setup */
+static struct twl4030_setup_data twl4030_setup = {
+	.ramp_delay_value = 3,  /* 161 ms */
+	.sysclk = 26000,
+	/*.hs_extmute = 1, */
+	.hs_extmute = 0,
+	.set_hs_extmute = zoom2_set_hs_extmute,
 };
 
 static struct platform_device *zoom2_snd_device;

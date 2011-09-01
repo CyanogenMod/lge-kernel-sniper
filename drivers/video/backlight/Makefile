@@ -35,4 +35,5 @@ obj-$(CONFIG_BACKLIGHT_ADP5520)	+= adp5520_bl.o
 obj-$(CONFIG_BACKLIGHT_ADP8860)	+= adp8860_bl.o
 obj-$(CONFIG_BACKLIGHT_88PM860X) += 88pm860x_bl.o
 obj-$(CONFIG_BACKLIGHT_PCF50633)	+= pcf50633-backlight.o
-
+obj-$(CONFIG_BACKLIGHT_AAT2862)	+= hub_aat2862.o	#20100619 kyungtae.oh@lge.com Hub backlight driver
+obj-$(CONFIG_BACKLIGHT_AAT2870)	+= aat2870_bl.o	

@@ -28,11 +28,25 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/i2c/twl.h>
+#include <linux/workqueue.h>	
+#include <linux/delay.h>	
+
+
+#include <linux/dvs_suite.h>
+
 
 #define PWR_PWRON_IRQ (1 << 0)
 
 #define STS_HW_CONDITIONS 0xf
 
+static struct workqueue_struct *pwrbutton_wq;	
+static struct work_struct pwrbutton_wk;		
+static struct input_dev *pwr;			
+
+
+extern void resumekey_pressed();
+
+/*
 static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 {
 	struct input_dev *pwr = _pwr;
@@ -42,6 +56,9 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 	err = twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER, &value,
 				STS_HW_CONDITIONS);
 	if (!err)  {
+
+		resumekey_pressed();
+
 		input_report_key(pwr, KEY_POWER, value & PWR_PWRON_IRQ);
 		input_sync(pwr);
 	} else {
@@ -51,12 +68,63 @@ static irqreturn_t powerbutton_irq(int irq, void *_pwr)
 
 	return IRQ_HANDLED;
 }
+*/
+
+static void pwrbutton_wq_func(struct work_struct *work){
+
+	int err;
+	u8 value;
+
+	err = twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER, &value, STS_HW_CONDITIONS);
+	if (!err)  {
+
+		resumekey_pressed();
+
+		input_report_key(pwr, KEY_POWER, value & PWR_PWRON_IRQ);
+		input_sync(pwr);
+	} else {
+		dev_err(pwr->dev.parent, "twl4030: i2c error %d while reading"
+			" TWL4030 PM_MASTER STS_HW_CONDITIONS register\n", err);
+	}
+}
+
+static irqreturn_t powerbutton_irq(int irq, void *_pwr)
+{
+	pwr = _pwr;
+
+	queue_work(pwrbutton_wq, &pwrbutton_wk);
+
+
+/* Move this code later to somewhere common, such as the irq entry point.
+ */
+#if 1
+	if(ds_status.flag_run_dvs == 1){
+        ds_status.flag_touch_timeout_count = DS_TOUCH_TIMEOUT_COUNT_MAX;    // = 6
+        if(ds_status.touch_timeout_sec == 0){
+            if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
+                ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
+                ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
+            }
+            else{
+                ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
+                ds_status.touch_timeout_usec = (ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
+            }
+        }
+    }
+#endif
+
+
+	return IRQ_HANDLED;
+}
+
 
 static int __devinit twl4030_pwrbutton_probe(struct platform_device *pdev)
 {
-	struct input_dev *pwr;
+	//struct input_dev *pwr;	
 	int irq = platform_get_irq(pdev, 0);
 	int err;
+
+	pwrbutton_wq = create_workqueue("pwrbutton_workqueue");	
 
 	pwr = input_allocate_device();
 	if (!pwr) {
@@ -70,7 +138,9 @@ static int __devinit twl4030_pwrbutton_probe(struct platform_device *pdev)
 	pwr->phys = "twl4030_pwrbutton/input0";
 	pwr->dev.parent = &pdev->dev;
 
-	err = request_threaded_irq(irq, NULL, powerbutton_irq,
+	
+	INIT_WORK(&pwrbutton_wk, pwrbutton_wq_func);
+	err = request_irq(irq, powerbutton_irq,
 			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
 			"twl4030_pwrbutton", pwr);
 	if (err < 0) {
@@ -102,6 +172,9 @@ static int __devexit twl4030_pwrbutton_remove(struct platform_device *pdev)
 
 	free_irq(irq, pwr);
 	input_unregister_device(pwr);
+
+	flush_workqueue(pwrbutton_wq);		
+	destroy_workqueue(pwrbutton_wq);
 
 	return 0;
 }

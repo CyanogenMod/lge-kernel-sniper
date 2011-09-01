@@ -184,8 +184,9 @@ static inline int omap2_i2c_add_bus(int bus_id)
 	 * completes.
 	 * Only omap3 has support for constraints
 	 */
-	if (cpu_is_omap34xx())
+	if (cpu_is_omap34xx()) {
 		pdata->set_mpu_wkup_lat = omap_pm_set_max_mpu_wakeup_lat;
+	}
 
 	if (cpu_is_omap44xx() && (omap_rev() > OMAP4430_REV_ES1_0))
 		pdata->features |= I2C_HAS_FASTMODE_PLUS;

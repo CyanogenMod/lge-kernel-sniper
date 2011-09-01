@@ -27,7 +27,9 @@ obj-$(CONFIG_SPI_IMX)			+= spi_imx.o
 obj-$(CONFIG_SPI_LM70_LLP)		+= spi_lm70llp.o
 obj-$(CONFIG_SPI_PXA2XX)		+= pxa2xx_spi.o
 obj-$(CONFIG_SPI_OMAP_UWIRE)		+= omap_uwire.o
-obj-$(CONFIG_SPI_OMAP24XX)		+= omap2_mcspi.o
+#obj-$(CONFIG_SPI_OMAP24XX)		+= omap2_mcspi.o
+obj-$(CONFIG_LGE_SPI_MASTER)		+= omap2_mcspi.o
+obj-$(CONFIG_LGE_SPI_SLAVE)		+= omap2_mcspi_slave.o
 obj-$(CONFIG_SPI_OMAP_100K)		+= omap_spi_100k.o
 obj-$(CONFIG_SPI_ORION)			+= orion_spi.o
 obj-$(CONFIG_SPI_PL022)			+= amba-pl022.o
@@ -55,6 +57,10 @@ spi_s3c24xx_hw-$(CONFIG_SPI_S3C24XX_FIQ) += spi_s3c24xx_fiq.o
 # 	... add above this line ...
 
 # SPI protocol drivers (device/link on bus)
+# //LGE_UPDATE_S [eungbo.shim@lge.com] 20100709
+obj-$(CONFIG_LGE_SPI_MASTER)		+= ifx_n721_spi.o
+obj-$(CONFIG_LGE_SPI_SLAVE)		+= ifx_n721_spi_slave.o
+# //LGE_UPDATS_E [eungbo.shim@lge.com] 20100709
 obj-$(CONFIG_SPI_SPIDEV)	+= spidev.o
 obj-$(CONFIG_SPI_TLE62X0)	+= tle62x0.o
 # 	... add above this line ...

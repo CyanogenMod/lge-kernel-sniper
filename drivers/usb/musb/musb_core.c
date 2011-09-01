@@ -138,6 +138,11 @@ MODULE_LICENSE("GPL");
 MODULE_ALIAS("platform:" MUSB_DRIVER_NAME);
 
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
+extern void SAVE_MUSB_ADDRESS_FOR_LGMUSB_P(struct musb *address );
+#endif // defined(CONFIG_MACH_LGE_OMAP3)
+
+
 /*-------------------------------------------------------------------------*/
 
 static inline struct musb *dev_to_musb(struct device *dev)
@@ -1897,6 +1902,10 @@ static void musb_irq_work(struct work_struct *data)
 			plat->set_min_bus_tput(musb->controller,
 				OCP_INITIATOR_AGENT, -1);
 		}
+
+// 20110427 prime@sdcmicro.com Reset the event value. Unless event processing might happen multiple times with wrong value [START]
+	musb->xceiv->event = -1;
+// 20110427 prime@sdcmicro.com Reset the event value. Unless event processing might happen multiple times with wrong value [END]
 }
 
 /* --------------------------------------------------------------------------
@@ -2046,6 +2055,10 @@ bad_config:
 		status = -ENOMEM;
 		goto fail0;
 	}
+
+#if defined(CONFIG_MACH_LGE_OMAP3) 
+	SAVE_MUSB_ADDRESS_FOR_LGMUSB_P(musb);
+#endif // defined(CONFIG_MACH_LGE_OMAP3)
 
 	spin_lock_init(&musb->lock);
 	musb->board_mode = plat->mode;

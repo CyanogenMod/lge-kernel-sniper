@@ -75,6 +75,11 @@ obj-$(CONFIG_VIDEO_TVEEPROM) += tveeprom.o
 obj-$(CONFIG_VIDEO_MT9V011) += mt9v011.o
 obj-$(CONFIG_VIDEO_IMX046) += imx046.o
 obj-$(CONFIG_VIDEO_LV8093) += lv8093.o
+obj-$(CONFIG_VIDEO_IMX072) += imx072.o
+obj-$(CONFIG_VIDEO_IMX072) += dw9716.o
+obj-$(CONFIG_VIDEO_IMX072) += rt8515.o
+obj-$(CONFIG_VIDEO_YACD5B1S) += yacd5b1s.o
+obj-$(CONFIG_VIDEO_LV8093) += lv8093.o
 
 obj-y += isp/
 

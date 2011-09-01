@@ -1343,8 +1343,13 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *user)
 	p->enable_lnk		= omap2_enable_lnk;
 	p->disable_lnk		= omap2_disable_lnk;
 	p->set_dma_chain_ch	= set_dma_chain_ch;
+#if defined(CONFIG_MACH_LGE_OMAP3)
+	p->dma_context_save	= NULL;
+	p->dma_context_restore	= NULL;
+#else
 	p->dma_context_save	= omap2_dma_context_save;
 	p->dma_context_restore	= omap2_dma_context_restore;
+#endif
 	p->clear_lch_regs	= NULL;
 	p->get_gdma_dev		= NULL;
 	p->set_gdma_dev		= NULL;
@@ -1400,7 +1405,7 @@ static int __init omap2_system_dma_init_dev(struct omap_hwmod *oh, void *user)
 		return -ENOMEM;
 	}
 
-	/* OMAP4 and OMAP3630 has descrіptor loading registers */
+	/* OMAP4 and OMAP3630 has descr?ptor loading registers */
 	if (cpu_is_omap3630() || cpu_is_omap4430())
 		ch_spec_regs = 22;
 	else

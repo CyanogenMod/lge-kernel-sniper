@@ -166,6 +166,7 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 	u8 ctx = vrfb->context;
 	u32 size;
 	u32 control;
+	u16 temp;
 
 	DBG("omapfb_set_vrfb(%d, %lx, %dx%d, %d, %d)\n", ctx, paddr,
 			width, height, bytespp, yuv_mode);
@@ -176,7 +177,17 @@ void omap_vrfb_setup(struct vrfb *vrfb, unsigned long paddr,
 		bytespp *= 2;
 		width /= 2;
 	}
-
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+//#define ORG_GB_ROTATION // Tushar            
+#ifndef ORG_GB_ROTATION // Tushar
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+	/* Configure the vrfb buffer for rotation*/
+	if (rotation == OMAP_DSS_ROT_90 || rotation == OMAP_DSS_ROT_270) {
+		temp = width;
+		width = height;
+		height = temp;
+	}
+#endif
 	if (bytespp == 4)
 		pixel_size_exp = 2;
 	else if (bytespp == 2)

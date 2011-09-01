@@ -17,6 +17,8 @@
 
 #include "power_supply.h"
 
+//#define TESTCODE	1
+
 /*
  * This is because the name "current" breaks the device attr macro.
  * The "current" word resolves to "(get_current())" so instead of
@@ -35,6 +37,15 @@
 	.show = power_supply_show_property,				\
 	.store = power_supply_store_property,				\
 }
+
+#ifdef TESTCODE
+#define POWER_SUPPLY_ATTR_RW(_name)					\
+{									\
+	.attr = { .name = #_name, .mode = 0666 },					\
+	.show = power_supply_show_property,				\
+	.store = power_supply_store_property,				\
+}
+#endif
 
 static struct device_attribute power_supply_attrs[];
 
@@ -108,12 +119,24 @@ static ssize_t power_supply_store_property(struct device *dev,
 	union power_supply_propval value;
 	long long_val;
 
+#ifdef TESTCODE
+	if( off == POWER_SUPPLY_PROP_PSEUDO_BATT )
+		value.strval = buf;
+	else
+	{
+#endif
+
 	/* TODO: support other types than int */
 	ret = strict_strtol(buf, 10, &long_val);
 	if (ret < 0)
 		return ret;
 
 	value.intval = long_val;
+
+#ifdef TESTCODE
+	}
+#endif
+
 
 	ret = psy->set_property(psy, off, &value);
 	if (ret < 0)
@@ -164,6 +187,11 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(time_to_full_now),
 	POWER_SUPPLY_ATTR(time_to_full_avg),
 	POWER_SUPPLY_ATTR(type),
+
+#ifdef TESTCODE
+	POWER_SUPPLY_ATTR_RW(pseudo_batt),
+#endif
+
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_ATTR(model_name),
 	POWER_SUPPLY_ATTR(manufacturer),

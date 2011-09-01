@@ -240,6 +240,13 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 	omapfb_unlock(fbdev);
 }
 
+static struct omap_dss_device *Prev_disp;
+void _FrameDone_Sync(void)
+{
+	if (Prev_disp && Prev_disp->driver && Prev_disp->driver->sync)
+		Prev_disp->driver->sync(Prev_disp);
+}
+
 /*
  * Present frame and synchronize with the display to prevent tearing
  * On DSI panels the sync function is used to handle FRAMEDONE IRQ
@@ -259,7 +266,8 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 
 	omapfb_lock(fbdev);
 
-	display = fb2display(framebuffer);
+////	display = fb2display(framebuffer);
+	Prev_disp = display = fb2display(framebuffer);
 	/* The framebuffer doesn't have a display attached, just bail out */
 	if (!display) {
 		omapfb_unlock(fbdev);
@@ -379,6 +387,8 @@ static struct platform_device omaplfb_device = {
 static void OMAPLFBDriverSuspend_Entry(struct early_suspend *ea_event)
 {
 	DEBUG_PRINTK("Requested driver suspend");
+
+	_FrameDone_Sync();
 	OMAPLFBCommonSuspend();
 }
 

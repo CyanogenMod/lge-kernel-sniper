@@ -1825,6 +1825,7 @@ int usb_gadget_register_driver(struct usb_gadget_driver *driver)
 
 		otg_set_peripheral(musb->xceiv, &musb->g);
 
+		musb_save_context(musb); 
 		spin_unlock_irqrestore(&musb->lock, flags);
 
 		if (is_otg_enabled(musb)) {
@@ -1869,6 +1870,7 @@ static void stop_activity(struct musb *musb, struct usb_gadget_driver *driver)
 	/* deactivate the hardware */
 	if (musb->softconnect) {
 		musb->softconnect = 0;
+		printk(KERN_INFO "stop_activity : + musb_pullup ----*[disconnect]*----\n");
 		musb_pullup(musb, 0);
 	}
 	musb_stop(musb);
@@ -1892,7 +1894,9 @@ static void stop_activity(struct musb *musb, struct usb_gadget_driver *driver)
 		}
 
 		spin_unlock(&musb->lock);
+		printk(KERN_INFO "stop_activity : + driver->disconnect ----*[disconnect]*----\n");
 		driver->disconnect(&musb->g);
+		printk(KERN_INFO "stop_activity : - driver->disconnect ----*[disconnect]*----\n");
 		spin_lock(&musb->lock);
 	}
 }
@@ -1954,6 +1958,7 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
 		 */
 	}
 
+	musb_save_context(musb); 
 	return retval;
 }
 EXPORT_SYMBOL(usb_gadget_unregister_driver);

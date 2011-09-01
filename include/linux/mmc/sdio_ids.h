@@ -48,4 +48,7 @@
 #define SDIO_DEVICE_ID_SIANO_NOVA_A0		0x1100
 #define SDIO_DEVICE_ID_SIANO_STELLAR 		0x5347
 
+#define SDIO_VENDOR_ID_BRCM            0x2d0  // louislee : add
+#define SDIO_DEVICE_ID_BCM4329         0x4329 // louislee : add
+
 #endif

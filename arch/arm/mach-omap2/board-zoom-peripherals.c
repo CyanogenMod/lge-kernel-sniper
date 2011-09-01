@@ -40,6 +40,7 @@
 
 #include "mux.h"
 #include "hsmmc.h"
+#include "twl4030.h"
 
 #define OMAP_SYNAPTICS_GPIO	163
 
@@ -134,6 +135,8 @@ static struct twl4030_keypad_data zoom_kp_twl4030_data = {
 	.rep		= 0,
 };
 
+static struct __initdata twl4030_power_data zoom_t2scripts_data;
+
 static struct regulator_consumer_supply zoom_vmmc1_supply = {
 	.supply		= "vmmc",
 };
@@ -226,13 +229,10 @@ static struct omap2_hsmmc_info mmc[] __initdata = {
 		.power_saving	= true,
 	},
 	{
-		.name		= "internal",
 		.mmc		= 3,
 		.caps		= MMC_CAP_4_BIT_DATA,
 		.gpio_cd	= -EINVAL,
 		.gpio_wp	= -EINVAL,
-		.nonremovable	= true,
-		.power_saving	= true,
 	},
 	{}      /* Terminator */
 };
@@ -276,6 +276,15 @@ static int zoom_twl_gpio_setup(struct device *dev,
 {
 	/* gpio + 0 is "mmc0_cd" (input/IRQ) */
 	mmc[0].gpio_cd = gpio + 0;
+
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+	/* The controller that is connected to the 128x device
+	 * should have the card detect gpio disabled. This is
+	 * achieved by initializing it with a negative value
+	 */
+	mmc[CONFIG_TIWLAN_MMC_CONTROLLER - 1].gpio_cd = -EINVAL;
+#endif
+
 	omap2_hsmmc_init(mmc);
 
 	/* link regulators to MMC adapters ... we "know" the
@@ -339,6 +348,7 @@ static struct twl4030_platform_data zoom_twldata = {
 	.usb		= &zoom_usb_data,
 	.gpio		= &zoom_gpio_data,
 	.keypad		= &zoom_kp_twl4030_data,
+	.power		= &zoom_t2scripts_data,
 	.codec		= &zoom_codec_data,
 	.vmmc1          = &zoom_vmmc1,
 	.vmmc2          = &zoom_vmmc2,
@@ -502,6 +512,7 @@ static void enable_board_wakeup_source(void)
 
 void __init zoom_peripherals_init(void)
 {
+	twl4030_get_scripts(&zoom_t2scripts_data);
 	omap_i2c_init();
 	platform_add_devices(zoom_board_devices,
 		ARRAY_SIZE(zoom_board_devices));

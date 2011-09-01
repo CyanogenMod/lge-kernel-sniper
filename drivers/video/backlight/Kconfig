@@ -124,6 +124,21 @@ config BACKLIGHT_CLASS_DEVICE
 	  To have support for your specific LCD panel you will have to
 	  select the proper drivers which depend on this option.
 
+config BACKLIGHT_AAT2862 #20100619 kyungtae.oh@lge.com Hub backlight driver
+	tristate "AAT2862_HUB backlight"
+	default n
+	help
+	  If you have HUB board say Y to enable the backlight driver
+
+config BACKLIGHT_AAT2870
+	tristate "AAT2870 backlight control"
+	depends on I2C
+	default m
+	help
+	  If you have a backlight based on AAT2870 controller chip,
+	  then say y to include a power driver for it.
+	  LGE Sniper uses this chip.
+
 if BACKLIGHT_CLASS_DEVICE
 
 config BACKLIGHT_ATMEL_LCDC

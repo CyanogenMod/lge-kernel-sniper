@@ -258,6 +258,11 @@ restore:
         moveq   r9, #0x3        @ MPU OFF => L1 and L2 lost
 	movne	r9, #0x1	@ Only L1 and L2 lost => avoid L2 invalidation
 	bne	logic_l1_restore
+
+	mrc	p15, 0, r4, c1, c0, 1
+	bic	r4, r4, #2	@ disable L2 cache
+	mcr	p15, 0, r4, c1, c0, 1
+
 	ldr	r0, control_stat
 	ldr	r1, [r0]
 	and	r1, #0x700
@@ -318,6 +323,10 @@ smi:    .word 0xE1600070		@ Call SMI monitor (smieq)
 	mov	r12, #0x2
 	.word 0xE1600070	@ Call SMI monitor (smieq)
 logic_l1_restore:
+	mrc	p15, 0, r4, c1, c0, 1
+	orr	r4, r4, #2	@ enable L2 cache
+	mcr	p15, 0, r4, c1, c0, 1
+
 	mov	r1, #0
 	/* Invalidate all instruction caches to PoU
 	 * and flush branch target cache */
@@ -520,72 +529,16 @@ clean_caches:
 	cmp	r9, #1 /* Check whether L2 inval is required or not*/
 	bne	skip_l2_inval
 clean_l2:
-	/* read clidr */
-	mrc     p15, 1, r0, c0, c0, 1
-	/* extract loc from clidr */
-	ands    r3, r0, #0x7000000
-	/* left align loc bit field */
-	mov     r3, r3, lsr #23
-	/* if loc is 0, then no need to clean */
-	beq     finished
-	/* start clean at cache level 0 */
-	mov     r10, #0
-loop1:
-	/* work out 3x current cache level */
-	add     r2, r10, r10, lsr #1
-	/* extract cache type bits from clidr*/
-	mov     r1, r0, lsr r2
-	/* mask of the bits for current cache only */
-	and     r1, r1, #7
-	/* see what cache we have at this level */
-	cmp     r1, #2
-	/* skip if no cache, or just i-cache */
-	blt     skip
-	/* select current cache level in cssr */
-	mcr     p15, 2, r10, c0, c0, 0
-	/* isb to sych the new cssr&csidr */
-	isb
-	/* read the new csidr */
-	mrc     p15, 1, r1, c0, c0, 0
-	/* extract the length of the cache lines */
-	and     r2, r1, #7
-	/* add 4 (line length offset) */
-	add     r2, r2, #4
-	ldr     r4, assoc_mask
-	/* find maximum number on the way size */
-	ands    r4, r4, r1, lsr #3
-	/* find bit position of way size increment */
-	clz     r5, r4
-	ldr     r7, numset_mask
-	/* extract max number of the index size*/
-	ands    r7, r7, r1, lsr #13
-loop2:
-	mov     r9, r4
-	/* create working copy of max way size*/
-loop3:
-	/* factor way and cache number into r11 */
-	orr     r11, r10, r9, lsl r5
-	/* factor index number into r11 */
-	orr     r11, r11, r7, lsl r2
-	/*clean & invalidate by set/way */
-	mcr     p15, 0, r11, c7, c10, 2
-	/* decrement the way*/
-	subs    r9, r9, #1
-	bge     loop3
-	/*decrement the index */
-	subs    r7, r7, #1
-	bge     loop2
-skip:
-	add     r10, r10, #2
-	/* increment cache number */
-	cmp     r3, r10
-	bgt     loop1
-finished:
-	/*swith back to cache level 0 */
-	mov     r10, #0
-	/* select current cache level in cssr */
-	mcr     p15, 2, r10, c0, c0, 0
-	isb
+        /*
+         *jump out to kernel flush routine
+         * - reuse that code is better
+         * - it executes in a cahced space so is faster than refetch per-block
+         * - should be faster and will change with kernel
+         * - 'might' have to copy address,load and jump to it
+         */
+        ldr     r1, kernel_flush
+        mov     lr, pc
+        bx      r1
 skip_l2_inval:
 	/* Data memory barrier and Data sync barrier */
 	mov     r1, #0
@@ -618,19 +571,37 @@ wait_sdrc_ok:
         ldr     r5, [r4]
         bic     r5, r5, #0x40
         str     r5, [r4]
-wait_dll_lock:
-        /* Is dll in lock mode? */
+is_dll_in_lock_mode:
         ldr     r4, sdrc_dlla_ctrl
         ldr     r5, [r4]
         tst     r5, #0x4
         bxne    lr
         /* wait till dll locks */
+wait_dll_lock_timed:
         ldr     r4, sdrc_dlla_status
+	mov	r6, #0x2000
+wait_dll_lock:
+	subs	r6, r6, #0x1
+	beq	kick_dll
         ldr     r5, [r4]
         and     r5, r5, #0x4
         cmp     r5, #0x4
         bne     wait_dll_lock
         bx      lr
+
+	/* Kick DLL state machine if lock not started */
+kick_dll:
+	ldr	r4, sdrc_dlla_ctrl	/* get dlla addr */
+	ldr	r5, [r4]		/* grab value */
+	mov	r6, r5			/* save value */
+	orr	r6, r6, #0x10		/* dllidle on */
+	str	r6, [r4]
+	dsb
+	bic	r6, #0x10		/* dllidle off */
+	str	r6, [r4]
+	dsb
+	str	r6, [r4]		/* restore old value */
+	b wait_dll_lock_timed
 
 cm_idlest1_core:
 	.word	CM_IDLEST1_CORE_V
@@ -666,6 +637,8 @@ table_entry:
 	.word	0x00000C02
 cache_pred_disable_mask:
 	.word	0xFFFFE7FB
+kernel_flush:
+        .word   v7_flush_dcache_all
 control_stat:
 	.word	CONTROL_STAT
 ENTRY(omap34xx_cpu_suspend_sz)

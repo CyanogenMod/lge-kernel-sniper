@@ -23,8 +23,10 @@
  */
 #define NR_UNIX98_PTY_DEFAULT	4096      /* Default maximum for Unix98 ptys */
 #define NR_UNIX98_PTY_MAX	(1 << MINORBITS) /* Absolute limit */
-#define NR_LDISCS		30
-
+/* LGE_KERNEL_MUX START */    // Woojun.Ye: Copying from B-Froyo.
+//#define NR_LDISCS		30
+#define NR_LDISCS		23
+/* LGE_KERNEL_MUX END */ 
 /* line disciplines */
 #define N_TTY		0
 #define N_SLIP		1
@@ -46,10 +48,16 @@
 #define N_GIGASET_M101	16	/* Siemens Gigaset M101 serial DECT adapter */
 #define N_SLCAN		17	/* Serial / USB serial CAN Adaptors */
 #define N_PPS		18	/* Pulse per Second */
-#define N_V253		19	/* Codec control over voice modem */
-#define N_CAIF		20      /* CAIF protocol for talking to modems */
-#define N_GSM0710	21	/* GSM 0710 Mux */
-#define N_TI_WL		22	/* Texas Instruments WiLink shared transport */
+/* LGE_KERNEL_MUX START */   // Woojun.Ye: Copying from B-Froyo.
+#define N_TS2710	19	/* 3GPP TS 27.010 MUX */
+#define N_V253		20	/* Codec control over voice modem */
+//#define N_CAIF		20      /* CAIF protocol for talking to modems */
+#define N_CAIF		24      // Woojun.ye: Assign new value to avoid conflict.
+#define N_SHARED	21	/* for TI's WL7 connectivity chips */
+//#define N_GSM0710	21	/* GSM 0710 Mux */
+#define N_RIN		22
+/* LGE_KERNEL_MUX END */ 
+#define N_TI_WL		25	/* Texas Instruments WiLink shared transport */
 
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as

@@ -67,6 +67,10 @@
 #include <dspbridge/resourcecleanup.h>
 #include <_tiomap.h>
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+#include <linux/dvs_suite.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+
 #define HOSTPREFIX	  "/host"
 #define PIPEPREFIX	  "/dbpipe"
 
@@ -1210,8 +1214,14 @@ int node_create(struct node_object *hnode)
 		/* If node's create function is not loaded, load it */
 		/* Boost the OPP level to max level that DSP can be requested */
 #if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+		ds_status.flag_correct_cpu_op_update_path = 1;
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 		if (pdata->cpu_set_freq)
 			(*pdata->cpu_set_freq) (pdata->mpu_max_speed);
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+		ds_status.flag_correct_cpu_op_update_path = 0;
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 		status = hnode_mgr->nldr_fxns.pfn_load(hnode->nldr_node_obj,
 						       NLDR_CREATE);
@@ -1228,8 +1238,14 @@ int node_create(struct node_object *hnode)
 		}
 		/* Request the lowest OPP level */
 #if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+		ds_status.flag_correct_cpu_op_update_path = 1;
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 		if (pdata->cpu_set_freq)
 			(*pdata->cpu_set_freq) (pdata->mpu_min_speed);
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+		ds_status.flag_correct_cpu_op_update_path = 0;
+		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 		/* Get address of iAlg functions, if socket node */
 		if (DSP_SUCCEEDED(status)) {

@@ -662,7 +662,11 @@ void mmc_set_bus_mode(struct mmc_host *host, unsigned int mode)
 void mmc_set_bus_width_ddr(struct mmc_host *host, unsigned int width, int ddr)
 {
 	host->ios.bus_width = width;
+#if 0
 	host->ios.ddr = ddr ? MMC_DDR_MODE : MMC_SDR_MODE;
+#else
+	host->ios.ddr = ddr;
+#endif
 	mmc_set_ios(host);
 }
 
@@ -671,7 +675,11 @@ void mmc_set_bus_width_ddr(struct mmc_host *host, unsigned int width, int ddr)
  */
 void mmc_set_bus_width(struct mmc_host *host, unsigned int width)
 {
+#if 0
 	mmc_set_bus_width_ddr(host, width, 0);
+#else
+	mmc_set_bus_width_ddr(host, width, MMC_SDR_MODE);
+#endif
 }
 
 /**

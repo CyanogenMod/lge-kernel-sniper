@@ -66,6 +66,8 @@ struct omap34xxcam_sensor_info {
 
 /* Boolean control used to force CSI2->MEM datapath on pipeline calculation */
 #define V4L2_CID_PRIVATE_OMAP3ISP_CSI2MEM	(V4L2_CID_PRIVATE_BASE + 0)
+/* Boolean control used to toggle Continuous Capture */
+#define V4L2_CID_PRIVATE_OMAP3ISP_CONTINUOUS_CAPTURE (V4L2_CID_PRIVATE_BASE + 1)
 
 /* AE/AWB related structures and flags*/
 

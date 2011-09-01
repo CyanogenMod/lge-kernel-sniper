@@ -19,6 +19,10 @@
 #ifndef __LINUX_SPI_H
 #define __LINUX_SPI_H
 
+#ifndef  LGE_SLAVE_SPI
+#define  LGE_SLAVE_SPI
+#endif
+
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
 #include <linux/slab.h>
@@ -99,6 +103,10 @@ struct spi_device {
 	 *  - chipselect delays
 	 *  - ...
 	 */
+#ifdef  LGE_SLAVE_SPI     
+     void (* slave_ready)(struct spi_device *spi, int enable);/*This is callback function will 
+                                  called when spi is ready to transfer*/
+#endif     
 };
 
 static inline struct spi_device *to_spi_device(struct device *dev)

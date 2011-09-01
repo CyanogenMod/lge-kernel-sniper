@@ -133,13 +133,8 @@ void omap34xxcam_vbq_complete(struct videobuf_buffer *vb, void *priv)
 {
 	struct v4l2_fh *vfh = priv;
 	struct omap34xxcam_fh *ofh = to_omap34xxcam_fh(vfh);
-	struct timespec temp_tp;
-	s64 temp_nsec;
 
-	/* Get system time, and adapt to timeval (less granular)*/
-	ktime_get_ts(&temp_tp);
-	temp_nsec = timespec_to_ns(&temp_tp);
-	vb->ts = ns_to_timeval(temp_nsec);
+	do_gettimeofday(&vb->ts);
 	vb->field_count = atomic_add_return(2, &ofh->field_count);
 	vb->state = VIDEOBUF_DONE;
 

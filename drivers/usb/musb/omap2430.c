@@ -41,6 +41,53 @@ static struct timer_list musb_idle_timer;
 static void __iomem *ctrl_base;
 void __iomem *phymux_base;
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
+
+struct musb *LGMUSB_P;
+void SAVE_MUSB_ADDRESS_FOR_LGMUSB_P(struct musb *address )
+{
+	LGMUSB_P = address;
+}
+EXTERN_SYMBOL(SAVE_MUSB_ADDRESS_FOR_LGMUSB_P);
+
+void musb_link_force_active(int enable)
+{
+
+	if ( LGMUSB_P == NULL ) {
+		printk(KERN_ERR "<<<<<<<<<<<<<< LGMUSB_P can not get musb address\n");
+		return;
+	}
+
+	u32 l;
+
+	l = musb_readl(LGMUSB_P->mregs, OTG_SYSCONFIG);
+
+	if (enable) {
+
+		l &= ~SMARTSTDBY; 
+		l |= NOSTDBY;
+		l &= ~SMARTIDLE; 
+		l |= NOIDLE;
+		musb_writel(LGMUSB_P->mregs, OTG_FORCESTDBY, 
+			(musb_readl(LGMUSB_P->mregs,OTG_FORCESTDBY) & ~ENABLEFORCE));
+
+	} else {
+
+		l |= ENABLEWAKEUP;
+		l &= ~SMARTSTDBY;
+		l |= FORCESTDBY;
+		l &= ~NOSTDBY;
+		l |= FORCEIDLE;
+		l &= ~NOIDLE;
+		musb_writel(LGMUSB_P->mregs, OTG_FORCESTDBY, 
+			(musb_readl(LGMUSB_P->mregs,OTG_FORCESTDBY) | ENABLEFORCE));
+		
+	}
+
+	musb_writel(LGMUSB_P->mregs, OTG_SYSCONFIG, l);
+}
+#endif // defined(CONFIG_MACH_LGE_OMAP3)
+
 void musb_enable_vbus(struct musb *musb)
 {
 	 int devctl;
@@ -81,6 +128,8 @@ int musb_notifier_call(struct notifier_block *nb,
 		/* configure musb into smartidle with wakeup enabled
 		 * smart standby mode.
 		 */
+
+		omap_pm_set_max_mpu_wakeup_lat(&pdata->musb_qos_request, 4000);
 
 		musb_writel(musb->mregs, OTG_FORCESTDBY, 0);
 		val = musb_readl(musb->mregs, OTG_SYSCONFIG);
@@ -153,6 +202,8 @@ int musb_notifier_call(struct notifier_block *nb,
 		val &= ~(SMARTIDLEWKUP | SMARTSTDBY | ENABLEWAKEUP);
 		val |= FORCEIDLE | FORCESTDBY;
 		musb_writel(musb->mregs, OTG_SYSCONFIG, val);
+
+		omap_pm_set_max_mpu_wakeup_lat(&pdata->musb_qos_request, -1);
 
 		val = __raw_readl(phymux_base +
 				USBA0_OTG_CE_PAD1_USBA0_OTG_DP);
@@ -364,6 +415,35 @@ int __init musb_platform_init(struct musb *musb)
 	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
 
+	l = musb_readl(musb->mregs, OTG_SYSCONFIG);
+
+        if (cpu_is_omap3630()) {
+        	/*
+		 * Do Forcestdby here, for the case when kernel boots up
+		 * without cable attached, force_active(0) won't be called.
+		*/
+		l |= ENABLEWAKEUP;      /* Enable wakeup */
+		l &= ~NOSTDBY;          /* remove possible nostdby */
+		l |= SMARTSTDBY;        /* enable smart standby */
+		l &= ~AUTOIDLE;         /* disable auto idle */
+		l &= ~NOIDLE;           /* remove possible noidle */
+	        l |= FORCEIDLE;         /* enable force idle */
+	} 
+	else {
+	        l &= ~ENABLEWAKEUP;     /* disable wakeup */
+	        l &= ~NOSTDBY;          /* remove possible nostdby */
+	        l |= SMARTSTDBY;        /* enable smart standby */
+	        l &= ~AUTOIDLE;         /* disable auto idle */
+	        l &= ~NOIDLE;           /* remove possible noidle */
+	        l |= SMARTIDLE;         /* enable smart idle */
+	}
+
+	musb_writel(musb->mregs, OTG_SYSCONFIG, l);
+	/*
+	 * MUSB AUTOIDLE and SMARTIDLE dont' work in 3430
+	 * Workwaround by Richard Woddruff/TI
+	 */
+
 	/*powerup the phy as romcode would have put the phy in some state
 	* which is impacting the core retention if the gadget driver is not
 	* loaded.
@@ -391,6 +471,7 @@ int __init musb_platform_init(struct musb *musb)
 	if (is_host_enabled(musb))
 		musb->board_set_vbus = omap_set_vbus;
 
+    	musb_save_context(musb);
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
 	plat->is_usb_active = is_musb_active;
 

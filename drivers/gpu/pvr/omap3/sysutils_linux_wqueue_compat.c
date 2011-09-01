@@ -44,6 +44,10 @@
 #error "PVR_LINUX_USING_WORKQUEUES must be defined"
 #endif
 
+#if defined(CONFIG_OMAP2_DSS_USE_DSI_PLL)
+#define SYS_OMAP3430_PIN_MEMORY_BUS_CLOCK
+#endif
+
 #define	ONE_MHZ	1000000
 #define	HZ_TO_MHZ(m) ((m) / ONE_MHZ)
 

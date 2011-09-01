@@ -41,7 +41,7 @@ static struct dspbridge_platform_data dspbridge_pdata __initdata = {
 	.dsp_get_opp	 = omap_pm_dsp_get_opp,
 	.cpu_set_freq	 = omap_pm_cpu_set_freq,
 	.cpu_get_freq	 = omap_pm_cpu_get_freq,
-	.dsp_get_rate_table = omap_get_dsp_rate_table,
+	.dsp_get_rate_table = omap_pm_dsp_get_opp_table,
 #endif
 	.dsp_prm_read	= prm_read_mod_reg,
 	.dsp_prm_write	= prm_write_mod_reg,
@@ -68,9 +68,14 @@ static int get_opp_table(struct dspbridge_platform_data *pdata)
 	unsigned long old_rate;
 	struct omap_opp *dsp_rate, *dsp_sort, temp;
 
-	opp_count = omap_pm_get_max_vdd1_opp();
 	dsp_rate = (*pdata->dsp_get_rate_table)();
+	if (dsp_rate == NULL) {
+		pr_err("dspbridge unable to obtain rate table\n");
+		ret = -EINVAL;
+		goto out;
+	}
 
+	for (opp_count = 1; dsp_rate[opp_count+1].rate; opp_count++);
 	dsp_sort = kzalloc(sizeof(struct omap_opp) * (opp_count + 1),
 			   GFP_KERNEL);
 	if (!dsp_sort) {
@@ -89,8 +94,8 @@ static int get_opp_table(struct dspbridge_platform_data *pdata)
 		dsp_sort[j + 1] = temp;
 	}
 
-	pdata->mpu_min_speed = dsp_sort[1].rate;
-	pdata->mpu_max_speed = dsp_sort[opp_count].rate;
+	pdata->mpu_min_speed = dsp_sort[1].opp_id;
+	pdata->mpu_max_speed = dsp_sort[opp_count].opp_id;
 
 	/* need an initial terminator */
 	pdata->dsp_freq_table = kzalloc(
@@ -103,13 +108,9 @@ static int get_opp_table(struct dspbridge_platform_data *pdata)
 	}
 
 	old_rate = 0;
-	/*
-	 * the freq table is in terms of khz.. so we need to
-	 * divide by 1000
-	 */
 	for (i = 1; i <= opp_count; i++) {
 		/* dsp frequencies are in khz */
-		u32 rate = dsp_sort[i].rate / 1000;
+		u32 rate = dsp_sort[i].rate;
 		/*
 		 * On certain 34xx silicons, certain OPPs are duplicated
 		 * for DSP - handle those by copying previous opp value
@@ -120,7 +121,7 @@ static int get_opp_table(struct dspbridge_platform_data *pdata)
 				sizeof(struct dsp_shm_freq_table));
 		} else {
 			pdata->dsp_freq_table[i].dsp_freq = rate;
-			pdata->dsp_freq_table[i].u_volts = dsp_sort[i].vsel;
+			pdata->dsp_freq_table[i].u_volts = dsp_sort[i].u_volt;
 			/*
 			 * min threshold:
 			 * NOTE: index 1 needs a min of 0! else no
@@ -186,6 +187,7 @@ err_out:
 	platform_device_put(pdev);
 	return err;
 }
+#ifdef MODULE
 module_init(dspbridge_init);
 
 static void __exit dspbridge_exit(void)
@@ -196,6 +198,9 @@ static void __exit dspbridge_exit(void)
 	platform_device_unregister(dspbridge_pdev);
 }
 module_exit(dspbridge_exit);
+#else
+late_initcall(dspbridge_init);
+#endif
 
 MODULE_AUTHOR("Hiroshi DOYU");
 MODULE_DESCRIPTION("TI's dspbridge platform device registration");

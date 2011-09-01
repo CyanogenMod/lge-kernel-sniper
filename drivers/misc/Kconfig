@@ -325,6 +325,14 @@ config SENSORS_BH1780
 	  This driver can also be built as a module.  If so, the module
 	  will be called bh1780gli.
 
+config SENSORS_LIS331DLH
+	tristate "LIS331DLH Accelerometer"
+	default n
+	depends on I2C
+	help
+	 Say yes here if you wish to include the STI Micro
+	 LIS331DLH accelerometer driver.
+
 config SENSORS_AK8975
 	tristate "AK8975 compass support"
 	default n
@@ -407,6 +415,14 @@ config BMP085
 	  To compile this driver as a module, choose M here: the
 	  module will be called bmp085.
 
+config LBEE9QMB_RFKILL
+	tristate "Bluetooth power control driver for Murata lbee9qmbc"
+	depends on RFKILL
+	default n
+	---help---
+	 Creates an rfkill entry in sysfs for power control of
+	 Murata lbee9qmbc Bluetooth+WiFi chips.
+
 config WL127X_RFKILL
 	tristate "Bluetooth power control driver for TI wl127x"
 	depends on RFKILL
@@ -430,10 +446,27 @@ config APANIC_PLABEL
 	 If your platform uses a different flash partition label for storing
  	 crashdumps, enter it here.
 
+config GP2AP_PROXIMITY
+	bool "GP2AP_PROXIMITY driver"
+	default y
+	---help---
+	 If you say yes here you get support for the 
+	 Sharp GP2AP Proximity Driver.
+
+
+
+config TSPDRV
+	bool "Immersion Corporation Vibrator Driver(TSPDRV)"
+	default y
+	---help---
+	 TouchSense Kernel Module(Immersion Corporation)
+
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
 source "drivers/misc/ti-st/Kconfig"
+source "drivers/misc/mpu3050/Kconfig"
 
 endif # MISC_DEVICES

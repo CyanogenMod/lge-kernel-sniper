@@ -1035,40 +1035,7 @@ static void _init_twl6030_settings(void)
 	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xF5);
 	/* CHARGERUSB_CTRL3 */
 	twl_i2c_write_u8(TWL6030_MODULE_ID1, 0x21, 0xEA);
-
-	/* SYSEN_CFG_TRANS */
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB3);
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xB4);
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x20, 0xB5);
-
-	/* TMP */
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xCE);
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x01, 0xCF);
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x20, 0xD0);
-
-	/* VBATMIN_HI */
-	twl_i2c_write_u8(TWL6030_MODULE_ID0, 0x00, 0xC9);
 }
-
-#ifdef CONFIG_PM
-static int
-twl_suspend(struct i2c_client *client, pm_message_t message)
-{
-	/* Make sure below init twl settings are not left on */
-	_init_twl6030_settings();
-
-	return 0;
-}
-
-static int
-twl_resume(struct i2c_client *client)
-{
-	return 0;
-}
-#else
-#define twl_suspend NULL
-#define twl_resume NULL
-#endif
 
 /* NOTE:  this driver only handles a single twl4030/tps659x0 chip */
 static int __devinit
@@ -1174,6 +1141,23 @@ fail:
 	return status;
 }
 
+void twl_rewrite_starton_condition(u8 condition)
+{
+	u8 val = 0;
+
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER, &val, 0x00);
+	printk("[Start on condition] Before: CFG_P1_TRANSITION - 0x%x\n", val);
+
+	if(val != condition)
+	{
+		unprotect_pm_master();
+		twl_i2c_write_u8(TWL4030_MODULE_PM_MASTER, condition, 0);
+		twl_i2c_write_u8(TWL4030_MODULE_PM_MASTER, condition, 1);
+		twl_i2c_write_u8(TWL4030_MODULE_PM_MASTER, condition, 2);
+		protect_pm_master();
+	}
+}
+
 static const struct i2c_device_id twl_ids[] = {
 	{ "twl4030", TWL4030_VAUX2 },	/* "Triton 2" */
 	{ "twl5030", 0 },		/* T2 updated */
@@ -1191,8 +1175,6 @@ static struct i2c_driver twl_driver = {
 	.driver.name	= DRIVER_NAME,
 	.id_table	= twl_ids,
 	.probe		= twl_probe,
-	.suspend	= twl_suspend,
-	.resume		= twl_resume,
 	.remove		= __devexit_p(twl_remove),
 };
 

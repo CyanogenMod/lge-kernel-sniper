@@ -79,6 +79,13 @@
 
 #include "sched_cpupri.h"
 
+#include <asm/current.h>	/* For current macro */
+#include <linux/dvs_suite.h>
+#include <linux/kernel.h>   /* For printk */
+#include <linux/list.h>	 /* For struct list_head */
+#include <linux/sched.h>	/* For struct task_struct */
+#include <linux/slab.h>	 /* For kmalloc and kfree */
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
@@ -2797,6 +2804,13 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
 #endif
 
+	if(ds_configuration.on_dvs == 1){
+		ds_parameter.entry_type = DS_ENTRY_SWITCH_TO;
+		ds_parameter.prev_p = prev;
+		ds_parameter.next_p = next;
+		do_dvs_suite();
+	}
+
 	/* Here we just switch the register state and the stack. */
 	switch_to(prev, next, prev);
 
@@ -3583,6 +3597,14 @@ asmlinkage void __sched schedule(void)
 	struct rq *rq;
 	int cpu;
 
+	struct sched_param lc_sched_param;
+
+	if(ds_configuration.on_dvs == 1){
+		//ds_counter.schedule_no ++;	// Not needed unless we want statistics.
+		ds_update_time_counter();
+		ds_status.cpu_mode = DS_CPU_MODE_SCHEDULE;
+	}
+
 need_resched:
 	preempt_disable();
 	cpu = smp_processor_id();
@@ -3647,6 +3669,36 @@ need_resched_nonpreemptible:
 	preempt_enable_no_resched();
 	if (need_resched())
 		goto need_resched;
+
+	if(ds_configuration.on_dvs == 1){
+		ds_update_time_counter();
+
+		if(next->pid == 0)
+			ds_status.cpu_mode = DS_CPU_MODE_IDLE;
+		else
+			ds_status.cpu_mode = DS_CPU_MODE_TASK;
+
+#if 0   // WARNING: This code will cause a severe performance degradation!!!
+if(next->pid == 0)
+printk(KERN_WARNING "%d %5d %16s %3d\n",
+ds_status.type[prev->pid],
+prev->pid,
+prev->comm,
+//prev->prio,
+prev->static_prio
+);
+#endif
+#if 0   // WARNING: This code will cause a severe performance degradation!!!
+if(prev->pid == 0)
+printk(KERN_WARNING "%d %5d %16s %3d\n",
+ds_status.type[next->pid],
+next->pid,
+next->comm,
+//next->prio,
+next->static_prio
+);
+#endif
+	}
 }
 EXPORT_SYMBOL(schedule);
 
@@ -4215,9 +4267,19 @@ void set_user_nice(struct task_struct *p, long nice)
 	int old_prio, delta, on_rq;
 	unsigned long flags;
 	struct rq *rq;
+#if 0
+	long nice_refined;
+#endif
 
 	if (TASK_NICE(p) == nice || nice < -20 || nice > 19)
 		return;
+#if 0
+	if(p->static_prio < 120){
+		nice_refined = nice - (120 - p->static_prio);
+		if(nice_refined < -20) nice_refined = -20;
+		nice = nice_refined;
+	}
+#endif
 	/*
 	 * We have to be careful, if called from sys_setpriority(),
 	 * the task might be in the middle of scheduling on another CPU.
@@ -7671,6 +7733,14 @@ void __init sched_init(void)
 	perf_event_init();
 
 	scheduler_running = 1;
+
+	ds_configuration.sched_scheme = DS_SCHED_GPSCHED;
+	ds_configuration.dvs_scheme = DS_DVS_GPSCHEDVS;
+	ds_configuration.gpschedvs_strategy = 0;
+	ds_configuration.aidvs_interval_window_size = DS_AIDVS_INTERVAL_WINDOW_SIZE;
+	ds_configuration.aidvs_speedup_threshold = DS_AIDVS_SPEEDUP_THRESHOLD;
+	ds_configuration.aidvs_speedup_interval = DS_AIDVS_SPEEDUP_INTERVAL;
+	ds_initialize_dvs_suite(DS_CPU_MODE_TASK);
 }
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP

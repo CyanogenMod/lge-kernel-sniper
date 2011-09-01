@@ -495,6 +495,7 @@ out:
  */
 static int mmc_sdio_suspend(struct mmc_host *host)
 {
+	#if 0
 	int i, err = 0;
 
 	for (i = 0; i < host->card->sdio_funcs; i++) {
@@ -525,10 +526,14 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 	}
 
 	return err;
+	#endif
+	
+	return 0;
 }
 
 static int mmc_sdio_resume(struct mmc_host *host)
 {
+	#if 0
 	int i, err = 0;
 
 	BUG_ON(!host);
@@ -575,6 +580,9 @@ static int mmc_sdio_resume(struct mmc_host *host)
 	}
 
 	return err;
+	#endif
+	
+	return 0;
 }
 
 static int mmc_sdio_power_restore(struct mmc_host *host)

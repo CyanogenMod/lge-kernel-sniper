@@ -33,6 +33,8 @@
 #include <asm/cpu.h>
 #include <plat/omap_device.h>
 
+#include <linux/dvs_suite.h>
+
 #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 #include <plat/omap-pm.h>
 #include <plat/opp.h>
@@ -102,6 +104,16 @@ static int omap_target(struct cpufreq_policy *policy,
 	struct device *mpu_dev = omap2_get_mpuss_device();
 	int ret = 0;
 #endif
+#if 1//prime@sdcmiro 2011-05-09 fixed for L3 clock
+	unsigned long l3_freq;
+	struct device *l3_dev = omap2_get_l3_device();
+	static struct device dummy_l3_dev;
+#endif
+
+#if 1
+	if(ds_status.flag_run_dvs == 1)
+		if(ds_status.flag_correct_cpu_op_update_path == 0) return 0;
+#endif
 
 #ifdef CONFIG_SMP
 	/* Wait untill all CPU's are initialized */
@@ -149,6 +161,44 @@ static int omap_target(struct cpufreq_policy *policy,
 	freq = target_freq * 1000;
 	if (opp_find_freq_ceil(mpu_dev, &freq))
 		omap_device_set_rate(mpu_dev, mpu_dev, freq);
+#if 0//prime@sdcmiro 2011-05-09 fixed for L3 clock
+	if(ds_status.flag_run_dvs == 1){
+		switch(target_freq*1000){
+			case DS_CPU_OP_INDEX_0:
+				if(ds_status.flag_post_early_suspend == 0)
+					l3_freq = 200000000;
+				else
+					l3_freq = 100000000;
+				break;
+			case DS_CPU_OP_INDEX_1:
+				if(ds_status.flag_post_early_suspend == 0)
+					l3_freq = 200000000;
+				else
+					l3_freq = 100000000;
+				break;
+			case DS_CPU_OP_INDEX_2:
+				if(ds_status.flag_post_early_suspend == 0)
+					l3_freq = 200000000;
+				else
+					l3_freq = 100000000;
+				break;
+			case DS_CPU_OP_INDEX_3:
+				l3_freq = 100000000;
+				break;
+			default:
+				break;
+		}
+	}
+	else{
+		if(target_freq == policy->min)
+			l3_freq = (target_freq/3) * 1000;
+		else
+			l3_freq = 200000 * 1000;
+	}
+	if (opp_find_freq_ceil(l3_dev, &l3_freq))
+		omap_device_set_rate(&dummy_l3_dev, l3_dev, l3_freq);
+#endif
+
 #ifdef CONFIG_SMP
 	/*
 	 * Note that loops_per_jiffy is not updated on SMP systems in
@@ -170,6 +220,7 @@ static int omap_target(struct cpufreq_policy *policy,
 	}
 #endif
 #endif
+	omap_pm_cpu_set_freq(freq);
 	return ret;
 }
 
@@ -213,8 +264,11 @@ static int omap_cpu_init(struct cpufreq_policy *policy)
 	policy->cur = omap_getspeed(policy->cpu);
 
 	/* FIXME: what's the actual transition time? */
+#if 1
+	policy->cpuinfo.transition_latency = 15 * 1000;
+#else
 	policy->cpuinfo.transition_latency = 300 * 1000;
-
+#endif
 #ifdef CONFIG_SMP
 	/*
 	 * On OMAP4i, both processors share the same voltage and

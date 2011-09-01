@@ -38,10 +38,12 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
+#include <linux/i2c/twl.h>
 
 #define NAME_SIZE	32
 
 static DECLARE_WAIT_QUEUE_HEAD(soc_pm_waitq);
+extern int voice_get_curmode(void);
 
 #ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_root;
@@ -63,6 +65,7 @@ static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num);
  * between two audio tracks.
  */
 static int pmdown_time = 5000;
+static int incallnosuspend = 0;
 module_param(pmdown_time, int, 0);
 MODULE_PARM_DESC(pmdown_time, "DAPM stream powerdown time (msecs)");
 
@@ -106,7 +109,10 @@ static int run_delayed_work(struct delayed_work *dwork)
 /* codec register dump */
 static ssize_t soc_codec_reg_show(struct snd_soc_codec *codec, char *buf)
 {
-	int ret, i, step = 1, count = 0;
+//	int ret, i, step = 1, count = 0;
+	int step = 1, count = 0;
+	unsigned int ret=0;
+	unsigned int i = 0;
 
 	if (!codec->driver->reg_cache_size)
 		return 0;
@@ -131,7 +137,12 @@ static ssize_t soc_codec_reg_show(struct snd_soc_codec *codec, char *buf)
 			 * the register being volatile and the device being
 			 * powered off.
 			 */
+#if 0 	 
 			ret = codec->driver->read(codec, i);
+#else
+			twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE, (u8*)&ret, (u8)i);		
+#endif 		
+//				printk("[BIZZ][soc_codec_reg_show] i=%x ret = %x\n",i,ret);
 			if (ret >= 0)
 				count += snprintf(buf + count,
 						  PAGE_SIZE - count,
@@ -165,7 +176,36 @@ static ssize_t codec_reg_show(struct device *dev,
 	return soc_codec_reg_show(rtd->codec, buf);
 }
 
+#if 1 // added codec_reg_store
+ssize_t codec_reg_store(struct device *dev, 
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+    int reg, data;
+	char *r, *d;
+	struct snd_soc_pcm_runtime *rtd =
+				container_of(dev, struct snd_soc_pcm_runtime, dev);
+
+	printk("[LUCKYJUN77] codec_reg_store : %s\n", buf);
+	r= &buf[0];
+	printk("[LUCKYJUN77] r : %s\n", r);
+	d= &buf[5];
+	printk("[LUCKYJUN77] d : %s\n", d);
+	reg = simple_strtoul(r, NULL, 16);
+	data = simple_strtoul(d, NULL, 16);
+
+	printk("[LUCKYJUN77] reg: %x, data : %x\n", reg, data);			
+#if 0 
+    snd_soc_write(rtd->codec, reg, data);
+#else	
+	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE, (u8)data, (u8)reg);		
+#endif 
+	return count;
+}
+
+static DEVICE_ATTR(codec_reg, 0777, codec_reg_show, codec_reg_store);
+#else
 static DEVICE_ATTR(codec_reg, 0444, codec_reg_show, NULL);
+#endif
 
 static ssize_t pmdown_time_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -1142,6 +1182,16 @@ static int soc_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	int i;
+	int phone_suspended = voice_get_curmode();
+	
+
+	printk("soc_suspend...phone_suspended=%d\n",phone_suspended);
+	if(phone_suspended !=0)
+	{
+		incallnosuspend = 1;
+		printk("case call.....return\n");
+		return 0;
+	}
 
 	/* If the initialization of this soc device failed, there is no codec
 	 * associated with it. Just bail out in this case.
@@ -1363,7 +1413,11 @@ static int soc_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	int i;
-
+	if(incallnosuspend == 1)
+	{
+		incallnosuspend = 0;
+		printk("incallsuspend -> soc-resume......return\n");
+	}
 	/* AC97 devices might have other drivers hanging off them so
 	 * need to resume immediately.  Other drivers don't have that
 	 * problem and may take a substantial amount of time to resume
@@ -3649,6 +3703,18 @@ found:
 	kfree(codec);
 }
 EXPORT_SYMBOL_GPL(snd_soc_unregister_codec);
+
+struct snd_soc_codec *snd_soc_get_codec(const char *name) {
+	struct snd_soc_codec *codec;
+
+	list_for_each_entry(codec, &codec_list, list) {
+		if (!strcmp(codec->name, name))
+			return codec;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_get_codec);
 
 static int __init snd_soc_init(void)
 {

@@ -43,6 +43,37 @@ menuconfig USB_GADGET
 
 if USB_GADGET
 
+config LGE_ANDROID_USB
+	boolean "LGE Android USB driver"
+	depends on USB_GADGET
+	help
+	   LGE USB driver for Android mobile
+
+config LGE_ANDROID_USB_DIAG
+	boolean "DIAG port for LGE Android USB driver"
+	depends on USB_GADGET
+	help
+	   LGE Diag port
+
+config LGE_ANDROID_USB_NMEA
+	boolean "NMEA port forLGE Android USB driver"
+	depends on USB_GADGET
+	help
+	   LGE NMEA port
+config LGE_ANDROID_USB_CDC_ECM
+	tristate "cdc ecm function driver"
+	depends on USB_GADGET
+	help
+	  enabling this option adds CDC-ECM support to the
+  	  android gadget.
+	  Say "y" to link the CDC-ECM as a part of android gadget
+
+config USB_SUPPORT_LGE_ANDROID_ECM_FIX
+  	boolean "CDC ECM interface support in LGE Android model(common)"
+	depends on LGE_ANDROID_USB_CDC_ECM
+	help
+	  It supports LG CDC ECM interface in LGE Android model.
+
 config USB_GADGET_DEBUG
 	boolean "Debugging messages (DEVELOPMENT)"
 	depends on DEBUG_KERNEL
@@ -209,6 +240,17 @@ config USB_OMAP
 	depends on USB_GADGET_OMAP
 	default USB_GADGET
 	select USB_GADGET_SELECTED
+
+config USB_OTG
+	boolean "OTG Support"
+	depends on USB_GADGET_OMAP && ARCH_OMAP_OTG && USB_OHCI_HCD
+	help
+	   The most notable feature of USB OTG is support for a
+	   "Dual-Role" device, which can act as either a device
+	   or a host.  The initial role choice can be changed
+	   later, when two dual-role devices talk to each other.
+
+	   Select this only if your OMAP board has a Mini-AB connector.
 
 config USB_GADGET_PXA25X
 	boolean "PXA 25x or IXP 4xx"

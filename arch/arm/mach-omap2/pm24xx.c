@@ -109,6 +109,10 @@ static void omap2_enter_full_retention(void)
 
 	omap2_gpio_prepare_for_idle(false);
 
+#if 1
+	omap_idle_notifier_start();
+#endif
+
 	if (omap2_pm_debug) {
 		omap2_pm_dump(0, 0, 0);
 		getnstimeofday(&ts_preidle);
@@ -141,6 +145,10 @@ no_sleep:
 		tmp = timespec_to_ns(&ts_idle) * NSEC_PER_USEC;
 		omap2_pm_dump(0, 1, tmp);
 	}
+
+#if 1
+	omap_idle_notifier_end();
+#endif
 	omap2_gpio_resume_after_idle(false);
 
 	clk_enable(osc_ck);

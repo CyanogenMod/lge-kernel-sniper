@@ -83,6 +83,12 @@ int fb_get_color_depth(struct fb_var_screeninfo *var,
 }
 EXPORT_SYMBOL(fb_get_color_depth);
 
+// LGE_UPDATE
+#if defined(CONFIG_MACH_LGE_OMAP3)
+extern void omapfb_boot_status_set(bool val);
+#endif
+// LGE_UPDATE
+
 /*
  * Data padding functions.
  */
@@ -1027,6 +1033,10 @@ fb_blank(struct fb_info *info, int blank)
  	return ret;
 }
 
+//ANDY_PORTING OSP [woongchang.kim@lge.com 110331]
+extern unsigned int cur_main_lcd_level;
+//ANDY_END
+
 static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			unsigned long arg)
 {
@@ -1062,6 +1072,11 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		unlock_fb_info(info);
 		if (!ret && copy_to_user(argp, &var, sizeof(var)))
 			ret = -EFAULT;
+// LGE_UPDATE
+#if defined(CONFIG_MACH_LGE_OMAP3)
+		omapfb_boot_status_set(true);
+#endif
+// LGE_UPDATE
 		break;
 	case FBIOGET_FSCREENINFO:
 		if (!lock_fb_info(info))
@@ -1144,6 +1159,18 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		release_console_sem();
 		unlock_fb_info(info);
 		break;
+	//ANDY_PORTING OSP [woongchang.kim@lge.com 110331]
+	/* 20100709 jugwan.eom@lge.com For OnScreenPhone to get screen data FASTER */
+        case FBIOGET_SCREEN_DATA:
+		if (system_state == SYSTEM_RUNNING) {
+			ret = copy_to_user(argp, phys_to_virt(omap_readl(0x48050480)), 1536000) ? -EFAULT : 0;
+		}
+		break;
+	/* 20100825 jugwan.eom@lge.com for OSP to check backlight status */
+	case FBIOGET_BL_STATUS:
+		ret = copy_to_user(argp, &cur_main_lcd_level, sizeof(int)) ? -EFAULT : 0;
+		break;
+	//ANDY_END
 	default:
 		if (!lock_fb_info(info))
 			return -ENODEV;

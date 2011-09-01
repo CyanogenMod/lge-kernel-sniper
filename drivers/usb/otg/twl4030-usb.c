@@ -39,6 +39,15 @@
 #include <linux/err.h>
 #include <linux/notifier.h>
 #include <linux/slab.h>
+#include <linux/wakelock.h>
+
+#if defined(CONFIG_MACH_LGE_OMAP3)
+#include <linux/usb/ch9.h>
+#include <linux/usb/gadget.h>
+#include <linux/wakelock.h> 
+#endif // defined(CONFIG_MACH_LGE_OMAP3)
+
+
 
 /* Register defines */
 
@@ -238,6 +247,10 @@
 #define PMBR1				0x0D
 #define GPIO_USB_4PIN_ULPI_2430C	(3 << 0)
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
+extern void musb_link_force_active(int enable);
+#endif // defined(CONFIG_MACH_LGE_OMAP3)
+
 struct twl4030_usb {
 	struct otg_transceiver	otg;
 	struct device		*dev;
@@ -245,7 +258,9 @@ struct twl4030_usb {
 	/* TWL4030 internal USB regulator supplies */
 	struct regulator	*usb1v5;
 	struct regulator	*usb1v8;
+#if 0	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-11-27, for <USB interrupt BUG fix> */
 	struct regulator	*usb3v1;
+#endif /* CONFIG_MACH_LGE_HEAVEN */
 
 	/* for vbus reporting with irqs disabled */
 	spinlock_t		lock;
@@ -258,6 +273,20 @@ struct twl4030_usb {
 	u8			asleep;
 	bool			irq_enabled;
 };
+
+#if 0 /* mbk_wake mbk_temp */ 
+// LGE_CHANGE wake lock for usb connection
+struct wlock {
+	int wake_lock_on;
+	struct wake_lock wake_lock;
+};
+static struct wlock the_wlock;
+// LGE_CHANGE wake lock for usb connection
+
+// LGE_CHANGE work queue
+static struct delayed_work twl4030_usb_wq;
+// LGE_CHANGE work queue
+#endif 
 
 /* internal define on top of container_of */
 #define xceiv_to_twl(x)		container_of((x), struct twl4030_usb, otg);
@@ -446,9 +475,16 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
 	u8 pwr;
 
 	pwr = twl4030_usb_read(twl, PHY_PWR_CTRL);
+	printk(KERN_ERR "twl4030_phy_power + : PHY_PWR_CTRL=%x ====^^==== (twl4030-usb.c)\n", pwr);
+	pwr = twl4030_usb_read(twl, PHY_CLK_CTRL);
+	printk(KERN_ERR "twl4030_phy_power + : PHY_CLK_CTRL=%x ====^^==== (twl4030-usb.c)\n", pwr);
+	pwr = twl4030_usb_read(twl, PHY_CLK_CTRL_STS);
+	printk(KERN_ERR "twl4030_phy_power + : PHY_CLK_CTRL_STS=%x ====^^==== (twl4030-usb.c)\n", pwr);
 	if (on) {
+#if 0	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
 		regulator_enable(twl->usb3v1);
 		regulator_enable(twl->usb1v8);
+#endif
 		/*
 		 * Disabling usb3v1 regulator (= writing 0 to VUSB3V1_DEV_GRP
 		 * in twl4030) resets the VUSB_DEDICATED2 register. This reset
@@ -458,6 +494,9 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
 		 */
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
 							VUSB_DEDICATED2);
+#if 1	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
+		regulator_enable(twl->usb1v8);
+#endif
 		regulator_enable(twl->usb1v5);
 		pwr &= ~PHY_PWR_PHYPWD;
 		WARN_ON(twl4030_usb_write_verify(twl, PHY_PWR_CTRL, pwr) < 0);
@@ -466,18 +505,32 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
 					(PHY_CLK_CTRL_CLOCKGATING_EN |
 						PHY_CLK_CTRL_CLK32K_EN));
 	} else  {
+		msleep(250); // LGE_CHANGE [HUB] jjun.lee for USB unplug detect (TI Girish)
 		pwr |= PHY_PWR_PHYPWD;
 		WARN_ON(twl4030_usb_write_verify(twl, PHY_PWR_CTRL, pwr) < 0);
 		regulator_disable(twl->usb1v5);
 		regulator_disable(twl->usb1v8);
+#if 1	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
+		/* Put VUSB3V1 regulator in sleep mode */
+		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x08,
+				                        VUSB_DEDICATED2);
+#else
 		regulator_disable(twl->usb3v1);
+#endif
 	}
+	pwr = twl4030_usb_read(twl, PHY_PWR_CTRL);
+	printk(KERN_ERR "twl4030_phy_power - : PHY_PWR_CTRL=%x ====^^==== (twl4030-usb.c)\n", pwr);
+	pwr = twl4030_usb_read(twl, PHY_CLK_CTRL);
+	printk(KERN_ERR "twl4030_phy_power - : PHY_CLK_CTRL=%x ====^^==== (twl4030-usb.c)\n", pwr);
+	pwr = twl4030_usb_read(twl, PHY_CLK_CTRL_STS);
+	printk(KERN_ERR "twl4030_phy_power - : PHY_CLK_CTRL_STS=%x ====^^==== (twl4030-usb.c)\n", pwr);
 }
 
 static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
 {
-	if (twl->asleep)
+	if (twl->asleep) {
 		return;
+	}
 
 	twl4030_phy_power(twl, 0);
 	twl->asleep = 1;
@@ -485,8 +538,19 @@ static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
 
 static void twl4030_phy_resume(struct twl4030_usb *twl)
 {
-	if (!twl->asleep)
+	int status; // LGE CHANGE jjun.lee, Current Optimization by Prakash TI
+	if (!twl->asleep) {
 		return;
+	}
+	
+	// LGE CHANGE jjun.lee, Current Optimization by Prakash TI
+	/* To check the LINK status before resume..
+	 * check to avoid enabling a LDO's 
+	 * */
+	status = twl4030_usb_linkstat(twl);
+	if (status == USB_EVENT_NONE)
+		return;
+	// LGE CHANGE jjun.lee, Current Optimization by Prakash TI
 
 	twl4030_phy_power(twl, 1);
 	twl4030_i2c_access(twl, 1);
@@ -508,12 +572,17 @@ static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
 	/* input to VUSB3V1 LDO is from VBAT, not VBUS */
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x14, VUSB_DEDICATED1);
 
+#if 1	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
+	/* Turn on 3.1V regulator */
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x20, VUSB3V1_DEV_GRP);
+#else
 	/* Initialize 3.1V regulator */
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0, VUSB3V1_DEV_GRP);
 
 	twl->usb3v1 = regulator_get(twl->dev, "usb3v1");
 	if (IS_ERR(twl->usb3v1))
 		return -ENODEV;
+#endif
 
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0, VUSB3V1_TYPE);
 
@@ -544,8 +613,10 @@ fail2:
 	regulator_put(twl->usb1v5);
 	twl->usb1v5 = NULL;
 fail1:
+#if 0	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
 	regulator_put(twl->usb3v1);
 	twl->usb3v1 = NULL;
+#endif
 	return -ENODEV;
 }
 
@@ -564,6 +635,21 @@ static ssize_t twl4030_usb_vbus_show(struct device *dev,
 	return ret;
 }
 static DEVICE_ATTR(vbus, 0444, twl4030_usb_vbus_show, NULL);
+
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+extern void set_external_power_detect(u8 ta_on);
+extern void set_charging_current(void);
+
+struct work_struct set_ext_pwr_twl_usb_work;
+static void twl_usb_ext_pwr_work(struct work_struct *data)
+{
+	printk(KERN_INFO "[charging_msg] %s: ext_pwr \n", __FUNCTION__);
+	set_charging_current();
+	return ;
+}
+
+#endif 
+
 
 static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 {
@@ -584,15 +670,60 @@ static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 		 * starts to handle softconnect right.
 		 */
 		if (status == USB_EVENT_NONE)
-			twl4030_phy_suspend(twl, 0);
-		else
-			twl4030_phy_resume(twl);
+		{
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
+			musb_link_force_active(0);
+#endif // defined(CONFIG_MACH_LGE_OMAP3)
+
+			twl4030_phy_suspend(twl, 0);
+		}
+		else // usb connnect
+		{
+
+#if defined(CONFIG_MACH_LGE_OMAP3)
+			musb_link_force_active(1);
+#endif // defined(CONFIG_MACH_LGE_OMAP3)
+			twl4030_phy_resume(twl);
+		}
 		blocking_notifier_call_chain(&twl->otg.notifier, status,
 				twl->otg.gadget);
 	}
-	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
+#if 0 /* mbk_temp */ 
+	printk(KERN_INFO "[charging_msg] %s: status %x\n", __FUNCTION__, status);
+	//lge_twl4030charger_presence_evt(1);
+	if( status == USB_EVENT_NONE) {
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+		set_external_power_detect(0);
+		schedule_work(&set_ext_pwr_twl_usb_work);
+#endif 
 
+#if 0 /* mbk_wake mbk_temp */ 
+		// LGE_CHANGE work queue &  wake lock for usb connection
+		if(1==the_wlock.wake_lock_on){
+			schedule_delayed_work(&twl4030_usb_wq, msecs_to_jiffies(500));	/* 500 msec */ // to delay unlock wake_lock
+		}
+		// LGE_CHANGE work queue &  wake lock for usb connection
+#endif
+	}
+	else if( status == USB_EVENT_VBUS) {
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+		set_external_power_detect(1);
+		schedule_work(&set_ext_pwr_twl_usb_work);
+#endif 
+
+#if 0 /* mbk_wake mbk_temp */ 
+		// LGE_CHANGE wake lock for usb connection
+		if(0==the_wlock.wake_lock_on){
+			wake_lock(&the_wlock.wake_lock);
+			the_wlock.wake_lock_on=1;
+			printk(KERN_WARNING "[twl4030-usb] wake_lock_on=1 (locked)\n");
+		}
+		// LGE_CHANGE wake lock for usb connection
+#endif
+	}
+#endif 
+	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	return IRQ_HANDLED;
 }
 
@@ -645,6 +776,21 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	struct twl4030_usb	*twl;
 	int			status, err;
 
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+	INIT_WORK(&set_ext_pwr_twl_usb_work, twl_usb_ext_pwr_work);
+#endif 
+
+#if 0 /* mbk_wake mbk_temp */ 
+	// LGE_CHANGE wake lock for usb connection
+	wake_lock_init(&the_wlock.wake_lock, WAKE_LOCK_SUSPEND, "twl4030_usb_connection");
+	the_wlock.wake_lock_on=0;
+	// LGE_CHANGE wake lock for usb connection
+
+	// LGE_CHANGE work queue
+	INIT_DELAYED_WORK(&twl4030_usb_wq, twl4030_usb_wq_func);
+	// LGE_CHANGE work queue
+#endif
+
 	if (!pdata) {
 		dev_dbg(&pdev->dev, "platform_data not available\n");
 		return -EINVAL;
@@ -691,7 +837,7 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	 */
 	twl->irq_enabled = true;
 	status = request_threaded_irq(twl->irq, NULL, twl4030_usb_irq,
-			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
+			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING | IRQF_ONESHOT,
 			"twl4030_usb", twl);
 	if (status < 0) {
 		dev_dbg(&pdev->dev, "can't get IRQ %d, err %d\n",
@@ -700,6 +846,7 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 		return status;
 	}
 
+	//regulator_enable(twl->usb3v1);
 	/* The IRQ handler just handles changes from the previous states
 	 * of the ID and VBUS pins ... in probe() we must initialize that
 	 * previous state.  The easy way:  fake an IRQ.
@@ -709,6 +856,9 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	 * because of scheduling delays.
 	 */
 	twl4030_usb_irq(twl->irq, twl);
+	//if (twl4030_usb_linkstat(twl) == USB_EVENT_NONE) {
+	//	regulator_disable(twl->usb3v1);
+	//}
 
 	dev_info(&pdev->dev, "Initialized TWL4030 USB module\n");
 	return 0;
@@ -742,9 +892,17 @@ static int __exit twl4030_usb_remove(struct platform_device *pdev)
 	twl4030_phy_power(twl, 0);
 	regulator_put(twl->usb1v5);
 	regulator_put(twl->usb1v8);
+#if 0	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
 	regulator_put(twl->usb3v1);
+#endif
 
 	kfree(twl);
+
+#if 0 /* mbk_wake mbk_temp */ 
+	// LGE_CHANGE wake lock for usb connection
+	wake_lock_destroy(&the_wlock.wake_lock);
+	// LGE_CHANGE wake lock for usb connection
+#endif
 
 	return 0;
 }

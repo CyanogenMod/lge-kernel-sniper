@@ -409,6 +409,26 @@ static ssize_t display_device_connected_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", device_connected);
 }
 
+extern int reset_status; 
+static ssize_t boot_completed_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	long completed = simple_strtol(buf, NULL, 0);
+	printk("[BCH][%s][%s()] (L:%d) completed=%d \n",  __FILE__, __func__, __LINE__, completed);
+	if (completed)
+#if 1
+		reset_status = 0 /*RESET_NORMAL*/;
+#else
+		dsi_wake_up_update_thread();
+#endif
+	return size;
+}
+static ssize_t boot_completed_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	printk("[BCH][%s][%s()] (L:%d) \n",  __FILE__, __func__, __LINE__);
+	return snprintf(buf, PAGE_SIZE, "%u\n", 0);
+}
 
 static ssize_t display_edid_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -485,6 +505,8 @@ static DEVICE_ATTR(device_detect_enabled, S_IRUGO|S_IWUSR,
 static DEVICE_ATTR(device_connected, S_IRUGO,
 		display_device_connected_show,
 		NULL);
+static DEVICE_ATTR(boot_completed, 0664,
+		boot_completed_show, boot_completed_store);  // /sys/devices/omapdss/display0/boot_completed
 
 static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_enabled,
@@ -499,6 +521,7 @@ static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_hpd_enabled,
 	&dev_attr_device_detect_enabled,
 	&dev_attr_device_connected,
+	&dev_attr_boot_completed, 
 	NULL
 };
 

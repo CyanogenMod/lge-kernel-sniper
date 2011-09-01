@@ -427,6 +427,12 @@ static void set_fb_fix(struct fb_info *fbi, int from_init)
 		fix->smem_start		= rg->paddr;
 		fix->smem_len		= rg->size;
 	}
+/* LGE_CHANGE_S <sunggyun.yu@lge.com> for GFX_DDK*/
+#ifdef CONFIG_MACH_LGE_HUB
+	fix->mmio_start = DSS_BASE;
+	fix->mmio_len = DSS_SZ_REGS;
+#endif
+/* LGE_CHANGE_E <sunggyun.yu@lge.com> for GFX_DDK*/
 
 	fix->type = FB_TYPE_PACKED_PIXELS;
 	bpp = var->bits_per_pixel;

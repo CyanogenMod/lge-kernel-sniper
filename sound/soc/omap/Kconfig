@@ -161,3 +161,11 @@ config SND_OMAP_SOC_IGEP0020
 	select SND_SOC_TWL4030
 	help
 	  Say Y if you want to add support for Soc audio on IGEP v2 board.
+	  
+config SND_OMAP_SOC_HUB
+	tristate "SoC Audio support for Hub"
+	depends on TWL4030_CORE && SND_OMAP_SOC && MACH_LGE_HUB
+	select SND_OMAP_SOC_MCBSP
+	select SND_SOC_TWL4030
+	help
+	  Say Y if you want to add support for Soc audio on Hub board.
