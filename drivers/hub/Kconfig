@@ -99,12 +99,12 @@ config LGE_CHARGE_CONTROL_BATTERY_FET
 #	help
 #	   Hub Vibrator Motor Seletion, Simple vibrator for Android or Vibtonz for Immersion Haptic
 
-#config HUB_VIBRATOR
-#	tristate "Hub Vibrator Driver"
-#	depends on MACH_LGE_HUB
-#	default n
-#	---help---
-#		Support for Linear Vibrator Driver
+config HUB_VIBRATOR
+	tristate "Hub Vibrator Driver"
+	depends on MACH_LGE_HUB
+	default n
+	---help---
+		Support for Linear Vibrator Driver
 
 #endchoice
 
