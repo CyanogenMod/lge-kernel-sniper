@@ -624,5 +624,13 @@ config TOUCHSCREEN_TPS6507X
 config TOUCHSCREEN_HUB_SYNAPTICS
 	default y
 	bool "HUB Synaptics touchscreen"
+
+config TOUCHSCREEN_ANDROID_VIRTUALKEYS
+	boolean "Support userspace-managed virtual keys on android"
+	depends on TOUCHSCREEN_HUB_SYNAPTICS
+	default y
+	help
+	  Replaces the direct key events with a sysfs file with the key coordinates
+	  to be used by Android userspace for the capacitive keys
 	
 endif

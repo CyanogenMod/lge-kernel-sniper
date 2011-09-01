@@ -595,6 +595,10 @@ static void synaptics_ts_work_func(struct work_struct *work)
 	struct synaptics_ts_data *ts = container_of(work, struct synaptics_ts_data, work);
 	int i;
 	int finger_count = 0;
+#ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
+        unsigned long timeout_jiffies = 0;
+#endif
+	
 
 	if(init_stabled != 1)
 		return;
@@ -613,7 +617,7 @@ do{
 		dummy_read_byte = synaptics_ts_i2c_read_byte_data(ts->client, SYNAPTICS_2D_GESTURE_FINGER_0 );
 	}
 	#endif
-	
+
 	
 	if(ts_reg_data.interrupt_status_reg & SYNAPTICS_INT_ABS0)
 	{
@@ -688,15 +692,31 @@ do{
 					         pressed++;
 					 }
 #endif
+#ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
+					 curr_event_type = TOUCH_EVENT_ABS;
+#else
 					if((curr_ts_data.Y_position[i] < SYNAPTICS_PANEL_LCD_MAX_Y && prev_event_type == TOUCH_EVENT_NULL) || prev_event_type == TOUCH_EVENT_ABS)
 						curr_event_type = TOUCH_EVENT_ABS;
 					else if((curr_ts_data.Y_position[i] >= SYNAPTICS_PANEL_LCD_MAX_Y && prev_event_type == TOUCH_EVENT_NULL) || prev_event_type == TOUCH_EVENT_BUTTON)
 						curr_event_type = TOUCH_EVENT_BUTTON;
+#endif
 
 					if(curr_event_type == TOUCH_EVENT_ABS)
 					{
+#ifndef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
 						if(curr_ts_data.Y_position[i] < SYNAPTICS_PANEL_LCD_MAX_Y)
+#endif
 						{
+#ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
+                                                                        if(curr_ts_data.Y_position[i] >= SYNAPTICS_PANEL_LCD_MAX_Y) {
+                                                                                if (!prev_ts_data.touch_status[i]) {
+                                                                                        timeout_jiffies = jiffies + msecs_to_jiffies(300);
+                                                                                } else if (time_is_after_eq_jiffies(timeout_jiffies)) {
+                                                                                        input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
+                                                                                        input_mt_sync(ts->input_dev);
+                                                                                }
+                                                                        }
+#endif
 							input_report_abs(ts->input_dev, ABS_MT_POSITION_X, curr_ts_data.X_position[i]);
 							input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, curr_ts_data.Y_position[i]);
 							input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, curr_ts_data.pressure[i]);

@@ -771,6 +771,52 @@ static struct synaptics_i2c_rmi_platform_data hub_ts_synaptics_platform_data[] =
 	},
 };
 
+#ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
+static ssize_t sniper_virtual_keys_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	/* Dimensions, 80x80, y starts at 830
+	   center: x: menu: 75, home: 185, back: 295, search 405, y: 910 */
+	return sprintf(buf,
+			__stringify(EV_KEY) ":" __stringify(KEY_MENU)  ":75:910:110:110"
+			":" __stringify(EV_KEY) ":" __stringify(KEY_HOME)   ":185:910:110:110"
+			":" __stringify(EV_KEY) ":" __stringify(KEY_BACK)   ":295:910:110:110"
+			":" __stringify(EV_KEY) ":" __stringify(KEY_SEARCH) ":405:910:110:110"
+			"\n");
+}
+
+static struct kobj_attribute sniper_virtual_keys_attr = {
+	.attr = {
+		.name = "virtualkeys.hub_synaptics_touch",
+		.mode = S_IRUGO,
+	},
+	.show = &sniper_virtual_keys_show,
+};
+
+static struct attribute *sniper_properties_attrs[] = {
+	&sniper_virtual_keys_attr.attr,
+	NULL
+};
+
+static struct attribute_group sniper_properties_attr_group = {
+	.attrs = sniper_properties_attrs,
+};
+
+static int __init sniper_init_android_virtualkeys(void)
+{
+	struct kobject *properties_kobj;
+
+	properties_kobj = kobject_create_and_add("board_properties", NULL);
+	if (properties_kobj) {
+		if (sysfs_create_group(properties_kobj,
+					&sniper_properties_attr_group))
+			pr_err("failed to create board_properties\n");
+	} else {
+		pr_err("failed to create board_properties\n");
+	}
+}
+#endif
+
 static struct i2c_board_info __initdata hub_i2c_bus2_info[] = {
 	{
 		//I2C_BOARD_INFO("hub_i2c_bl", HUB_BACKLIGHT_ADDRESS),
@@ -1268,6 +1314,10 @@ void __init hub_peripherals_init(void)
 	platform_add_devices(hub_devices, ARRAY_SIZE(hub_devices));
 
 	hub_synaptics_dev_init();
+
+#ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
+        sniper_init_android_virtualkeys();
+#endif
 
 #if defined(CONFIG_MPU_SENSORS_MPU3050) || defined(CONFIG_MPU_SENSORS_MPU3050_MODULE)
 	mpu3050_dev_init();
