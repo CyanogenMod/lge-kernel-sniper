@@ -769,8 +769,8 @@ static int previewer_open(struct inode *inode, struct file *filp)
 	if (mutex_lock_interruptible(&device->prevwrap_mutex))
 		return -EINTR;
 
-	if (device->opened || (filp->f_flags & O_NONBLOCK)) {
-		dev_err(prev_dev, "%s: Device is already opened\n", __func__);
+	if (device->opened /*|| (filp->f_flags & O_NONBLOCK)*/) {
+		dev_err(prev_dev, "%s: Device is already opened (%d)\n", __func__,device->opened);
 		ret = -EBUSY;
 		goto err_open_fh;
 	}
