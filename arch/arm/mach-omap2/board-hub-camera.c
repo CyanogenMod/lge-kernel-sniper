@@ -66,6 +66,8 @@ static struct lp8720_platform_data lp8720_pdata = {
 
 #define ISP_IMX072_MCLK		216000000
 
+#define ISP_YACD5B1S_MCLK               216000000
+
 
 /* Sensor specific GPIO signals */
 #define IMX072_RESET_GPIO  	98
@@ -98,6 +100,10 @@ static struct lp8720_platform_data lp8720_pdata = {
 #define IMX072_CSI2_PHY_TCLK_MISS	1
 #define IMX072_CSI2_PHY_TCLK_SETTLE	14
 #define IMX072_BIGGEST_FRAME_BYTE_SIZE	PAGE_ALIGN(2608 * 1960 * 2)
+#endif
+
+#if defined(CONFIG_VIDEO_YACD5B1S) || defined(CONFIG_VIDEO_YACD5B1S_MODULE)
+#include <../drivers/media/video/yacd5b1s.h>
 #endif
 
 
@@ -528,6 +534,192 @@ struct rt8515_platform_data hub_rt8515_data = {
 };
 
 #endif
+
+#if defined(CONFIG_VIDEO_YACD5B1S) || defined(CONFIG_VIDEO_YACD5B1S_MODULE)
+
+static struct omap34xxcam_sensor_config yacd5b1s_hwc = {
+        .sensor_isp = 1,
+        .capture_mem = PAGE_ALIGN(1600 * 1200 * 2) * 2,
+        .ival_default   = { 1, 30 },
+};
+
+static int yacd5b1s_sensor_set_prv_data(struct v4l2_int_device *s, void *priv)
+{
+        struct omap34xxcam_hw_config *hwc = priv;
+
+        hwc->u.sensor = yacd5b1s_hwc;
+        hwc->dev_index = 0;
+        hwc->dev_minor = 0;
+        hwc->dev_type = OMAP34XXCAM_SLAVE_SENSOR;
+
+        return 0;
+}
+
+static struct isp_interface_config yacd5b1s_if_config = {
+        .ccdc_par_ser = ISP_PARLL,
+        .dataline_shift = 0x2,
+        .hsvs_syncdetect = ISPCTRL_SYNC_DETECT_VSRISE,
+        .strobe = 0x0,
+        .prestrobe = 0x0,
+        .shutter = 0x0,
+        .cam_mclk =  ISP_YACD5B1S_MCLK,
+        .wenlog = ISPCCDC_CFG_WENLOG_AND,
+        .wait_hs_vs = 0,
+//      .raw_fmt_in = ISPCCDC_INPUT_FMT_RG_GB,
+        .u.par.par_bridge = 0x2,
+        .u.par.par_clk_pol = 0x0,
+
+};
+static int yacd5b1s_sensor_power_set(struct v4l2_int_device *dev, enum v4l2_power power)
+{
+        struct omap34xxcam_videodev *vdev = dev->u.slave->master->priv;
+        struct isp_device *isp = dev_get_drvdata(vdev->cam->isp);
+        static enum v4l2_power previous_power = V4L2_POWER_OFF;
+	static struct pm_qos_request_list *qos_request;
+        int err = 0;
+
+        switch (power) {
+        case V4L2_POWER_ON:
+                /* Power Up Sequence */
+                printk(KERN_DEBUG "yacd5b1s_sensor_power_set(ON)\n");
+
+
+                omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 800000);
+
+                /* Hold a constraint to keep MPU in C1 */
+                omap_pm_set_max_mpu_wakeup_lat(&qos_request, 12);
+
+                isp_configure_interface(vdev->cam->isp,&yacd5b1s_if_config);
+
+
+                if (gpio_request(YACD5B1S_RESET_GPIO, "yacd5b1s_rst") != 0)
+                        printk("\n\n\n>>>>>>>>>>>>YACD5B1S_RESET_GPIO_gpio_request_error\n\n\n");//return -EIO;
+
+                if (gpio_request(YACD5B1S_STANDBY_GPIO, "yacd5b1s_PWD") != 0)
+                        printk("\n\n\n>>>>>>>>>>>>YACD5B1S_STANDBY_GPIO_gpio_request_error\n\n\n");//return -EIO;return -EIO;
+
+#if 1
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        SET_VMMC1_V2_8,VMMC1_DEDICATED );
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        VMMC1_DEV_GRP_P1,VMMC1_DEV_GRP );
+#endif
+
+                udelay(20);
+
+#if 1
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        VAUX3_1_8_V, TWL4030_VAUX3_DEDICATED);
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        VAUX_DEV_GRP_P1, TWL4030_VAUX3_DEV_GRP);
+#endif
+
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        VAUX_1_8_V, TWL4030_VAUX4_DEDICATED);
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        VAUX_DEV_GRP_P1, TWL4030_VAUX4_DEV_GRP);
+                //wait typical 500ms for xclk to settle
+        //mdelay(500);
+
+                gpio_direction_output(YACD5B1S_STANDBY_GPIO, true);
+                udelay(100);
+                gpio_set_value(YACD5B1S_STANDBY_GPIO, 0);
+                udelay(1500);
+
+                gpio_set_value(YACD5B1S_STANDBY_GPIO, 1);
+                mdelay(100);
+
+                udelay(50);
+
+                gpio_direction_output(YACD5B1S_RESET_GPIO, true);
+                udelay(100);
+                gpio_set_value(YACD5B1S_RESET_GPIO, 0);
+
+                /* set to output mode */
+
+
+                udelay(1500);
+
+                gpio_set_value(YACD5B1S_RESET_GPIO, 1);
+
+                udelay(300);
+
+                break;
+
+        case V4L2_POWER_OFF:
+                printk(KERN_DEBUG "yacd5b1s_sensor_power_set(OFF)\n");
+                /* Power Down Sequence */
+
+                gpio_set_value(YACD5B1S_RESET_GPIO, 0);
+                udelay(50);
+                gpio_set_value(YACD5B1S_STANDBY_GPIO, 0);
+
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                VAUX_DEV_GRP_NONE, TWL4030_VAUX4_DEV_GRP);
+
+#if 1
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        VAUX_DEV_GRP_NONE,VMMC1_DEV_GRP );
+#endif
+#if 1
+                twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
+                                        VAUX_DEV_GRP_NONE, TWL4030_VAUX3_DEV_GRP);
+#endif
+
+
+                gpio_free(YACD5B1S_STANDBY_GPIO);
+                gpio_free(YACD5B1S_RESET_GPIO);
+
+
+                omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
+                omap_pm_set_max_mpu_wakeup_lat(&qos_request, -1);
+
+                if (previous_power == V4L2_POWER_ON){
+                        isp_disable_mclk(isp);
+                        udelay(5);
+        }
+
+                break;
+
+        case V4L2_POWER_STANDBY:
+                printk(KERN_DEBUG "yacd5b1s_sensor_power_set(STANDBY)\n");
+
+                gpio_set_value(YACD5B1S_RESET_GPIO, 0);
+                udelay(50);
+                gpio_set_value(YACD5B1S_STANDBY_GPIO, 0);
+                udelay(50);
+                gpio_free(YACD5B1S_STANDBY_GPIO);
+                gpio_free(YACD5B1S_RESET_GPIO);
+
+                if (previous_power == V4L2_POWER_ON){
+                        isp_disable_mclk(isp);
+                        udelay(5);
+        }
+
+                break;
+        }
+
+        /* Save powerstate to know what was before calling POWER_ON. */
+        previous_power = power;
+
+        return err;
+}
+static u32 yacd5b1s_sensor_set_xclk(struct v4l2_int_device *s, u32 xclkfreq)
+{
+        struct omap34xxcam_videodev *vdev = s->u.slave->master->priv;
+
+        return isp_set_xclk(vdev->cam->isp, xclkfreq, USE_XCLKB); // XCLK B 
+}
+
+struct yacd5b1s_platform_data hub_yacd5b1s_platform_data = {
+        .power_set      = yacd5b1s_sensor_power_set,
+        .priv_data_set  = yacd5b1s_sensor_set_prv_data,
+        .set_xclk       = yacd5b1s_sensor_set_xclk,
+};
+
+
+
+#endif //endif for the secondary sensor 
 
 
 

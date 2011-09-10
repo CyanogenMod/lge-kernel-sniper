@@ -66,8 +66,13 @@ struct omap34xxcam_sensor_info {
 
 /* Boolean control used to force CSI2->MEM datapath on pipeline calculation */
 #define V4L2_CID_PRIVATE_OMAP3ISP_CSI2MEM	(V4L2_CID_PRIVATE_BASE + 0)
+/* Boolean control used to toggle Hynix secondary camera */
+#define V4L2_CID_PRIVATE_OMAP3ISP_HYNIX_SMART_CAMERA   (V4L2_CID_PRIVATE_BASE + 1)
+/* Boolean control used to toggle Hynix secondary camera in Video Telephony mode */
+#define V4L2_CID_PRIVATE_OMAP3ISP_HYNIX_SMART_CAMERA_VT        (V4L2_CID_PRIVATE_BASE + 2)
 /* Boolean control used to toggle Continuous Capture */
-#define V4L2_CID_PRIVATE_OMAP3ISP_CONTINUOUS_CAPTURE (V4L2_CID_PRIVATE_BASE + 1)
+#define V4L2_CID_PRIVATE_OMAP3ISP_CONTINUOUS_CAPTURE (V4L2_CID_PRIVATE_BASE + 3)
+//#define V4L2_CID_PRIVATE_OMAP3ISP_CONTINUOUS_CAPTURE (V4L2_CID_PRIVATE_BASE + 1)
 
 /* AE/AWB related structures and flags*/
 

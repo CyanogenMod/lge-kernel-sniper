@@ -22,6 +22,7 @@
 #include "omap34xxcam.h"
 #include "isp/isp.h"
 #include "isp/ispcsi2.h"
+#include <linux/videodev2.h>
 
 
 #define YACD5B1S_DRIVER_NAME  "yacd5b1s"
@@ -52,6 +53,7 @@ struct yacd5b1s_sensor {
 	bool resuming;
 	bool reset_camera;
 	bool vt_mode;
+	bool capture_mode;
 };
 
 static struct yacd5b1s_sensor yacd5b1s;
@@ -62,9 +64,33 @@ static enum yacd5b1s_image_size isize_current = YACD5B1S_2MP;
 /* list of image formats supported by yacd5b1s sensor */
 const static struct v4l2_fmtdesc yacd5b1s_formats[] = {
 	{
-		.description = "YUYV (YUV 4:2:2), packed",
-		.pixelformat = V4L2_PIX_FMT_YUYV,
+		.description = "UYVY (YUV 4:2:2), packed",
+		.pixelformat = V4L2_PIX_FMT_UYVY,
 	}
+};
+
+const static struct yacd5b1s_reg *config_regs_table[YACD5B1S_CFG_MODE][YACD5B1S_SIZE] = {
+	{ // preview mode
+		set_preview_qcif_config,
+		set_preview_qvga_config,
+		set_preview_vga_config,
+		sensor_core_dummy,
+		sensor_core_dummy
+	},
+	{ // return to preview mode
+		set_return_to_preview_qcif_config,
+		set_return_to_preview_qvga_config,
+		set_return_to_preview_vga_config,
+		sensor_core_dummy,
+		sensor_core_dummy,
+	},
+	{ // capture mode
+		set_capture_qcif_config,
+		set_capture_qvga_config,
+		set_capture_vga_config,
+		set_capture_1mpix_config,
+		set_capture_2mpix_config
+	},
 };
 
 #define NUM_CAPTURE_FORMATS ARRAY_SIZE(yacd5b1s_formats)
@@ -431,6 +457,7 @@ static enum yacd5b1s_image_size yacd5b1s_find_size(unsigned int width,
 	return isize;
 }
 
+#if 0
 /**
  * Set CSI2 Virtual ID.
  * @client: i2c client driver structure
@@ -459,6 +486,7 @@ static int yacd5b1s_set_framerate(struct v4l2_int_device *s,
 	int err = 0;
 	return err;
 }
+#endif
 
 /**
  * yacd5b1ssensor_calc_xclk - Calculate the required xclk frequency
@@ -472,6 +500,7 @@ static unsigned long yacd5b1ssensor_calc_xclk(void)
 	return xclk_current;
 }
 
+#if 0
 /**
  * Sets the correct orientation based on the sensor version.
  *   IU046F2-Z   version=2  orientation=3
@@ -482,6 +511,7 @@ static int yacd5b1s_set_orientation(struct i2c_client *client, u32 ver)
 	int err = 0;
 	return err;
 }
+#endif
 
 /**
  * yacd5b1ssensor_set_exposure_time - sets exposure time per input value
@@ -803,18 +833,20 @@ int yacd5b1s_configure_frame(struct i2c_client *client,
  */
 static int yacd5b1s_configure(struct v4l2_int_device *s)
 {
+	const struct yacd5b1s_reg *cfg_table = NULL;
 	struct yacd5b1s_sensor *sensor = s->priv;
 	struct v4l2_pix_format *pix = &sensor->pix;
 	struct i2c_client *client = sensor->i2c_client;
 	enum yacd5b1s_image_size isize;
+	enum yacd5b1s_cfg_mode config_mode = YACD5B1S_CFG_PREVIEW;
 	int err = 0;
 
 	isize = yacd5b1s_find_size(pix->width, pix->height);
 	isize_current = isize;
 
-	printk(KERN_ERR "+yacd5b1s_configure size = [%d]\n", isize_current);
+	printk(KERN_ERR "+yacd5b1s_configure size = [%d], reset_camera(%d), capture_mode(%d)\n", \
+			isize_current, sensor->reset_camera, sensor->capture_mode);
 
-	// sensor core
 	if (!sensor->reset_camera){
 		if (!sensor->vt_mode){
 			/* set dinamic frame rate 10 ~ 22 fps */
@@ -823,40 +855,20 @@ static int yacd5b1s_configure(struct v4l2_int_device *s)
 			/* set fixed frame rate 15fps */
 			yacd5b1s_write_regs(client, VT_sensor_core_settings);
 		}
+		config_mode = YACD5B1S_CFG_PREVIEW; // preview mode
+	} else {
+		if (!sensor->capture_mode) {
+			config_mode = YACD5B1S_CFG_RETPREVIEW; // return to preview mode
+		} else {
+			config_mode = YACD5B1S_CFG_CAPTURE; // capture mode
+		}
 	}
 
-     
-	if(0 == isize_current){
+	cfg_table = config_regs_table[config_mode][isize];
 
-		yacd5b1s_write_regs(client, set_preview_qcif_config);
-
-		mdelay(30);
-
-	}else if (1 == isize_current){
-
-		yacd5b1s_write_regs(client, set_preview_qvga_config);
-
-
-		mdelay(30);
-
-	}else if (2 == isize_current){
-
-		yacd5b1s_write_regs(client, set_preview_vga_config);
-
-		mdelay(30);
-
-	}else if (3 == isize_current){
-
-		yacd5b1s_write_regs(client, set_capture_1mpix_config);
-
-		mdelay(30);
-
-	}else{
-		yacd5b1s_write_regs(client, set_capture_2mpix_config);
-
-		mdelay(30);
-
-	}
+	yacd5b1s_write_regs(client, cfg_table);
+	
+	mdelay(30);
 		     
 	return err;
 }
@@ -1035,7 +1047,12 @@ static int ioctl_s_ctrl(struct v4l2_int_device *s,
 		retval = yacd5b1ssensor_set_metering(vc->value, s, lvc);
 		break;
 	case V4L2_CID_PRIVATE_OMAP3ISP_HYNIX_SMART_CAMERA:
-		sensor->reset_camera = vc->value ? true : false;
+		if(vc->value) {
+			sensor->reset_camera = true;
+			sensor->capture_mode = true;
+		} else {
+			sensor->reset_camera = false;
+		}
 		lvc->current_value = vc->value;
 		retval = 0;
 		break;
@@ -1191,13 +1208,36 @@ static int ioctl_priv_g_pixclk(struct v4l2_int_device *s, u32 *pixclk)
  * Returns the sensor's current active image basesize.
  */
 static int ioctl_priv_g_activesize(struct v4l2_int_device *s,
-			      struct v4l2_pix_format *pix)
+				   struct v4l2_rect *pix)
 {
-	struct yacd5b1s_sensor *sensor = s->priv;
+//	struct yacd5b1s_frame_settings *frm;
 
-	pix->width = sensor->pix.width;
-	pix->height = sensor->pix.height;
-	
+	if(0 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 176;
+		pix->height = 144;
+	}else if (1 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 320;
+		pix->height = 240;
+	}else if (2 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 640;
+		pix->height = 480;
+	}else if (3 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 1280;
+		pix->height = 960;
+	}else{
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 1600;
+		pix->height = 1200;
+	}
 
 	return 0;
 }
@@ -1210,11 +1250,57 @@ static int ioctl_priv_g_activesize(struct v4l2_int_device *s,
  * Returns the sensor's biggest image basesize.
  */
 static int ioctl_priv_g_fullsize(struct v4l2_int_device *s,
-			    struct v4l2_pix_format *pix)
+				 struct v4l2_rect *pix)
 {
 
-	pix->width = yacd5b1s_sizes[NUM_IMAGE_SIZES - 1].width;
-	pix->height = yacd5b1s_sizes[NUM_IMAGE_SIZES - 1].height;
+//	struct yacd5b1s_frame_settings *frm;
+
+	pix->left = 0;
+	pix->top = 0;
+	pix->width = 1600;
+	pix->height = 1200;
+
+	return 0;
+}
+
+/**
+ * ioctl_g_pixelsize - V4L2 sensor interface handler for ioctl_g_pixelsize
+ * @s: pointer to standard V4L2 device structure
+ * @pix: pointer to standard V4L2 v4l2_pix_format structure
+ *
+ * Returns the sensor's configure pixel size.
+ */
+static int ioctl_priv_g_pixelsize(struct v4l2_int_device *s,
+				  struct v4l2_rect *pix)
+{
+//	struct yacd5b1s_frame_settings *frm;
+
+	if(0 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 2;
+		pix->height = 2;
+	}else if (1 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 2;
+		pix->height = 2;
+	}else if (2 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 2;
+		pix->height = 2;
+	}else if (3 == isize_current){
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 1;
+		pix->height = 1;
+	}else{
+		pix->left = 0;
+		pix->top = 0;
+		pix->width = 1;
+		pix->height = 1;
+	}
 
 	return 0;
 }
@@ -1341,23 +1427,29 @@ static int yacd5b1s_power_on(struct v4l2_int_device *s)
 static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 {
 	struct yacd5b1s_sensor *sensor = s->priv;
-	struct i2c_client *client = sensor->i2c_client;
-	struct omap34xxcam_hw_config hw_config;
+//	struct i2c_client *client = sensor->i2c_client;
+//	struct omap34xxcam_hw_config hw_config;
 	struct vcontrol *lvc;
 	int i;
 
+//	printk(KERN_DEBUG "yacd5b1s: ioctl_s_power(%d ==> %d, reset: %d)(cnt: %d)\n", current_power_state, on, sensor->reset_camera, sensor->capture_mode);
+
 	switch (on) {
 	case V4L2_POWER_ON:
-		if (!sensor->reset_camera)
-			yacd5b1s_power_on(s);
-		if (current_power_state == V4L2_POWER_STANDBY) {
-			sensor->resuming = true;
-			yacd5b1s_configure(s);
+		if (!sensor->reset_camera) {
+			if (sensor->capture_mode == false)
+				yacd5b1s_power_on(s);
+			else
+				sensor->capture_mode = false;
 		}
+		yacd5b1s_configure(s);
 		break;
 	case V4L2_POWER_OFF:
-		if (!sensor->reset_camera)
-			yacd5b1s_power_off(s);
+		if(sensor->reset_camera)
+			yacd5b1s_power_standby(s);
+		yacd5b1s_power_off(s);
+		
+		sensor->capture_mode = false;
 
 		/* Reset defaults for controls */
 		i = find_vctrl(V4L2_CID_GAIN);
@@ -1558,7 +1650,9 @@ static struct v4l2_int_ioctl_desc yacd5b1s_ioctl_desc[] = {
 	{ .num = vidioc_int_priv_g_activesize_num,
 	  .func = (v4l2_int_ioctl_func *)ioctl_priv_g_activesize },
 	{ .num = vidioc_int_priv_g_fullsize_num,
-	  .func = (v4l2_int_ioctl_func *)ioctl_priv_g_fullsize },	
+	  .func = (v4l2_int_ioctl_func *)ioctl_priv_g_fullsize },
+	{ .num = vidioc_int_priv_g_pixelsize_num,
+	  .func = (v4l2_int_ioctl_func *)ioctl_priv_g_pixelsize },	  
 	  	
 };
 
@@ -1608,11 +1702,13 @@ static int __devinit yacd5b1s_probe(struct i2c_client *client,
 	/* Make the default capture format QCIF V4L2_PIX_FMT_UYVY */
 	sensor->pix.width = YACD5B1S_IMAGE_WIDTH_MAX;
 	sensor->pix.height = YACD5B1S_IMAGE_HEIGHT_MAX;
-	sensor->pix.pixelformat = V4L2_PIX_FMT_YUYV;
+	sensor->pix.pixelformat = V4L2_PIX_FMT_UYVY;
 
 	/* Enable reset secondary camera default */
 	sensor->reset_camera = false;
 	sensor->vt_mode = false;
+
+	sensor->capture_mode = false;
 
 	err = v4l2_int_device_register(sensor->v4l2_int_device);
 	if (err)
@@ -1675,6 +1771,10 @@ static struct yacd5b1s_sensor yacd5b1s = {
 static int __init yacd5b1ssensor_init(void)
 {
 	int err;
+//LGE_CHANGE_S [] 2011-01-20, for factory process without sub-board
+//	extern int lcd_off_boot;
+//	if (lcd_off_boot) return -ENODEV;
+//LGE_CHANGE_E [] 2011-01-20, for factory process without sub-board
 
 	err = i2c_add_driver(&yacd5b1ssensor_i2c_driver);
 	if (err) {

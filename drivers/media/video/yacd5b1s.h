@@ -107,8 +107,18 @@ enum yacd5b1s_image_size {
 	YACD5B1S_QVGA,  /*QVGA Resolution*/
 	YACD5B1S_VGA,  /*VGA Resolution*/
 	YACD5B1S_1MP,  /*1MP Resolution*/
-	YACD5B1S_2MP /*2MP Full Resolution*/	
+	YACD5B1S_2MP, /*2MP Full Resolution*/	
+	YACD5B1S_SIZE
 };
+
+/* Configuration mode for yacd5b1s */
+enum yacd5b1s_cfg_mode {
+	YACD5B1S_CFG_PREVIEW,
+	YACD5B1S_CFG_RETPREVIEW,
+	YACD5B1S_CFG_CAPTURE,
+	YACD5B1S_CFG_MODE
+};
+
 #define NUM_IMAGE_SIZES ARRAY_SIZE              (yacd5b1s_sizes)
 
 /**

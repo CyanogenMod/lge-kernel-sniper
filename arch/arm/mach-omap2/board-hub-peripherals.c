@@ -84,6 +84,9 @@ static struct lp8720_platform_data lp8720_pdata = {
 #define KEY_LEDS_BD2802_ADDRESS 	0x1A
 #endif
 
+#define SNIPER_COMPASS_INT_GPIO         58
+/* magnetic device names */
+int mag_dev_name;
 
 #ifdef CONFIG_OMAP2_DSS_HDMI
 #define HDMI_TX_NAME	"tda19989"
@@ -108,6 +111,10 @@ extern struct dw9716_platform_data hub_dw9716_platform_data;
 extern struct rt8515_platform_data hub_rt8515_data;
 #endif
 
+#if (defined(CONFIG_VIDEO_YACD5B1S) || defined(CONFIG_VIDEO_YACD5B1S_MODULE)) 
+#include <../drivers/media/video/yacd5b1s.h>
+extern struct yacd5b1s_platform_data hub_yacd5b1s_platform_data;
+#endif
 
 #ifdef CONFIG_VIDEO_OMAP3
 extern void hub_cam_init(void);
@@ -142,6 +149,35 @@ static void sniper_hall_effect_init(void)
 	gpio_direction_input(SNIPER_HF_SOUTH_GPIO);
 }
 #endif
+
+static int sniper_select_magnetic_device(void)
+{
+        int value;
+
+        omap_mux_init_signal("gpio_58", OMAP_PIN_INPUT_PULLDOWN);
+
+        gpio_request(SNIPER_COMPASS_INT_GPIO, "sniper compass interrupt pin");
+        gpio_direction_input(SNIPER_COMPASS_INT_GPIO);
+
+        value = gpio_get_value(SNIPER_COMPASS_INT_GPIO);
+
+        printk("[%s] SNIPER_COMPASS_INT_GPIO value = %d \n",__func__, value);
+
+        if( value == 0)
+        {
+                mag_dev_name = 0;//AKM8975C
+                printk("[%s] set akm8975c feature\n",__func__);
+                return value;
+        }
+        else
+        {
+                mag_dev_name = 1;//AMI306;
+                printk("[%s] set ami306 feature\n",__func__);
+                return value;
+        }
+
+}
+
 
 //extern struct regulator_init_data hub_vdac;
 extern struct regulator_init_data hub_vdsi;
@@ -956,6 +992,58 @@ static struct i2c_board_info __initdata hub_i2c_bus3_info[] = {
 	},
 #endif
 
+#if (defined(CONFIG_VIDEO_YACD5B1S) || defined(CONFIG_VIDEO_YACD5B1S_MODULE)) 
+	{
+		I2C_BOARD_INFO("yacd5b1s", YACD5B1S_I2C_ADDR),
+		.platform_data = &hub_yacd5b1s_platform_data,
+	},
+#endif
+
+};
+
+// 20100624 , add the i2c3 platform device [START_LGE]
+static struct i2c_board_info __initdata hub_i2c_bus3_ami306_info[] = {
+        {
+                I2C_BOARD_INFO("kxtf9", 0x0F),
+        },
+        {
+                I2C_BOARD_INFO("hub_ami306",0x0E),
+        },
+        {
+                I2C_BOARD_INFO("heaven_gyro", 0x68),
+        },
+        #if defined(CONFIG_HUB_SUBPMIC_LP8720)
+        {
+                I2C_BOARD_INFO(LP8720_I2C_NAME,  LP8720_I2C_ADDR),
+                .platform_data =&lp8720_pdata,
+        },
+        #endif
+
+// 20100717  Hub Proximity Sensor [START_LGE]
+        {        I2C_BOARD_INFO("hub_proxi", 0x44),
+//              .irq = OMAP_GPIO_IRQ(14),        
+        },
+// 20100717  Hub Proximity Sensor [END_LGE]
+#if (defined(CONFIG_VIDEO_IMX072) || defined(CONFIG_VIDEO_IMX072_MODULE)) 
+                {
+                        I2C_BOARD_INFO("imx072", IMX072_I2C_ADDR),
+                        .platform_data = &hub_imx072_platform_data,
+                },
+
+                {
+                        I2C_BOARD_INFO(DW9716_NAME,  DW9716_AF_I2C_ADDR),
+                        .platform_data = &hub_dw9716_platform_data,
+                },
+
+#endif
+
+#if (defined(CONFIG_VIDEO_YACD5B1S) || defined(CONFIG_VIDEO_YACD5B1S_MODULE)) 
+                {
+                        I2C_BOARD_INFO("yacd5b1s", YACD5B1S_I2C_ADDR),
+                        .platform_data = &hub_yacd5b1s_platform_data,
+                },
+#endif
+
 };
 
 static int __init omap_i2c_init(void)
@@ -964,8 +1052,15 @@ static int __init omap_i2c_init(void)
 			ARRAY_SIZE(hub_i2c_boardinfo));
 	omap_register_i2c_bus(2, 400, NULL,hub_i2c_bus2_info,
 			ARRAY_SIZE(hub_i2c_bus2_info));
-	omap_register_i2c_bus(3, 400, NULL,hub_i2c_bus3_info, 
-			ARRAY_SIZE(hub_i2c_bus3_info));
+
+	if(mag_dev_name == 0){
+		omap_register_i2c_bus(3, 400, NULL,hub_i2c_bus3_info,
+				ARRAY_SIZE(hub_i2c_bus3_info));// 20100624 , add the i2c3 platform device
+	}else{
+		omap_register_i2c_bus(3, 400, NULL,hub_i2c_bus3_ami306_info,
+				ARRAY_SIZE(hub_i2c_bus3_ami306_info));
+	}
+
 	return 0;
 }
 
@@ -1309,6 +1404,8 @@ static void enable_board_wakeup_source(void)
 
 void __init hub_peripherals_init(void)
 {
+        sniper_select_magnetic_device();
+
 	hub_mmc1_gpio_init();
 	omap_i2c_init();
 	platform_add_devices(hub_devices, ARRAY_SIZE(hub_devices));
