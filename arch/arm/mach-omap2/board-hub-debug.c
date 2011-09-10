@@ -128,7 +128,9 @@ static int lge_hub_panic_event(struct notifier_block *this,
 
 #endif /* CONFIG_FRAMEBUFFER_CONSOLE */
 
-		reset_mode = 'p';
+		//reset_mode = 'p';
+		/* Temporary, to prevent dev deadlocks: Go to recovery after a panic */
+		reset_mode = 'f';
 	}
 
 	emergency_restart();
