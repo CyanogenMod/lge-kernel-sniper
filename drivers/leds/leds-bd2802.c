@@ -293,7 +293,7 @@ static void bd2802_turn_white(struct bd2802_led *led, enum key_leds id)
 	u8 reg;
 	u8 wavepattern = 0x04; //BDCMGB_SEQ_BLINK_ON
 #ifdef BDCMGB_SEQ_BLINK_ON
-	if(led->led_state == BD2802_SEQ && /*led->*/led_isboot)
+	if(led->led_state == BD2802_SEQ)
 		wavepattern = 0x00;
 #endif
 
@@ -915,7 +915,7 @@ static ssize_t bd2802_store_led_start(struct device *dev,
 		if(bIskeystopdisable == true)
 			led->led_iskeystopdisable = 0;
 
-		if(led->led_issuspend == 1 || /*led->*/led_isboot == 0)
+		if(led->led_issuspend == 1)
 		{
 			bd2802_off(led);
 			bd2802_reset(led);
@@ -1359,7 +1359,7 @@ static void bd2802_early_suspend(struct early_suspend *h)
 	led->led_issuspend = 1;
 	led->led_isresumekeypressed =0;
 
-	if(/*led->*/led_isboot == 0 || led->led_state==BD2802_SEQ)
+	if(led->led_state==BD2802_SEQ)
 		return;
 #endif
 
@@ -1397,8 +1397,6 @@ static void bd2802_late_resume(struct early_suspend *h)
 	}
 	led->led_isresumekeypressed =0;
 
-	if(/*led->*/led_isboot == 0)
-		return;
 #endif
 	bd2802_bl_resume(led->client);
 }

@@ -709,6 +709,7 @@ do{
 						{
 #ifdef CONFIG_TOUCHSCREEN_ANDROID_VIRTUALKEYS
                                                                         if(curr_ts_data.Y_position[i] >= SYNAPTICS_PANEL_LCD_MAX_Y) {
+										touchkey_pressed((int)((curr_ts_data.X_position[i]*4)/SYNAPTICS_PANEL_MAX_X));
                                                                                 if (!prev_ts_data.touch_status[i]) {
                                                                                         timeout_jiffies = jiffies + msecs_to_jiffies(300);
                                                                                 } else if (time_is_after_eq_jiffies(timeout_jiffies)) {
