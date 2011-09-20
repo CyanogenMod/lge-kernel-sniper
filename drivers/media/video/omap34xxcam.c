@@ -593,6 +593,7 @@ static int try_pix_parm(struct omap34xxcam_videodev *vdev,
 				 * at same fps.
 				 */
 #ifdef CONFIG_VIDEO_OMAP3_SIZENEG_TRYBIGGER
+				if (!(vdev->vdev_sensor_config.sensor_isp)){
 				if (frmi.width + frmi.height
 				    > best_pix_in->width + best_pix_in->height
 				    && FPS_ABS_DIFF(fps, frmi.discrete)
@@ -604,6 +605,7 @@ static int try_pix_parm(struct omap34xxcam_videodev *vdev,
 						best_pix_in->width,
 						best_pix_in->height);
 					goto do_it_now;
+				}
 				}
 #endif
 				dev_dbg(&vdev->vfd->dev, "falling through\n");
@@ -1303,7 +1305,7 @@ static int vidioc_cropcap(struct file *file, void *_fh, struct v4l2_cropcap *a)
 
 	rval = vidioc_int_cropcap(vdev->vdev_sensor, a);
 
-	if (rval && !vdev->vdev_sensor_config.sensor_isp) {
+	if (rval /* && !vdev->vdev_sensor_config.sensor_isp*/) {
 		struct v4l2_format f;
 		struct v4l2_rect pixel_size;
 
@@ -1366,9 +1368,9 @@ static int vidioc_g_crop(struct file *file, void *_fh, struct v4l2_crop *a)
 
 	mutex_lock(&vdev->mutex);
 
-	if (vdev->vdev_sensor_config.sensor_isp)
+	/*if (vdev->vdev_sensor_config.sensor_isp)
 		rval = vidioc_int_g_crop(vdev->vdev_sensor, a);
-	else
+	else*/
 		rval = isp_g_crop(isp, a);
 
 	mutex_unlock(&vdev->mutex);
@@ -1398,9 +1400,9 @@ static int vidioc_s_crop(struct file *file, void *_fh, struct v4l2_crop *a)
 
 	mutex_lock(&vdev->mutex);
 
-	if (vdev->vdev_sensor_config.sensor_isp)
+	/*if (vdev->vdev_sensor_config.sensor_isp)
 		rval = vidioc_int_s_crop(vdev->vdev_sensor, a);
-	else
+	else*/
 		rval = isp_s_crop(isp, a);
 
 	mutex_unlock(&vdev->mutex);
