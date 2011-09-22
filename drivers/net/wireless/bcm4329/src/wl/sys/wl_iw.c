@@ -713,6 +713,7 @@ wl_iw_set_scan_unassoc_time_ms(
 }
 */
 
+// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [START] : kernel patch from Platform LAB
 /*
 static int
 wl_iw_set_scan_unassoc_time_30_ms(
@@ -767,6 +768,7 @@ wl_iw_set_scan_unassoc_time_80_ms(
     return ret;
 }
 */
+// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [END] : kernel patch from Platform LAB
 
 
 /* BRCM_UPDATE_S for KEEP_ALIVE */
@@ -1393,6 +1395,7 @@ wl_control_wl_start(struct net_device *dev)
 //	MUTEX_LOCK(iw->pub);
 
 	if (g_onoff == G_WLAN_SET_OFF) {
+// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [START] : kernel patch from Platform power consume TDR
 //bill.jung@lge.com - Don't restart. 
 #if 0
 		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_ON);
@@ -1408,6 +1411,7 @@ wl_control_wl_start(struct net_device *dev)
 
 		dhd_dev_init_ioctl(dev);
 #endif
+// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [END] : kernel patch from Platform power consume TDR
 		g_onoff = G_WLAN_SET_ON;
 	}
 	WL_ERROR(("Exited %s \n", __FUNCTION__));
@@ -3458,7 +3462,13 @@ wl_iw_get_scan(
 	wl_scan_results_t *list = (wl_scan_results_t *) g_scan;
 	int error;
 	uint buflen_from_user = dwrq->length;
+
+  #if defined(CONFIG_LGE_BCM432X_PATCH) 
+        uint len =  G_SCAN_RESULTS - 1024;
+  #else
 	uint len =  G_SCAN_RESULTS;
+  #endif //DHD_USE_STATIC_BUF
+
 	__u16 len_ret = 0;
 	__u16 merged_len = 0;
 
@@ -6340,6 +6350,7 @@ wl_iw_set_priv(
 			ret = wl_iw_set_scan_unassoc_time_ms(dev, info, (union iwreq_data *)dwrq, extra);
 		}
 		*/
+// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [START] : kernel patch from Platform LAB
 		/*
 		else if (strnicmp(extra, "BTCOEXSCAN-START", strlen("BTCOEXSCAN-START")) == 0)
 		{
@@ -6351,6 +6362,7 @@ wl_iw_set_priv(
 			ret = wl_iw_set_scan_unassoc_time_80_ms(dev, info, (union iwreq_data *)dwrq, extra);
 		}
 		*/
+// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [END] : kernel patch from Platform LAB
 		
 #endif /* CONFIG_LGE_BCM432X_PATCH */
 /* LGE_CHANGE_E [yoohoo@lge.com] 2009-05-14, support private command */
@@ -7468,6 +7480,9 @@ int wl_iw_attach(struct net_device *dev, void * dhdp)
 #if defined(WL_IW_USE_ISCAN)
 	iscan_info_t *iscan = NULL;
 #endif
+#ifdef CONFIG_LGE_BCM432X_PATCH 
+    uint length = G_SCAN_RESULTS - 1024;
+#endif
 
 	if (!dev)
 		return 0;
@@ -7475,12 +7490,11 @@ int wl_iw_attach(struct net_device *dev, void * dhdp)
 #ifdef CONFIG_LGE_BCM432X_PATCH // pecan kmalloc fail
 	g_scan = NULL;
 
-	
-	g_scan = (void *)kmalloc(G_SCAN_RESULTS, GFP_KERNEL);
+	g_scan = (void *)kmalloc(length, GFP_KERNEL);
 	if (!g_scan)
 		return -ENOMEM;
 
-	memset(g_scan, 0, G_SCAN_RESULTS);
+	memset(g_scan, 0, length);
 	g_scan_specified_ssid = 0;
 #endif /* CONFIG_LGE_BCM432X_PATCH pecan kmalloc fail */
 

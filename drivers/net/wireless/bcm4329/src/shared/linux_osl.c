@@ -56,7 +56,7 @@ static bcm_static_buf_t *bcm_static_buf = 0;
 #define MAX_STATIC_PKT_NUM 8
 typedef struct bcm_static_pkt {
 	struct sk_buff *skb_4k[MAX_STATIC_PKT_NUM];
-	struct sk_buff *skb_8k[MAX_STATIC_PKT_NUM];
+	struct sk_buff *skb_12k[MAX_STATIC_PKT_NUM];
 	struct semaphore osl_pkt_sem;
 	unsigned char pkt_use[MAX_STATIC_PKT_NUM*2];
 } bcm_static_pkt_t;
@@ -298,9 +298,9 @@ osl_pktget_static(osl_t *osh, uint len)
 	struct sk_buff *skb;
 
 
-	if (len > (PAGE_SIZE*2))
+	if (len > (PAGE_SIZE*3))
 	{
-		printk("Do we really need this big skb??\n");
+		printk("Do we really need this big skb?? len=%d\n",len);
 		return osl_pktget(osh, len);
 	}
 
@@ -339,7 +339,7 @@ osl_pktget_static(osl_t *osh, uint len)
 	{
 		bcm_static_skb->pkt_use[i+MAX_STATIC_PKT_NUM] = 1;
 		up(&bcm_static_skb->osl_pkt_sem);
-		skb = bcm_static_skb->skb_8k[i];
+		skb = bcm_static_skb->skb_12k[i];
 		skb->tail = skb->data + len;
 		skb->len = len;
 
@@ -358,7 +358,7 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 {
 	int i;
 
-	for (i = 0; i < MAX_STATIC_PKT_NUM*2; i++)
+	for (i = 0; i < MAX_STATIC_PKT_NUM; i++)
 	{
 		if (p == bcm_static_skb->skb_4k[i])
 		{
@@ -366,6 +366,14 @@ osl_pktfree_static(osl_t *osh, void *p, bool send)
 			bcm_static_skb->pkt_use[i] = 0;
 			up(&bcm_static_skb->osl_pkt_sem);
 
+			return;
+		}
+
+		if (p == bcm_static_skb->skb_12k[i])
+		{
+			down(&bcm_static_skb->osl_pkt_sem);
+			bcm_static_skb->pkt_use[i+MAX_STATIC_PKT_NUM] = 0;
+			up(&bcm_static_skb->osl_pkt_sem);
 
 			return;
 		}

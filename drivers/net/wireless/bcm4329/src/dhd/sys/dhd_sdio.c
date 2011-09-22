@@ -64,6 +64,10 @@
 #include <dhdioctl.h>
 #include <sdiovar.h>
 
+/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
+//extern volatile bool dhd_mmc_suspend;
+/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
+
 #ifndef DHDSDIO_MEM_DUMP_FNAME
 #define DHDSDIO_MEM_DUMP_FNAME         "mem_dump"
 #endif
@@ -4366,6 +4370,12 @@ dhdsdio_isr(void *arg)
 	bcmsdh_info_t *sdh;
 
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
+
+/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
+//#if defined(CONFIG_LGE_BCM432X_PATCH)
+//	dhd_mmc_suspend = FALSE;
+//#endif
+/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
 
 	if (!bus) {
 		DHD_ERROR(("%s : bus is null pointer , exit \n", __FUNCTION__));

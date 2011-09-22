@@ -1,3 +1,4 @@
+# B-Project nvram TSSI by BRCM 2011.02.25
 # bcm94329sdagb board
 # $Copyright (C) 2008 Broadcom Corporation$
 # $id$
@@ -5,8 +6,7 @@
 sromrev=3
 vendid=0x14e4
 devid=0x432f
-#boardtype=0x597
-boardtype=0x4B9
+boardtype=0x4b9
 
 boardrev=0x36
 
@@ -21,14 +21,14 @@ aa5g=0
 ag0=255
 
 # 11g paparams
-pa0b0=5633,5633,5633
-pa0b1=64204,64204,64204
-pa0b2=65217,65217,65217
+pa0b0=5633,5633,5405
+pa0b1=64204,64204,64318
+pa0b2=65217,65217,65282
 pa0itssit=62
 pa0maxpwr=76
-mcs2gpo0=0x7777
-mcs2gpo1=0x7777
-ofdmpo=0x55555555
+mcs2gpo0=0x5555
+mcs2gpo1=0x5555
+ofdmpo=0x33333333
 
 # 11g rssi params
 rssismf2g=0xa,0xa,0xa
@@ -41,6 +41,10 @@ ccode=ALL
 cctl=0x0
 cckdigfilttype=1
 ofdmdigfilttype=1
+
+rxpo2g=4
+
+nvram_override=1
 
 boardnum=1
 macaddr=00:90:4c:c5:00:34
@@ -60,7 +64,7 @@ sd_gpval=0
 otpimagesize=182
 
 #remove BT chopping
-btc_params80=0
+#not yet allowed from broadcom#btc_params80=0
 
 btc_params8=10000
 
