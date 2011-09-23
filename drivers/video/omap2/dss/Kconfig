@@ -39,7 +39,9 @@ config OMAP2_DSS_COLLECT_IRQ_STATS
 
 config OMAP2_DSS_DPI
 	bool "DPI support"
+# prime@sdcmicro.com Changed the default value of OMAP2_DSS_DPI [START]
 	default n
+# prime@sdcmicro.com Changed the default value of OMAP2_DSS_DPI [END]
 	help
 	  DPI Interface. This is the Parallel Display Interface.
 

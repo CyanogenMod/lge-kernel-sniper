@@ -23,7 +23,9 @@
 #include <linux/latencytop.h>
 #include <linux/sched.h>
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #include <linux/dvs_suite.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 /*
  * Targeted preemption latency for CPU-bound tasks:
@@ -1053,11 +1055,13 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #if 1
 	if(ds_status.flag_run_dvs == 1){
-		ds_update_priority_normal(p);
+		ld_update_priority_normal(p);
 	}
 #endif
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	for_each_sched_entity(se) {
 		if (se->on_rq)
@@ -3533,11 +3537,13 @@ static void task_tick_fair(struct rq *rq, struct task_struct *curr, int queued)
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &curr->se;
 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #if 0
 	if(ds_status.flag_run_dvs == 1){
-			ds_update_priority_normal(curr);
+			ld_update_priority_normal(curr);
 	}
 #endif
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);

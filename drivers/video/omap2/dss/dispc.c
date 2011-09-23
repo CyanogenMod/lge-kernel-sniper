@@ -354,6 +354,7 @@ static struct {
 	struct omap_display_platform_data *pdata;
 	struct platform_device *pdev;
 } dispc;
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
 #ifdef CONFIG_GAMMA_TUNING
 /*static unsigned long int GammaTable[] =	
 {	
@@ -616,6 +617,7 @@ static struct {
 };
 */
 
+	/*LG_CHANGE_S lee.hyunji@lge.com 20110401 Gamma tuning*/
 	volatile unsigned long int GammaTable[] =	{	
 	0x00000000, 
 	0x00010101, 
@@ -873,11 +875,14 @@ static struct {
 	0x00FFEEFF, 
 	0x00FFEFFF, 
 	0x00FFF0FF};
+	/*LG_CHANGE_E lee.hyunji@lge.com 20110401 Gamma tuning*/
 
 #endif
+/*LG_CHANGE_E lee.hyunji@lge.com 20110223 Gamma setting*/
 
 static void _omap_dispc_set_irqs(void);
 
+static int dispc_is_vdma_req(u8 rotation, enum omap_color_mode color_mode); //Deepak fix for OMAPS00238807 
 static inline void dispc_write_reg(const struct dispc_reg idx, u32 val)
 {
 	__raw_writel(val, dispc.base + idx.idx);
@@ -2724,11 +2729,19 @@ static const s8 *get_scaling_coef(int orig_size, int out_size,
 		two_m < 58 ? fir5_m26 :
 		fir5_m32;
 }
+
+static void _dispc_set_vdma_attrs(enum omap_plane plane, bool enable)
+{
+	REG_FLD_MOD(dispc_reg_att[plane], enable ? 1 : 0, 20, 20);
+} //Deepak fix for OMAPS00238807
+
+
 static void _dispc_set_scaling(enum omap_plane plane,
 		u16 orig_width, u16 orig_height,
 		u16 out_width, u16 out_height,
 		enum device_n_buffer_type ilace, bool three_taps,
-		bool fieldmode, int scale_x, int scale_y)
+		//bool fieldmode, int scale_x, int scale_y)
+		bool fieldmode, int scale_x, int scale_y,bool vdma)//Deepak fix for OMAPS00238807
 {
 	int fir_hinc;
 	int fir_vinc;
@@ -2738,8 +2751,8 @@ static void _dispc_set_scaling(enum omap_plane plane,
 	const s8 *hfir, *vfir;
 	BUG_ON(plane == OMAP_DSS_GFX);
 
-	if (scale_x) {
-		fir_hinc = (1024 * orig_width) / out_width;
+	if (scale_x|| vdma) {	//Deepak fix for OMAPS00238807
+		fir_hinc = (1024 * (orig_width-1)) / (out_width-1);
 		if (fir_hinc > 4095)
 			fir_hinc = 4095;
 		hfir = get_scaling_coef(orig_width, out_width, 0, 0, 0);
@@ -2748,8 +2761,8 @@ static void _dispc_set_scaling(enum omap_plane plane,
 		hfir = fir3_m8;
 	}
 
-	if (scale_y) {
-		fir_vinc = (1024 * orig_height) / out_height;
+	if (scale_y|| vdma) {	//Deepak fix for OMAPS00238807
+		fir_vinc = (1024 * (orig_height-1)) / (out_height);
 		if (fir_vinc > 4095)
 			fir_vinc = 4095;
 		vfir = get_scaling_coef(orig_height, out_height, 0, 0,
@@ -2774,7 +2787,7 @@ static void _dispc_set_scaling(enum omap_plane plane,
 	l |= fir_vinc ? (1 << 6) : 0;
 
 	l |= three_taps ? 0 : (1 << 21);
-
+	l |= vdma ? (1 << 22) : 0;	//Deepak fix for OMAPS00238807
 	dispc_write_reg(dispc_reg_att[plane], l);
 
 	/*
@@ -2874,7 +2887,9 @@ static void _dispc_set_scaling_uv(enum omap_plane plane,
 	   _dispc_set_vid_accu2_1(plane, accuh, accu1); */
 }
 static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
-		bool mirroring, enum omap_color_mode color_mode)
+		//bool mirroring, enum omap_color_mode color_mode)
+		bool mirroring, enum omap_color_mode color_mode, bool vdma) //Deepak fix for OMAPS00238807
+
 {
 	BUG_ON(plane == OMAP_DSS_WB);
 
@@ -2932,8 +2947,9 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 		REG_FLD_MOD(dispc_reg_att[plane], vidrot, 13, 12);
 
 		if (!cpu_is_omap44xx()) {
-			if (rotation == OMAP_DSS_ROT_90 ||
-					rotation == OMAP_DSS_ROT_270)
+			//if (rotation == OMAP_DSS_ROT_90 || //Deepak fix for OMAPS00238807
+			if (!vdma && (rotation == OMAP_DSS_ROT_90 ||
+					rotation == OMAP_DSS_ROT_270))
 				REG_FLD_MOD(dispc_reg_att[plane], 0x1, 18, 18);
 			else
 				REG_FLD_MOD(dispc_reg_att[plane], 0x0, 18, 18);
@@ -3386,6 +3402,19 @@ static unsigned long calc_fclk(enum omap_channel channel, u16 width,
 	/* FIXME venc pclk? */
 	return dispc_pclk_rate(channel) * vf * hf;
 }
+ //Deepak fix for OMAPS00238807
+static int dispc_is_vdma_req(u8 rotation, enum omap_color_mode color_mode)
+{
+	/* TODO: VDMA support for RGB16 mode */
+	if (cpu_is_omap3630())
+		if ((color_mode == OMAP_DSS_COLOR_YUV2) ||
+			(color_mode == OMAP_DSS_COLOR_UYVY))
+			if ((rotation == OMAP_DSS_ROT_90 ||
+				rotation == OMAP_DSS_ROT_270))
+ 				return true;
+ 	return false;
+}
+
 
 void dispc_set_channel_out(enum omap_plane plane, enum omap_channel channel_out)
 {
@@ -3500,7 +3529,7 @@ int dispc_scaling_decision(u16 width, u16 height,
 		/* Also use 3-tap if downscaling by 2 or less */
 		*three_tap |= out_height * 2 >= in_height;
     		*three_tap = 0; // Tushar - omapdss DISPC error: failed to set up scaling, required fclk rate = 109333332 Hz, current fclk rate = 82000000 Hz
-#else 
+#else //LG_CHANGE lee.hyunji@lge.com 20110502 taps filter issue for DSS Resizer
 /*
 [   76.191894]  fclk =  213333332 Hz
 [   76.196014]  current fclk =  160000000 Hz
@@ -3527,7 +3556,7 @@ int dispc_scaling_decision(u16 width, u16 height,
 		/* Use 3-tap if 5-tap clock requirement is too high */
 		*three_tap |= fclk5 > fclk_max;
 
-#if 1
+#if 1//LG_CHANGE lee.hyunji@lge.com 20110520 DSI error with HTML5 media player proxy in portrait mode
 		/* for now we always use 5-tap unless 3-tap is required */
 			if ((!*three_tap) && (fclk5 != 0))
 			fclk = fclk5;
@@ -3591,6 +3620,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	s32 pix_inc;
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
+
+	bool vdma; //Deepak fix for OMAPS00238807
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3693,7 +3724,15 @@ static int _dispc_setup_plane(enum omap_plane plane,
 			return -EINVAL;
 		}
 	}
+	 //Deepak fix for OMAPS00238807
+#if 0 // 2011-07-12, Tushar, TI engineer, recommend to delete below code( below is temp code at DCM )
+	if(width == 720 && height == 1280 && out_width == 360 && out_height == 640)
+#endif
+		vdma = dispc_is_vdma_req(rotation, color_mode);
 
+	if (vdma)	//Deepak fix for OMAPS00238807
+		three_taps = false;
+		///
 	/* predecimate */
 	width = DIV_ROUND_UP(width, x_decim);
 	height = DIV_ROUND_UP(height, y_decim);
@@ -3877,7 +3916,9 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		_dispc_set_scaling(plane, width, height,
 				   out_width, out_height,
 				   ilace, three_taps, fieldmode,
-				   scale_x, scale_y);
+				   scale_x, scale_y,vdma); //Deepak fix for OMAPS00238807
+				   //scale_x, scale_y);
+		_dispc_set_vdma_attrs(plane, vdma);	//Deepak fix for OMAPS00238807
 		_dispc_set_vid_size(plane, out_width, out_height);
 
 		if (yuv2rgb_conv && yuv2rgb_conv->dirty) {
@@ -3901,9 +3942,8 @@ static int _dispc_setup_plane(enum omap_plane plane,
 
 		_dispc_enable_vid_color_conv(plane, cconv);
 	}
-
-	_dispc_set_rotation_attrs(plane, rotation, mirror, color_mode);
-
+	_dispc_set_rotation_attrs(plane, rotation, mirror, color_mode,vdma); //Deepak fix for OMAPS00238807
+	//_dispc_set_rotation_attrs(plane, rotation, mirror, color_mode);
 	if ((plane != OMAP_DSS_VIDEO1) || (cpu_is_omap44xx()))
 		_dispc_setup_global_alpha(plane, global_alpha);
 
@@ -5617,6 +5657,7 @@ int dispc_init(struct platform_device *pdev)
 	printk(KERN_INFO "OMAP DISPC rev %d.%d\n",
 		   FLD_GET(rev, 7, 4), FLD_GET(rev, 3, 0));
 
+	/*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting*/
 #ifdef CONFIG_GAMMA_TUNING
 	dispc_write_reg(DISPC_GFX_TABLE_BA , virt_to_phys(GammaTable));
 	//DISPC_CONFIG - PALETTEGAMMATABLE = 1 
@@ -5624,6 +5665,7 @@ int dispc_init(struct platform_device *pdev)
 	REG_FLD_MOD(DISPC_CONFIG, 0, 2, 1);
 	REG_FLD_MOD(DISPC_CONFIG, 1, 3, 3);
 #endif
+	/*LG_CHANGE_E lee.hyunji@lge.com 20110223 Gamma setting*/
 	enable_clocks(0);
 
 	return 0;
@@ -5730,6 +5772,7 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 	s32 row_inc = 0;
 	s32 pix_inc;
 	int truncate = 0;
+	bool vdma;	//Deepak fix for OMAPS00238807
 
 	DSSDBG("dispc_setup_wb\n");
 	DSSDBG("Maxds = %d\n", maxdownscale);
@@ -5782,6 +5825,10 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 	if (width > 1280)
 		three_taps = 1;
+	vdma = dispc_is_vdma_req(rotation, color_mode);		//Deepak fix for OMAPS00238807
+
+	if (vdma)		//Deepak fix for OMAPS00238807
+		three_taps = false;
 
 	enable_clocks(1);
 
@@ -5931,8 +5978,8 @@ int dispc_setup_wb(struct writeback_cache_data *wb)
 
 	_dispc_set_scaling(plane, width, height,
 			out_width, out_height,
-			0, three_taps, false, scale_x, scale_y);
-
+			0, three_taps, false, scale_x, scale_y,vdma);	//Deepak fix for OMAPS00238807
+	_dispc_set_vdma_attrs(plane, vdma);	//Deepak fix for OMAPS00238807
 	if (out_ch_width != out_width) {
 		/* this is true for YUV formats */
 		DSSDBG("scale uv set");

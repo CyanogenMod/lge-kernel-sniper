@@ -20,9 +20,11 @@
 
 #include "../mux.h"
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
+#ifdef CONFIG_HAS_EARLYSUSPEND /* 20110304 seven.kim@lge.com late_resume_lcd [START] */
 #include <linux/earlysuspend.h>
-#endif 
+#endif   /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
 
 #define PROXI_LDO_EN	150
 #define PROXI_OUT		14
@@ -39,7 +41,9 @@ static atomic_t proxi_status;
 static struct regulator *reg;
 static bool enabled=false;
 
+// 20100826 jh.koo@lge.com, for stable initialization [START_LGE]
 static struct i2c_client *hub_proximity_client = NULL;
+// 20100826 jh.koo@lge.com, for stable initialization [END_LGE]
 
 struct hub_proxi_data {
 	struct i2c_client *client;
@@ -49,9 +53,11 @@ struct hub_proxi_data {
 	unsigned long delay;
 	bool use_int_mode;
 	bool wakeup_while_sleep;
-#ifdef CONFIG_HAS_EARLYSUSPEND  
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
+#ifdef CONFIG_HAS_EARLYSUSPEND  /* 20110304 seven.kim@lge.com late_resume_lcd [START] */
 	struct early_suspend early_suspend;
-#endif  
+#endif  /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
 };
 
 struct hub_proxi_ctrl_data {
@@ -122,7 +128,7 @@ static int hub_read_vo_bit(struct i2c_client *client)
 
 	val = val & 0x01 ? 0 : 1; //0:near, 1:far
 
-	//printk("[!]%s() read val = %x\n", __func__, val);
+	printk("[!]%s() read val = %x\n", __func__, val);
 	//	hub_proxi_write_reg(client, 0x02, 0x20); // test
 
 	return val;
@@ -136,12 +142,12 @@ static void hub_proxi_power_onoff(bool enable)
 	if(enable) {
 		regulator_enable(reg);
 		enabled = true; 
-		//printk("[!] %s() - PROXI_LDO_EN enabled\n", __func__);		
+		printk("[!] %s() - PROXI_LDO_EN enabled\n", __func__);		
 	}
 	else {
 		regulator_disable(reg);
 		enabled = false;
-		//printk("[!] %s() - PROXI_LDO_EN disabled\n", __func__);
+		printk("[!] %s() - PROXI_LDO_EN disabled\n", __func__);
 	}
 #endif
 
@@ -170,7 +176,7 @@ static void hub_proxi_i2c_init(struct i2c_client *client)
 
 	for (i = 0; initialize_seq[i].reg != I2C_NO_REG; i++) {
 		hub_proxi_write_reg(client, initialize_seq[i].reg, initialize_seq[i].val);
-		//printk("[!] %s() - reg : 0x%x, val : 0x%x\n", __func__, initialize_seq[i].reg, initialize_seq[i].val);
+		printk("[!] %s() - reg : 0x%x, val : 0x%x\n", __func__, initialize_seq[i].reg, initialize_seq[i].val);
 	}
 }
 
@@ -221,7 +227,7 @@ static void hub_proxi_det_work(struct work_struct *work)
 //	int vo = hub_read_vo_bit(data->client);
 
 	input_report_abs(data->input_dev, ABS_DISTANCE, atomic_read(&proxi_status));
-	//printk("%s distance=%d\n", __FUNCTION__, atomic_read(&proxi_status));
+	printk("%s distance=%d\n", __FUNCTION__, atomic_read(&proxi_status));
 	input_sync(data->input_dev);
 }
 
@@ -274,18 +280,20 @@ static ssize_t hub_proxi_onoff_store(struct device *dev,  struct device_attribut
 
 	if(ret)	{
 		hub_proxi_enable(data->client);
-		enable_irq(data->client->irq);
+	//	enable_irq(data->client->irq);
+		enable_irq_wake(gpio_to_irq(PROXI_OUT));
 	}
 	else {
-		disable_irq(data->client->irq);
+	//	disable_irq(data->client->irq);
+		disable_irq_wake(gpio_to_irq(PROXI_OUT));
 		hub_proxi_disable(data->client);		
 	}
 
 	data->wakeup_while_sleep = (bool)ret;
 
-	return count;
+	return 0;
 }
-
+// 20100827 jh.koo@lge.com [START_LGE]
 int hub_proximity_check(void)
 {
 	int proximity_status;
@@ -296,7 +304,7 @@ int hub_proximity_check(void)
 
 	proximity_status = hub_read_vo_bit(hub_proximity_client);
 
-	//printk(KERN_DEBUG"[!]%s() - proximity status : %d\n", __func__, proximity_status);
+	printk(KERN_DEBUG"[!]%s() - proximity status : %d\n", __func__, proximity_status);
 
 	hub_proxi_disable(hub_proximity_client);	
 	alarm_flip = ALARM_FLIP_DEACTIVE;
@@ -304,7 +312,7 @@ int hub_proximity_check(void)
 	return proximity_status;
 }
 EXPORT_SYMBOL(hub_proximity_check);
-
+// 20100827 jh.koo@lge.com [END_LGE]
 
 static ssize_t hub_proxi_delay_show(struct device *dev,  struct device_attribute *attr,  char *buf)
 {
@@ -350,9 +358,9 @@ static ssize_t hub_proxi_wake_store(struct device *dev,  struct device_attribute
 //echo 1 > /sys/bus/i2c/drivers/hub_proxi/2-0044/onoff
 
 static DEVICE_ATTR(status, 0444, hub_proxi_status_show, NULL);
-static DEVICE_ATTR(onoff, 0666, hub_proxi_onoff_show, hub_proxi_onoff_store);
-static DEVICE_ATTR(delay, 0666, hub_proxi_delay_show, hub_proxi_delay_store);
-static DEVICE_ATTR(wake, 0666, hub_proxi_wake_show, hub_proxi_wake_store);
+static DEVICE_ATTR(onoff, 0664, hub_proxi_onoff_show, hub_proxi_onoff_store);
+static DEVICE_ATTR(delay, 0664, hub_proxi_delay_show, hub_proxi_delay_store);
+static DEVICE_ATTR(wake, 0664, hub_proxi_wake_show, hub_proxi_wake_store);
 
 static struct attribute *hub_proxi_attributes[] = {
 	&dev_attr_status.attr,
@@ -366,10 +374,12 @@ static const struct attribute_group hub_proxi_group = {
 	.attrs = hub_proxi_attributes,
 };
 
-#ifdef CONFIG_HAS_EARLYSUSPEND 
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
+#ifdef CONFIG_HAS_EARLYSUSPEND  /* 20110304 seven.kim@lge.com late_resume_lcd [START] */
 static void hub_proxi_early_suspend(struct early_suspend *handler);
 static void hub_proxi_late_resume(struct early_suspend *handler);
-#endif 
+#endif  /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
 
 static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -377,7 +387,9 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 	struct hub_proxi_data *data;
 	struct device *dev = &client->dev;
 
+	// 20100827 jh.koo@lge.com [START_LGE]
 	hub_proximity_client = client;
+	// 20100827 jh.koo@lge.com [END_LGE]
 
 	//Event_to_application(client);
 
@@ -386,6 +398,7 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 		return -ENOMEM;
 	}
 
+	// 20100810 jh.koo@lge.com GPIO Initialization [START_LGE]
 	omap_mux_init_gpio(PROXI_LDO_EN, OMAP_PIN_OUTPUT);
 	omap_mux_init_gpio(PROXI_OUT, OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
 
@@ -404,7 +417,7 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 
 	if (data->use_int_mode) {
 
-		//printk(KERN_WARNING"%s() : interrupt mode. START\n", __func__);
+		printk(KERN_WARNING"%s() : interrupt mode. START\n", __func__);
 
 		if (gpio_request(PROXI_OUT, "proxi interrupt gpio") < 0) {
 			printk("can't get hub proxi irq GPIO\n");
@@ -429,7 +442,7 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 			return -ENOSYS;
 		}
 #endif				
-		//printk(KERN_WARNING"%s() : interrupt mode. END\n", __func__);
+		printk(KERN_WARNING"%s() : interrupt mode. END\n", __func__);
 
 		//		ret = request_irq(client->irq, hub_proxi_int_handler, IRQF_DISABLED | IRQF_TRIGGER_FALLING, "proxi_driver", data); 
 	} 
@@ -441,6 +454,7 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 	}
 	INIT_WORK(&data->work, hub_proxi_det_work);
 
+	/*LGE_CHANGE_S [kyw2029@lge.com] 2010-01-04, ldoc control*/
 #if defined(CONFIG_MACH_LGE_HEAVEN_REV_A)
 	reg = regulator_get(dev, "vaux3");
 	if (reg == NULL) {
@@ -454,6 +468,7 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 		return -ENODEV;
 	}
 #endif
+	/*LGE_CHANGE_S [kyw2029@lge.com] 2010-01-04, ldoc control*/
 
 	//hub_proxi_power_onoff(1);
 	//hub_proxi_i2c_init(client);
@@ -473,7 +488,9 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 	set_bit(EV_ABS, data->input_dev->evbit);
 	input_set_abs_params(data->input_dev, ABS_DISTANCE, 0, 1, 0, 0);
 	data->input_dev->name = "proximity";
+// 20101004 jh.koo@lge.com, fix initial operation of proximity sensor [START_LGE]
 	data->input_dev->abs[ABS_DISTANCE] = -1;
+// 20101004 jh.koo@lge.com, fix initial operation of proximity sensor [END_LGE]
 	ret = input_register_device(data->input_dev);
 	if (ret) {
 		printk(KERN_ERR "%s: Fail to register device\n", __FUNCTION__);
@@ -483,12 +500,14 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 	if ((ret = sysfs_create_group(&dev->kobj, &hub_proxi_group)))
 		goto ERROR3;
 
-#ifdef CONFIG_HAS_EARLYSUSPEND 
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
+#ifdef CONFIG_HAS_EARLYSUSPEND /* 20110304 seven.kim@lge.com late_resume_lcd [START] */
 	data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN - 1;
 	data->early_suspend.suspend = hub_proxi_early_suspend;
 	data->early_suspend.resume = hub_proxi_late_resume;
 	register_early_suspend(&data->early_suspend);
-#endif
+#endif /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
 
 	return 0;
 
@@ -515,9 +534,11 @@ static int hub_proxi_remove(struct i2c_client *client)
 	input_unregister_device(data->input_dev);
 	kfree(data);
 	i2c_set_clientdata(client, NULL);
+/*LGE_CHANGE_S [kyw2029@lge.com] 2010-01-04, ldoc control*/
 #if defined(CONFIG_MACH_LGE_HEAVEN_REV_A) || defined(CONFIG_MACH_LGE_HUB)
 	regulator_put(reg);
 #endif
+/*LGE_CHANGE_S [kyw2029@lge.com] 2010-01-04, ldoc control*/
 	return 0;
 }
 
@@ -526,7 +547,7 @@ static int hub_proxi_suspend(struct i2c_client *client, pm_message_t mesg)
 	struct hub_proxi_data *data = i2c_get_clientdata(client);
 
 	if (!enabled) return 0;
-	//printk("%s\n", __FUNCTION__);
+	printk("%s\n", __FUNCTION__);
 	if (atomic_read(&proxi_status)) return 0;
 #if 0
 	if (hrtimer_try_to_cancel(&data->timer) > 0) //timer is active
@@ -546,7 +567,7 @@ static int hub_proxi_resume(struct i2c_client *client)
 {
 	struct hub_proxi_data *data = i2c_get_clientdata(client);
 
-	//printk("%s\n", __FUNCTION__);
+	printk("%s\n", __FUNCTION__);
 	if (!enabled) return 0;
 #if 0
 	if (data->wakeup_while_sleep)
@@ -555,15 +576,18 @@ static int hub_proxi_resume(struct i2c_client *client)
 	if (hrtimer_try_to_cancel(&data->timer) == 0) //timer is not active
 		hrtimer_start(&data->timer, ktime_set(0, data->delay), HRTIMER_MODE_REL);
 #endif
+// 20101115 jh.koo@lge.com work queue after wake up [START_LGE]
 	if(enabled)
 		schedule_work(&data->work);
+// 20101115 jh.koo@lge.com work queue after wake up [END_LGE]
 
 	if (!data->wakeup_while_sleep)
 		hub_proxi_enable(client);
 	return 0;
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND 
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
+#ifdef CONFIG_HAS_EARLYSUSPEND /* 20110304 seven.kim@lge.com late_resume_lcd [START] */
 static void hub_proxi_early_suspend(struct early_suspend *h)
 {
 	printk("%s\n", __func__);
@@ -575,7 +599,8 @@ static void hub_proxi_late_resume(struct early_suspend *h)
 	printk("%s\n", __func__);
 	hub_proxi_resume(hub_proximity_client);
 }
-#endif 
+#endif /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
 
 static const struct i2c_device_id hub_proxi_ids[] = {
 	{ "hub_proxi", 0 },
@@ -585,11 +610,12 @@ static const struct i2c_device_id hub_proxi_ids[] = {
 static struct i2c_driver hub_proxi_driver = {
 	.probe	 = hub_proxi_probe,
 	.remove	 = hub_proxi_remove,
-
-#ifndef CONFIG_HAS_EARLYSUSPEND
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
+#ifndef CONFIG_HAS_EARLYSUSPEND /* 20110304 seven.kim@lge.com late_resume_lcd [START] */
 	.suspend = hub_proxi_suspend,
 	.resume = hub_proxi_resume,
-#endif 
+#endif /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-13, Sync with P970 */
 	.id_table	= hub_proxi_ids,
 	.driver	 = {
 		.name = "hub_proxi",

@@ -293,6 +293,7 @@
 #define INT_24XX_USB_IRQ_HGEN	78
 #define INT_24XX_USB_IRQ_HSOF	79
 #define INT_24XX_USB_IRQ_OTG	80
+#define INT_34XX_UART4_IRQ			80  //2011_01_13 by seunghyun.yi@lge.com for UART4
 #define INT_24XX_MCBSP5_IRQ_TX	81
 #define INT_24XX_MCBSP5_IRQ_RX	82
 #define INT_24XX_MMC_IRQ	83

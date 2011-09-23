@@ -14,3 +14,6 @@ obj-$(CONFIG_CPU_FREQ_GOV_HOTPLUG)	+= cpufreq_hotplug.o
 # CPUfreq cross-arch helpers
 obj-$(CONFIG_CPU_FREQ_TABLE)		+= freq_table.o
 
+# 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE]
+obj-$(CONFIG_LG_DVFS)				+= lg_dvfs.o
+# 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE]

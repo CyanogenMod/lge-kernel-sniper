@@ -250,12 +250,10 @@ static int imx072_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 		subpm_output_enable();
         gpio_set_value(DW9716_VCM_ENABLE, 0);
 
-        isp_disable_mclk(isp);
         isp_csi2_complexio_power(&isp->isp_csi2, ISP_CSI2_POWER_OFF);
         isp_csi2_reset(&isp->isp_csi2);
         isp_csi2_ctrl_config_ecc_enable(&isp->isp_csi2, true);
         isp_csi2_complexio_power(&isp->isp_csi2, ISP_CSI2_POWER_OFF);
-        isp_disable_mclk(isp);
 		break;	
 		
 	case V4L2_POWER_STANDBY:
@@ -278,12 +276,11 @@ static int imx072_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 
 		/* Remove pm constraints */
 		omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
+// 20110426 prime@sdcmicro.com Update omap_pm_set_max_mpu_wakeup_lat()  for 2.6.35 kernel [START]
 		//omap_pm_set_max_mpu_wakeup_lat(vdev->cam->isp, -1);
 		omap_pm_set_max_mpu_wakeup_lat(&qos_request, -1);
+// 20110426 prime@sdcmicro.com Update omap_pm_set_max_mpu_wakeup_lat()  for 2.6.35 kernel [END]
 
-		/* Make sure not to disable the MCLK twice in a row */
-		if (previous_power == V4L2_POWER_ON)
-			isp_disable_mclk(isp);
 
 		break;
 	}
@@ -296,6 +293,14 @@ static int imx072_sensor_power_set(struct v4l2_int_device *s, enum v4l2_power po
 static u32 imx072_sensor_set_xclk(struct v4l2_int_device *s, u32 xclkfreq)
 {
 	struct omap34xxcam_videodev *vdev = s->u.slave->master->priv;
+	struct isp_device *isp = dev_get_drvdata(vdev->cam->isp);
+
+	/* Enable/Disable sensor xclk */
+	if (xclkfreq)
+		isp_enable_mclk(isp->dev);
+	else
+		isp_disable_mclk(isp);
+
 
 	return isp_set_xclk(vdev->cam->isp, xclkfreq, USE_XCLKA);
 }
@@ -575,7 +580,7 @@ static int yacd5b1s_sensor_power_set(struct v4l2_int_device *dev, enum v4l2_powe
         struct omap34xxcam_videodev *vdev = dev->u.slave->master->priv;
         struct isp_device *isp = dev_get_drvdata(vdev->cam->isp);
         static enum v4l2_power previous_power = V4L2_POWER_OFF;
-	static struct pm_qos_request_list *qos_request;
+	static struct pm_qos_request_list *qos_request_sec; /* 20110527 dongyu.gwak@lge.com camera l3 clock*/
         int err = 0;
 
         switch (power) {
@@ -584,10 +589,14 @@ static int yacd5b1s_sensor_power_set(struct v4l2_int_device *dev, enum v4l2_powe
                 printk(KERN_DEBUG "yacd5b1s_sensor_power_set(ON)\n");
 
 
+// prime@sdcmicro.com [TBD]Temporarily block the following code because PM APIs have been changed [START]
+#if 1
                 omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 800000);
 
                 /* Hold a constraint to keep MPU in C1 */
-                omap_pm_set_max_mpu_wakeup_lat(&qos_request, 12);
+		omap_pm_set_max_mpu_wakeup_lat(&qos_request_sec, 12); /* 20110527 dongyu.gwak@lge.com camera l3 clock*/
+#endif
+// prime@sdcmicro.com [TBD]Temporarily block the following code because PM APIs have been changed [END]
 
                 isp_configure_interface(vdev->cam->isp,&yacd5b1s_if_config);
 
@@ -618,6 +627,7 @@ static int yacd5b1s_sensor_power_set(struct v4l2_int_device *dev, enum v4l2_powe
                                         VAUX_1_8_V, TWL4030_VAUX4_DEDICATED);
                 twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,
                                         VAUX_DEV_GRP_P1, TWL4030_VAUX4_DEV_GRP);
+	
                 //wait typical 500ms for xclk to settle
         //mdelay(500);
 
@@ -671,13 +681,13 @@ static int yacd5b1s_sensor_power_set(struct v4l2_int_device *dev, enum v4l2_powe
                 gpio_free(YACD5B1S_RESET_GPIO);
 
 
+// prime@sdcmicro.com [TBD]Temporarily block the following code because PM APIs have been changed [START]
+#if 1
                 omap_pm_set_min_bus_tput(vdev->cam->isp, OCP_INITIATOR_AGENT, 0);
-                omap_pm_set_max_mpu_wakeup_lat(&qos_request, -1);
+		omap_pm_set_max_mpu_wakeup_lat(&qos_request_sec, -1);
+#endif
+// prime@sdcmicro.com [TBD]Temporarily block the following code because PM APIs have been changed [END]
 
-                if (previous_power == V4L2_POWER_ON){
-                        isp_disable_mclk(isp);
-                        udelay(5);
-        }
 
                 break;
 
@@ -691,10 +701,6 @@ static int yacd5b1s_sensor_power_set(struct v4l2_int_device *dev, enum v4l2_powe
                 gpio_free(YACD5B1S_STANDBY_GPIO);
                 gpio_free(YACD5B1S_RESET_GPIO);
 
-                if (previous_power == V4L2_POWER_ON){
-                        isp_disable_mclk(isp);
-                        udelay(5);
-        }
 
                 break;
         }
@@ -707,6 +713,14 @@ static int yacd5b1s_sensor_power_set(struct v4l2_int_device *dev, enum v4l2_powe
 static u32 yacd5b1s_sensor_set_xclk(struct v4l2_int_device *s, u32 xclkfreq)
 {
         struct omap34xxcam_videodev *vdev = s->u.slave->master->priv;
+	struct isp_device *isp = dev_get_drvdata(vdev->cam->isp);
+
+	/* Enable/Disable sensor xclk */
+	if (xclkfreq)
+		isp_enable_mclk(isp->dev);
+	else
+		isp_disable_mclk(isp);
+
 
         return isp_set_xclk(vdev->cam->isp, xclkfreq, USE_XCLKB); // XCLK B 
 }

@@ -33,7 +33,9 @@
 #include <asm/cpu.h>
 #include <plat/omap_device.h>
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #include <linux/dvs_suite.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 #if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 #include <plat/omap-pm.h>
@@ -110,9 +112,11 @@ static int omap_target(struct cpufreq_policy *policy,
 	static struct device dummy_l3_dev;
 #endif
 
-#if 1
+#if 0 // This simple return won't work.
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	if(ds_status.flag_run_dvs == 1)
 		if(ds_status.flag_correct_cpu_op_update_path == 0) return 0;
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 
 #ifdef CONFIG_SMP
@@ -145,7 +149,17 @@ static int omap_target(struct cpufreq_policy *policy,
 #elif defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_ARCH_OMAP4)
 #ifdef CONFIG_SMP
 	freqs.old = omap_getspeed(policy->cpu);;
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	//freqs_notify.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
+	if(ds_status.flag_run_dvs == 0){
 	freqs_notify.new = clk_round_rate(mpu_clk, target_freq * 1000) / 1000;
+	}
+	else{	// LG-DVFS is running.
+		if(ds_status.flag_correct_cpu_op_update_path == 0){ // Called by cpufreq.
+			freqs_notify.new = ds_status.target_cpu_op_index / 1000;
+		}
+	}
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	freqs.cpu = policy->cpu;
 
 	if (freqs.old == freqs.new)
@@ -158,10 +172,19 @@ static int omap_target(struct cpufreq_policy *policy,
 	}
 #endif
 
+#if 1
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	if(ds_status.flag_run_dvs == 0 ||
+		ds_status.flag_correct_cpu_op_update_path == 1)
+	{
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif
+
 	freq = target_freq * 1000;
 	if (opp_find_freq_ceil(mpu_dev, &freq))
 		omap_device_set_rate(mpu_dev, mpu_dev, freq);
 #if 0//prime@sdcmiro 2011-05-09 fixed for L3 clock
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	if(ds_status.flag_run_dvs == 1){
 		switch(target_freq*1000){
 			case DS_CPU_OP_INDEX_0:
@@ -190,13 +213,22 @@ static int omap_target(struct cpufreq_policy *policy,
 		}
 	}
 	else{
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 		if(target_freq == policy->min)
 			l3_freq = (target_freq/3) * 1000;
 		else
 			l3_freq = 200000 * 1000;
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	}
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	if (opp_find_freq_ceil(l3_dev, &l3_freq))
 		omap_device_set_rate(&dummy_l3_dev, l3_dev, l3_freq);
+#endif
+
+#if 1
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	}
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 
 #ifdef CONFIG_SMP
@@ -220,7 +252,23 @@ static int omap_target(struct cpufreq_policy *policy,
 	}
 #endif
 #endif
+
+#if 1
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	if(ds_status.flag_run_dvs == 0 ||
+		ds_status.flag_correct_cpu_op_update_path == 1)
+	{
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif
+
 	omap_pm_cpu_set_freq(freq);
+
+#if 1
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	}
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif
+
 	return ret;
 }
 
@@ -264,11 +312,13 @@ static int omap_cpu_init(struct cpufreq_policy *policy)
 	policy->cur = omap_getspeed(policy->cpu);
 
 	/* FIXME: what's the actual transition time? */
+/* LGE_CHANGE_S <sunggyun.yu@lge.com> 2010-12-01 For fast ondemand freq. change */
 #if 1
 	policy->cpuinfo.transition_latency = 15 * 1000;
 #else
 	policy->cpuinfo.transition_latency = 300 * 1000;
 #endif
+/* LGE_CHANGE_E <sunggyun.yu@lge.com> 2010-12-01 For fast ondemand freq. change */
 #ifdef CONFIG_SMP
 	/*
 	 * On OMAP4i, both processors share the same voltage and

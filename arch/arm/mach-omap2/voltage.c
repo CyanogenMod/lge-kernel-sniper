@@ -41,11 +41,13 @@
 #include <plat/smartreflex.h>
 #include <plat/control.h>
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+#include <linux/dvs_suite.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+
 #include "prm-regbits-34xx.h"
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
-
-#include <linux/dvs_suite.h>
 
 #define VP_IDLE_TIMEOUT		200
 #define VP_TRANXDONE_TIMEOUT	300 /* need to check TI */
@@ -150,14 +152,11 @@ struct abb_reg_val {
  * @voltdm		: Dependent vdd pointer
  * @dep_table		: Table containing the dependent vdd voltage
  *			  corresponding to every main vdd voltage.
- * @cur_dep_volt	: The voltage to which dependent vdd should be put
- *			  to for the current main vdd voltage.
  */
 struct omap_vdd_dep_info{
 	char *name;
 	struct voltagedomain *voltdm;
 	struct omap_vdd_dep_volt *dep_table;
-	unsigned long cur_dep_volt;
 };
 
 /**
@@ -210,10 +209,12 @@ struct omap_vdd_info{
 	int nr_dep_vdd;
 	struct device **dev_list;
 	int dev_count;
-	unsigned long nominal_volt;
-	unsigned long curr_volt;
+	struct omap_volt_data *nominal_volt;
+	struct omap_volt_data *curr_volt;
 	u8 cmdval_reg;
 	u8 vdd_sr_reg;
+	u16 ocp_mod;
+	u8 prm_irqst_reg;
 	struct omap_volt_pmic_info *pmic;
 	struct device vdd_device;
 };
@@ -367,10 +368,10 @@ static struct omap_volt_data omap34xx_vdd1_volt_data[] = {
 };
 
 static struct omap_volt_data omap36xx_vdd1_volt_data[] = {
-	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C, .abb_type = NOMINAL_OPP},
-	{.volt_nominal = 1100000, .sr_errminlimit = 0xF9, .vp_errgain = 0x16, .abb_type = NOMINAL_OPP},
-	{.volt_nominal = 1260000, .sr_errminlimit = 0xFA, .vp_errgain = 0x23, .abb_type = NOMINAL_OPP},
-	{.volt_nominal = 1350000, .sr_errminlimit = 0xFA, .vp_errgain = 0x27, .abb_type = FAST_OPP},
+	{.volt_nominal = 1000000, .sr_oppmargin = 37500, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C,.abb_type = NOMINAL_OPP}, 
+	{.volt_nominal = 1162500, .sr_oppmargin = 37500, .sr_errminlimit = 0xF9, .vp_errgain = 0x16,.abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1300000, .sr_oppmargin = 37500, .sr_errminlimit = 0xFA, .vp_errgain = 0x23,.abb_type = NOMINAL_OPP},
+	{.volt_nominal = 1350000, .sr_oppmargin = 62500, .sr_errminlimit = 0xFA, .vp_errgain = 0x27,.abb_type = FAST_OPP},
 };
 
 /* VDD2 */
@@ -381,8 +382,8 @@ static struct omap_volt_data omap34xx_vdd2_volt_data[] = {
 };
 
 static struct omap_volt_data omap36xx_vdd2_volt_data[] = {
-	{.volt_nominal = 930000, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
-	{.volt_nominal = 1137500, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
+	{.volt_nominal = 975000, .sr_oppmargin = 0, .sr_errminlimit = 0xF4, .vp_errgain = 0x0C},
+	{.volt_nominal = 1162500, .sr_oppmargin = 0, .sr_errminlimit = 0xF9, .vp_errgain = 0x16},
 };
 
 /*
@@ -520,7 +521,6 @@ static int vp_volt_debug_get(void *data, u64 *val)
 	}
 
 	vsel = voltage_read_reg(vdd->vp_offs.voltage);
-	pr_notice("curr_vsel = %x\n", vsel);
 	*val = vdd->pmic->vsel_to_uv(vsel);
 
 	return 0;
@@ -529,20 +529,25 @@ static int vp_volt_debug_get(void *data, u64 *val)
 static int nom_volt_debug_get(void *data, u64 *val)
 {
 	struct omap_vdd_info *vdd = (struct omap_vdd_info *) data;
+	struct omap_volt_data *vdata;
 
 	if (!vdd) {
 		pr_warning("Wrong paramater passed\n");
 		return -EINVAL;
 	}
 
-	*val = omap_voltage_get_nom_volt(&vdd->voltdm);
+	vdata = omap_voltage_get_nom_volt(&vdd->voltdm);
+	if (IS_ERR_OR_NULL(vdata))
+		return -EINVAL;
+
+	*val = vdata->volt_nominal;
+
 	return 0;
 }
 
 static int volt_dbg_show_users(struct seq_file *s, void *unused)
 {
 	struct omap_vdd_info *vdd = 0;
-	struct plist_node *node;
 	struct omap_vdd_user_list *user;
 	int count = 0;
 
@@ -563,9 +568,55 @@ static int volt_users_dbg_open(struct inode *inode, struct file *file)
 		inode->i_private);
 }
 
+static int dyn_volt_debug_get(void *data, u64 *val)
+{
+	struct omap_vdd_info *vdd = (struct omap_vdd_info *) data;
+	struct omap_volt_data *volt_data;
+
+	if (!vdd) {
+		pr_warning("Wrong paramater passed\n");
+		return -EINVAL;
+	}
+
+	volt_data = omap_voltage_get_nom_volt(&vdd->voltdm);
+	if (IS_ERR_OR_NULL(volt_data)) {
+		pr_warning("%s: No voltage/domain?\n", __func__);
+		return -ENODEV;
+	}
+
+	*val = volt_data->volt_dynamic_nominal;
+
+	return 0;
+}
+
+static int calib_volt_debug_get(void *data, u64 *val)
+{
+	struct omap_vdd_info *vdd = (struct omap_vdd_info *) data;
+	struct omap_volt_data *volt_data;
+
+	if (!vdd) {
+		pr_warning("Wrong paramater passed\n");
+		return -EINVAL;
+	}
+
+	volt_data = omap_voltage_get_nom_volt(&vdd->voltdm);
+	if (IS_ERR_OR_NULL(volt_data)) {
+		pr_warning("%s: No voltage/domain?\n", __func__);
+		return -ENODEV;
+	}
+
+	*val = volt_data->volt_calibrated;
+
+	return 0;
+}
+
 DEFINE_SIMPLE_ATTRIBUTE(vp_debug_fops, vp_debug_get, vp_debug_set, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(vp_volt_debug_fops, vp_volt_debug_get, NULL, "%llu\n");
 DEFINE_SIMPLE_ATTRIBUTE(nom_volt_debug_fops, nom_volt_debug_get, NULL,
+								"%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(dyn_volt_debug_fops, dyn_volt_debug_get, NULL,
+								"%llu\n");
+DEFINE_SIMPLE_ATTRIBUTE(calib_volt_debug_fops, calib_volt_debug_get, NULL,
 								"%llu\n");
 static const struct file_operations volt_users_dbg_fops = {
 	.open           = volt_users_dbg_open,
@@ -593,7 +644,8 @@ static void vp_latch_vsel(struct omap_vdd_info *vdd)
 	unsigned long uvdc;
 	char vsel;
 
-	uvdc = omap_voltage_get_nom_volt(&vdd->voltdm);
+	uvdc = omap_get_operation_voltage(
+			omap_voltage_get_nom_volt(&vdd->voltdm));
 	if (!uvdc) {
 		pr_warning("%s: unable to find current voltage for vdd_%s\n",
 			__func__, vdd->voltdm.name);
@@ -635,10 +687,8 @@ static int omap_abb_notify_voltage(struct notifier_block *nb,
 	int ret = 0;
 
 	v_info = (struct omap_volt_change_info *)data;
-	target_volt_data = omap_voltage_get_voltdata(&v_info->vdd_info->voltdm,
-			v_info->target_volt);
-	curr_volt_data = omap_voltage_get_voltdata(&v_info->vdd_info->voltdm,
-			v_info->curr_volt);
+	target_volt_data = v_info->target_volt;
+	curr_volt_data = v_info->curr_volt;
 
 	/* nothing to do here */
 	if (target_volt_data->abb_type == curr_volt_data->abb_type)
@@ -842,10 +892,41 @@ static void __init omap3_init_voltagecontroller(void)
 	voltage_write_reg(OMAP3_PRM_VOLTSETUP2_OFFSET, vc_config.voltsetup2);
 }
 
+static __init struct omap_volt_data *get_init_voltage(struct voltagedomain *voltdm)
+{
+	struct omap_opp *opp;
+	struct omap_vdd_info *vdd;
+	unsigned long freq;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return ERR_PTR(-EINVAL);
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	freq = vdd->volt_clk->rate;
+	opp = opp_find_freq_ceil(vdd->opp_dev, &freq);
+	if (IS_ERR(opp)) {
+		pr_warning("%s: Unable to find OPP for vdd_%s freq%ld\n",
+			__func__, voltdm->name, freq);
+		return 0;
+	}
+
+	/*
+	 * Use higher freq voltage even if an exact match is not available
+	 * we are probably masking a clock framework bug, so warn
+	 */
+	if (unlikely((freq / 1000000) != (vdd->volt_clk->rate / 1000000)))
+		pr_debug("%s: Available freq %ld != dpll freq %ld.\n",
+			__func__, freq, vdd->volt_clk->rate);
+
+	return omap_voltage_get_voltdata(voltdm, opp_get_voltage(opp));
+}
+
 /* Sets up all the VDD related info for OMAP3 */
 static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 {
-	unsigned long curr_volt;
 	struct omap_volt_data *volt_data;
 	struct clk *sys_ck;
 	u32 sys_clk_speed, timeout_val, waittime;
@@ -908,15 +989,12 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 		return;
 	}
 
-	curr_volt = vdd->curr_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
-	if (!curr_volt) {
-		pr_warning("%s: unable to find current voltage for vdd_%s\n",
-			__func__, vdd->voltdm.name);
-		return;
-	}
+	vdd->prm_irqst_reg = OMAP3_PRM_IRQSTATUS_MPU_OFFSET;
+	vdd->ocp_mod = OCP_MOD;
 
-	volt_data = omap_voltage_get_voltdata(&vdd->voltdm, curr_volt);
-	if (IS_ERR(volt_data)) {
+	volt_data = vdd->nominal_volt = vdd->curr_volt = get_init_voltage(&vdd->voltdm);
+
+	if (IS_ERR_OR_NULL(volt_data)) {
 		pr_warning("%s: Unable to get volt table for vdd_%s at init",
 			__func__, vdd->voltdm.name);
 		return;
@@ -935,9 +1013,6 @@ static void __init omap3_vdd_data_configure(struct omap_vdd_info *vdd)
 	clk_put(sys_ck);
 	/* Divide to avoid overflow */
 	sys_clk_speed /= 1000;
-
-	/* Nominal/Reset voltage of the VDD */
-	vdd->nominal_volt = 1200000;
 
 	/* VPCONFIG bit fields */
 	vdd->vp_reg.vpconfig_erroroffset = (vdd->pmic->vp_config_erroroffset <<
@@ -1121,7 +1196,6 @@ static void __init omap4_init_voltagecontroller(void)
 /* Sets up all the VDD related info for OMAP4 */
 static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 {
-	unsigned long curr_volt;
 	struct omap_volt_data *volt_data;
 	struct clk *sys_ck;
 	u32 sys_clk_speed, timeout_val, waittime;
@@ -1141,6 +1215,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 				OMAP4430_VP_MPU_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_MPU_L_OFFSET;
 		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
+		vdd->prm_irqst_reg = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET;
 	} else if (!strcmp(vdd->voltdm.name, "core")) {
 		vdd->vp_reg.vlimitto_vddmin = vdd->pmic->vp_vlimitto_vddmin;
 		vdd->vp_reg.vlimitto_vddmax = vdd->pmic->vp_vlimitto_vddmax;
@@ -1154,6 +1229,7 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 				OMAP4430_VP_CORE_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_CORE_L_OFFSET;
 		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
+		vdd->prm_irqst_reg = OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
 	} else if (!strcmp(vdd->voltdm.name, "iva")) {
 		vdd->vp_reg.vlimitto_vddmin = vdd->pmic->vp_vlimitto_vddmin;
 		vdd->vp_reg.vlimitto_vddmax = vdd->pmic->vp_vlimitto_vddmax;
@@ -1169,20 +1245,15 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 			OMAP4430_VP_IVA_TRANXDONE_ST_MASK;
 		vdd->cmdval_reg = OMAP4_PRM_VC_VAL_CMD_VDD_IVA_L_OFFSET;
 		vdd->vdd_sr_reg = vdd->pmic->i2c_vreg;
+		vdd->prm_irqst_reg = OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
 	} else {
 		pr_warning("%s: vdd_%s does not exisit in OMAP4\n",
 			__func__, vdd->voltdm.name);
 		return;
 	}
 
-	curr_volt = vdd->curr_volt = omap_voltage_get_nom_volt(&vdd->voltdm);
-	if (!curr_volt) {
-		pr_warning("%s: unable to find current voltage for vdd_%s\n",
-			__func__, vdd->voltdm.name);
-		return;
-	}
-
-	volt_data = omap_voltage_get_voltdata(&vdd->voltdm, curr_volt);
+	vdd->ocp_mod = OMAP4430_PRM_OCP_SOCKET_MOD;
+	volt_data = vdd->nominal_volt =  vdd->curr_volt = get_init_voltage(&vdd->voltdm);
 	if (IS_ERR(volt_data)) {
 		pr_warning("%s: Unable to get volt table for vdd_%s at init",
 			__func__, vdd->voltdm.name);
@@ -1202,9 +1273,6 @@ static void __init omap4_vdd_data_configure(struct omap_vdd_info *vdd)
 	clk_put(sys_ck);
 	/* Divide to avoid overflow */
 	sys_clk_speed /= 1000;
-
-	/* Nominal/Reset voltage of the VDD */
-	vdd->nominal_volt = 1200000;
 
 	/* VPCONFIG bit fields */
 	vdd->vp_reg.vpconfig_erroroffset =
@@ -1510,6 +1578,10 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 				(void *) vdd, &nom_volt_debug_fops);
 	(void) debugfs_create_file("volt_users", S_IRUGO, vdd_debug,
 				(void *) vdd, &volt_users_dbg_fops);
+	(void) debugfs_create_file("curr_dyn_nominal_volt", S_IRUGO, vdd_debug,
+				(void *) vdd, &dyn_volt_debug_fops);
+	(void) debugfs_create_file("curr_calibrated_volt", S_IRUGO, vdd_debug,
+				(void *) vdd, &calib_volt_debug_fops);
 #ifdef CONFIG_OMAP_ABB
 	if (cpu_is_omap44xx() && !strcmp("vdd_iva", name))
 		(void) debugfs_create_u8("fbb_enable", S_IRUGO | S_IWUGO,
@@ -1534,9 +1606,8 @@ static void __init init_voltagecontroller(void)
  * vc_bypass_scale_voltage - VC bypass method of voltage scaling
  */
 static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
-		unsigned long target_volt)
+		struct omap_volt_data *target_volt)
 {
-	struct omap_volt_data *volt_data;
 	u32 vc_bypass_value = 0, vc_cmdval = 0;
 	u32  vc_valid = 0, vc_bypass_val_reg_offs = 0;
 	u32 vp_errgain_val = 0, vc_cmd_on_mask = 0;
@@ -1545,6 +1616,11 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 	u8 vc_data_shift = 0, vc_slaveaddr_shift = 0, vc_regaddr_shift = 0;
 	u8 vc_cmd_on_shift = 0;
 	u8 target_vsel = 0, current_vsel = 0, sr_i2c_slave_addr = 0;
+
+	if (IS_ERR_OR_NULL(target_volt)) {
+		pr_warning("%s: bad target data\n", __func__);
+		return -EINVAL;
+	}
 
 	if (cpu_is_omap34xx()) {
 		vc_cmd_on_shift = OMAP3430_VC_CMD_ON_SHIFT;
@@ -1561,23 +1637,8 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 		return -EINVAL;
 	}
 
-	/* Get volt_data corresponding to target_volt */
-	volt_data = omap_voltage_get_voltdata(&vdd->voltdm, target_volt);
-	if (IS_ERR(volt_data)) {
-		/*
-		 * If a match is not found but the target voltage is
-		 * is the nominal vdd voltage allow scaling
-		 */
-		if (target_volt != vdd->nominal_volt) {
-			pr_warning("%s: Unable to get volt table for vdd_%s"
-				"during voltage scaling. Some really Wrong!",
-				__func__, vdd->voltdm.name);
-			return -ENODATA;
-		}
-		volt_data = NULL;
-	}
-
-	target_vsel = vdd->pmic->uv_to_vsel(target_volt);
+	target_vsel = vdd->pmic->uv_to_vsel(
+			omap_get_operation_voltage(target_volt));
 	current_vsel = voltage_read_reg(vdd->vp_offs.voltage);
 	smps_steps = abs(target_vsel - current_vsel);
 
@@ -1591,9 +1652,9 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 	 * Setting vp errorgain based on the voltage. If the debug option is
 	 * enabled allow the override of errorgain from user side
 	 */
-	if (!enable_sr_vp_debug && volt_data) {
+	if (!enable_sr_vp_debug && target_volt) {
 		vp_errgain_val = voltage_read_reg(vdd->vp_offs.vpconfig);
-		vdd->vp_reg.vpconfig_errorgain = volt_data->vp_errgain;
+		vdd->vp_reg.vpconfig_errorgain = target_volt->vp_errgain;
 		vp_errgain_val &= ~vdd->vp_reg.vpconfig_errorgain_mask;
 		vp_errgain_val |= vdd->vp_reg.vpconfig_errorgain <<
 				vdd->vp_reg.vpconfig_errorgain_shift;
@@ -1636,48 +1697,28 @@ static int vc_bypass_scale_voltage(struct omap_vdd_info *vdd,
 
 /* VP force update method of voltage scaling */
 static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
-		unsigned long target_volt)
+		struct omap_volt_data *target_volt)
 {
-	struct omap_volt_data *volt_data;
 	u32 vc_cmd_on_mask, vc_cmdval, vpconfig;
 	u32 smps_steps = 0, smps_delay = 0;
 	int timeout = 0;
 	u8 target_vsel = 0, current_vsel = 0;
 	u8 vc_cmd_on_shift = 0;
-	u8 prm_irqst_reg_offs = 0, ocp_mod = 0;
 
+	if (IS_ERR_OR_NULL(target_volt)) {
+		pr_warning("%s: bad target data\n", __func__);
+		return -EINVAL;
+	}
 	if (cpu_is_omap34xx()) {
 		vc_cmd_on_shift = OMAP3430_VC_CMD_ON_SHIFT;
 		vc_cmd_on_mask = OMAP3430_VC_CMD_ON_MASK;
-		prm_irqst_reg_offs = OMAP3_PRM_IRQSTATUS_MPU_OFFSET;
-		ocp_mod = OCP_MOD;
 	} else if (cpu_is_omap44xx()) {
 		vc_cmd_on_shift = OMAP4430_ON_SHIFT;
 		vc_cmd_on_mask = OMAP4430_ON_MASK;
-		if (!strcmp(vdd->voltdm.name, "mpu"))
-			prm_irqst_reg_offs = OMAP4_PRM_IRQSTATUS_MPU_2_OFFSET;
-		else
-			prm_irqst_reg_offs = OMAP4_PRM_IRQSTATUS_MPU_OFFSET;
-		ocp_mod = OMAP4430_PRM_OCP_SOCKET_MOD;
 	}
 
-	/* Get volt_data corresponding to the target_volt */
-	volt_data = omap_voltage_get_voltdata(&vdd->voltdm, target_volt);
-	if (IS_ERR(volt_data)) {
-		/*
-		 * If a match is not found but the target voltage is
-		 * is the nominal vdd voltage allow scaling
-		 */
-		if (target_volt != vdd->nominal_volt) {
-			pr_warning("%s: Unable to get voltage table for vdd_%s"
-				"during voltage scaling. Some really Wrong!",
-				__func__, vdd->voltdm.name);
-			return -ENODATA;
-		}
-		volt_data = NULL;
-	}
-
-	target_vsel = vdd->pmic->uv_to_vsel(target_volt);
+	target_vsel = vdd->pmic->uv_to_vsel(
+			omap_get_operation_voltage(target_volt));
 	current_vsel = voltage_read_reg(vdd->vp_offs.voltage);
 	smps_steps = abs(target_vsel - current_vsel);
 
@@ -1691,18 +1732,16 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 * Getting  vp errorgain based on the voltage. If the debug option is
 	 * enabled allow the override of errorgain from user side.
 	 */
-	if (!enable_sr_vp_debug && volt_data)
+	if (!enable_sr_vp_debug && target_volt)
 		vdd->vp_reg.vpconfig_errorgain =
-					volt_data->vp_errgain;
+					target_volt->vp_errgain;
 	/*
 	 * Clear all pending TransactionDone interrupt/status. Typical latency
 	 * is <3us
 	 */
 	while (timeout++ < VP_TRANXDONE_TIMEOUT) {
-		prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
-				ocp_mod, prm_irqst_reg_offs);
-		if (!(prm_read_mod_reg(ocp_mod, prm_irqst_reg_offs) &
-				vdd->vp_reg.tranxdone_status))
+		omap_vp_clear_transdone(&vdd->voltdm);
+		if (!omap_vp_is_transdone(&vdd->voltdm))
 				break;
 		udelay(1);
 	}
@@ -1737,7 +1776,7 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 * Wait for TransactionDone. Typical latency is <200us.
 	 * Depends on SMPSWAITTIMEMIN/MAX and voltage change
 	 */
-	omap_test_timeout((prm_read_mod_reg(ocp_mod, prm_irqst_reg_offs) &
+	omap_test_timeout((prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
 			vdd->vp_reg.tranxdone_status),
 			VP_TRANXDONE_TIMEOUT, timeout);
 
@@ -1759,10 +1798,8 @@ static int vp_forceupdate_scale_voltage(struct omap_vdd_info *vdd,
 	 */
 	timeout = 0;
 	while (timeout++ < VP_TRANXDONE_TIMEOUT) {
-		prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
-				ocp_mod, prm_irqst_reg_offs);
-		if (!(prm_read_mod_reg(ocp_mod, prm_irqst_reg_offs) &
-				vdd->vp_reg.tranxdone_status))
+		omap_vp_clear_transdone(&vdd->voltdm);
+		if (!omap_vp_is_transdone(&vdd->voltdm))
 				break;
 		udelay(1);
 	}
@@ -1828,11 +1865,6 @@ static int calc_dep_vdd_volt(struct device *dev,
 		ret = omap_voltage_add_userreq(dep_vdds[i].voltdm, dev,
 				&act_volt);
 
-		/*
-		 * Currently we do not bother if the dep volt and act volt are
-		 * different. We could add a check if needed.
-		 */
-		dep_vdds[i].cur_dep_volt = act_volt;
 	}
 
 	return ret;
@@ -1852,24 +1884,28 @@ static int scale_dep_vdd(struct omap_vdd_info *main_vdd)
 	dep_vdds = main_vdd->dep_vdd_info;
 
 	for (i = 0; i < main_vdd->nr_dep_vdd; i++)
-		omap_voltage_scale(dep_vdds[i].voltdm,
-				dep_vdds[i].cur_dep_volt);
+		omap_voltage_scale(dep_vdds[i].voltdm);
 	return 0;
 }
 
 /* Public functions */
+
 /**
- * omap_voltage_get_nom_volt : Gets the current non-auto-compensated voltage
- * @voltdm	: pointer to the VDD for which current voltage info is needed
+ * omap_vscale_pause() - Pause the dvfs transition for this domain
+ * @voltdom: voltage domain to pause
+ * @trylock: should we return if we dvfs already in transition
  *
- * API to get the current non-auto-compensated voltage for a VDD.
- * Returns 0 in case of error else returns the current voltage for the VDD.
+ * To ensure that the system accesses to internal registers of OMAP
+ * modules are made safe, we need to ensure exclusivity of access
+ * these module drivers request pause of the domain transition while
+ * they finish off their work. The users should ensure sanity
+ * between usual dvfs paths Vs usage of these APIs to prevent deadlocks
+ *
+ * Returns 0 if dvfs has been paused for the domain, else returns err val
  */
-unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
+int omap_vscale_pause(struct voltagedomain *voltdm, bool trylock)
 {
-	struct omap_opp *opp;
 	struct omap_vdd_info *vdd;
-	unsigned long freq;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -1878,23 +1914,81 @@ unsigned long omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
-	freq = vdd->volt_clk->rate;
-	opp = opp_find_freq_ceil(vdd->opp_dev, &freq);
-	if (IS_ERR(opp)) {
-		pr_warning("%s: Unable to find OPP for vdd_%s freq%ld\n",
-			__func__, voltdm->name, freq);
+	if (trylock)
+		return !mutex_trylock(&vdd->scaling_mutex);
+
+	mutex_lock(&vdd->scaling_mutex);
+	return 0;
+}
+
+/**
+ * omap_vscale_unpause() - Free up the dvfs transitions for this domain
+ * @voltdom: voltage domain to unpause
+ *
+ * In the cases where omap_vscale_pause operations are called, unpause
+ * is used to free up the sequences
+ */
+int omap_vscale_unpause(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
 		return 0;
 	}
 
-	/*
-	 * Use higher freq voltage even if an exact match is not available
-	 * we are probably masking a clock framework bug, so warn
-	 */
-	if (unlikely((freq / 1000000) != (vdd->volt_clk->rate / 1000000)))
-		pr_debug("%s: Available freq %ld != dpll freq %ld.\n",
-			__func__, freq, vdd->volt_clk->rate);
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
-	return opp_get_voltage(opp);
+	mutex_unlock(&vdd->scaling_mutex);
+	return 0;
+}
+
+/**
+ * omap_voltage_get_nom_volt : Gets the current non-auto-compensated voltage
+ * @voltdm	: pointer to the VDD for which current voltage info is needed
+ *
+ * API to get the current voltage data pointer for a VDD.
+	 */
+struct omap_volt_data *omap_voltage_get_nom_volt(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+
+	if (!voltdm || IS_ERR(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return 0;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	return vdd->curr_volt;
+}
+
+/**
+ * omap_voltage_calib_reset() - reset the calibrated voltage entries
+ * @voltdm: voltage domain to reset the entries for
+ *
+ * when the calibrated entries are no longer valid, this api allows
+ * the calibrated voltages to be reset.
+ */
+int omap_voltage_calib_reset(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+	struct omap_volt_data *volt_data;
+	int i;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_warning("%s: VDD specified does not exist!\n", __func__);
+		return -EINVAL;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	volt_data = vdd->volt_data;
+	/* reset the calibrated voltages as 0 */
+	for (i = 0; i < vdd->volt_data_count; i++) {
+		volt_data->volt_calibrated = 0;
+		volt_data++;
+	}
+	return 0;
 }
 
 /**
@@ -1951,11 +2045,15 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
     if(ds_status.mutex_lock_on_clock_state_cnt != 0) return 0;
     ds_status.mutex_lock_on_clock_state_cnt ++;
     ds_status.flag_mutex_lock_on_clock_state = 1;
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	mutex_lock(&vdd->scaling_mutex);
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
     ds_status.flag_mutex_lock_on_clock_state = 0;
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	plist_for_each_entry(user, &vdd->user_list, node) {
 		if (user->dev == dev) {
@@ -1983,7 +2081,9 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 	*volt = node->prio;
 
 	mutex_unlock(&vdd->scaling_mutex);
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	ds_status.mutex_lock_on_clock_state_cnt --;
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	return 0;
 }
@@ -2102,6 +2202,48 @@ void omap_vp_disable(struct voltagedomain *voltdm)
 }
 
 /**
+ * omap_vp_is_transdone() - is voltage transfer done on vp?
+ * @voltdm:	pointer to the VDD which is to be scaled.
+ *
+ * VP's transdone bit is the only way to ensure that the transfer
+ * of the voltage value has actually been send over to the PMIC
+ * This is hence useful for all users of voltage domain to precisely
+ * identify once the PMIC voltage has been set by the voltage processor
+ */
+bool omap_vp_is_transdone(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_warning("%s: Bad Params vdm=%p\n", __func__, voltdm);
+		return false;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	return (prm_read_mod_reg(vdd->ocp_mod, vdd->prm_irqst_reg) &
+				vdd->vp_reg.tranxdone_status) ?  true : false;
+}
+
+/**
+ * omap_vp_clear_transdone() - clear voltage transfer done status on vp
+ * @voltdm:	pointer to the VDD which is to be scaled.
+ */
+bool omap_vp_clear_transdone(struct voltagedomain *voltdm)
+{
+	struct omap_vdd_info *vdd;
+
+	if (IS_ERR_OR_NULL(voltdm)) {
+		pr_warning("%s: Bad Params vdm=%p\n", __func__, voltdm);
+		return false;
+	}
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	prm_write_mod_reg(vdd->vp_reg.tranxdone_status,
+			vdd->ocp_mod, vdd->prm_irqst_reg);
+	return true;
+}
+
+/**
  * omap_voltage_scale_vdd : API to scale voltage of a particular voltage domain.
  * @voltdm: pointer to the VDD which is to be scaled.
  * @target_volt : The target voltage of the voltage domain
@@ -2110,7 +2252,7 @@ void omap_vp_disable(struct voltagedomain *voltdm)
  * for a particular voltage domain during dvfs or any other situation.
  */
 int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
-		unsigned long target_volt)
+		struct omap_volt_data *target_volt)
 {
 	struct omap_vdd_info *vdd;
 	struct omap_volt_change_info v_info;
@@ -2153,7 +2295,7 @@ int omap_voltage_scale_vdd(struct voltagedomain *voltdm,
  */
 void omap_voltage_reset(struct voltagedomain *voltdm)
 {
-	unsigned long target_uvdc;
+	struct omap_volt_data *target_uvdc;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -2161,7 +2303,7 @@ void omap_voltage_reset(struct voltagedomain *voltdm)
 	}
 
 	target_uvdc = omap_voltage_get_nom_volt(voltdm);
-	if (!target_uvdc) {
+	if (IS_ERR_OR_NULL(target_uvdc)) {
 		pr_err("%s: unable to find current voltage for vdd_%s\n",
 			__func__, voltdm->name);
 		return;
@@ -2294,8 +2436,8 @@ struct omap_volt_data *omap_voltage_get_voltdata(struct voltagedomain *voltdm,
 			return &vdd->volt_data[i];
 	}
 
-	pr_notice("%s: Unable to match the current voltage with the voltage"
-		"table for vdd_%s\n", __func__, voltdm->name);
+	pr_notice("%s: Unable to match the current voltage %ld with the voltage"
+		"table for vdd_%s\n", __func__, volt, voltdm->name);
 
 	return ERR_PTR(-ENODATA);
 }
@@ -2368,7 +2510,6 @@ struct voltagedomain *omap_voltage_domain_get(char *name)
  * omap_voltage_scale : API to scale the devices associated with a
  *			voltage domain vdd voltage.
  * @volt_domain : the voltage domain to be scaled
- * @volt : the new voltage for the voltage domain
  *
  * This API runs through the list of devices associated with the
  * voltage domain and scales the device rates to those corresponding
@@ -2376,12 +2517,15 @@ struct voltagedomain *omap_voltage_domain_get(char *name)
  * the voltage domain voltage to the new value. Returns 0 on success
  * else the error value.
  */
-int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
+int omap_voltage_scale(struct voltagedomain *voltdm)
 {
 	unsigned long curr_volt;
 	int is_volt_scaled = 0, i;
+	bool is_sr_disabled = false;
 	struct omap_vdd_info *vdd;
+	struct omap_volt_data *vnom;
 	struct plist_node *node;
+	unsigned long volt;
 
 	if (!voltdm || IS_ERR(voltdm)) {
 		pr_warning("%s: VDD specified does not exist!\n", __func__);
@@ -2389,26 +2533,35 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	}
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+	vnom = omap_voltage_get_nom_volt(voltdm);
 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
     if(ds_status.mutex_lock_on_clock_state_cnt != 0) return 0;
     ds_status.mutex_lock_on_clock_state_cnt ++;
     ds_status.flag_mutex_lock_on_clock_state = 1;
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	mutex_lock(&vdd->scaling_mutex);
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
     ds_status.flag_mutex_lock_on_clock_state = 0;
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
-	curr_volt = omap_voltage_get_nom_volt(voltdm);
+	curr_volt = vnom->volt_nominal;
 
 	/* Find the highest voltage for this vdd */
 	node = plist_last(&vdd->user_list);
 	volt = node->prio;
 
 	/* Disable smartreflex module across voltage and frequency scaling */
+	if (curr_volt != volt) {
 	omap_smartreflex_disable(voltdm);
+		is_sr_disabled = true;
+	}
 
 	if (curr_volt == volt) {
 		is_volt_scaled = 1;
 	} else if (curr_volt < volt) {
-		omap_voltage_scale_vdd(voltdm, volt);
+		omap_voltage_scale_vdd(voltdm,
+				omap_voltage_get_voltdata(voltdm, volt));
 		is_volt_scaled = 1;
 	}
 
@@ -2432,13 +2585,17 @@ int omap_voltage_scale(struct voltagedomain *voltdm, unsigned long volt)
 	}
 
 	if (!is_volt_scaled)
-		omap_voltage_scale_vdd(voltdm, volt);
+		omap_voltage_scale_vdd(voltdm,
+				omap_voltage_get_voltdata(voltdm, volt));
 
 	/* Enable Smartreflex module */
+	if (is_sr_disabled)
 	omap_smartreflex_enable(voltdm);
 
 	mutex_unlock(&vdd->scaling_mutex);
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	ds_status.mutex_lock_on_clock_state_cnt --;
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
     /* calculate the voltages for dependent vdd's */
 	if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {

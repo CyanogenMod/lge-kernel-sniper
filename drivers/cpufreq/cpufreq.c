@@ -1558,8 +1558,12 @@ int __cpufreq_driver_target(struct cpufreq_policy *policy,
 {
 	int retval = -EINVAL;
 
+#if 0
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	if(ds_status.flag_run_dvs == 1)
         if(ds_status.flag_correct_cpu_op_update_path == 0) return 0;
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif
 
 	dprintk("target for CPU %u: %u kHz, relation %u\n", policy->cpu,
 		target_freq, relation);

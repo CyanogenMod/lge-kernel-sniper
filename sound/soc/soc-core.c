@@ -1413,11 +1413,16 @@ static int soc_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	int i;
+	
+#if 1 // SPK Call Mute, lab3
 	if(incallnosuspend == 1)
 	{
 		incallnosuspend = 0;
 		printk("incallsuspend -> soc-resume......return\n");
+		return 0;
 	}
+#endif
+	
 	/* AC97 devices might have other drivers hanging off them so
 	 * need to resume immediately.  Other drivers don't have that
 	 * problem and may take a substantial amount of time to resume

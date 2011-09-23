@@ -549,6 +549,8 @@ static int bridge_release(struct inode *ip, struct file *filp)
 	flush_signals(current);
 	drv_remove_all_resources(pr_ctxt);
 	proc_detach(pr_ctxt);
+	kfree(pr_ctxt->node_idp);
+	kfree(pr_ctxt->strm_idp);
 	kfree(pr_ctxt);
 
 	filp->private_data = NULL;

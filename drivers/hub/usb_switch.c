@@ -51,18 +51,23 @@
 #include "hub_charging_ic.h"
 #include "../mux.h"
 
+/* LGE_CHANGE_S [LS855:FW:bking.moon@lge.com] 2011-02-15, */ 
 #if 1 /* mbk_temp */ 
 #include <linux/i2c/twl4030-madc.h>
 #endif 
+/* LGE_CHANGE_E [LS855:FW:bking.moon@lge.com] 2011-02-15 */
 
-
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2010-12-14, CP retain mode and 910K cable detect*/
 #define CABLE_DETECT_910K
 //#define CP_RETAIN
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2010-12-14, CP retain mode and 910K cable detect*/
 
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2011-01-06, CP retain mode and Hidden Menu AP CP Switching Retain */
 #ifdef CP_RETAIN
 static int is_cp_retained;
 #endif
 static int hidden_menu_switching;
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2011-01-06, CP retain mode */
 
 /* Wake lock for usb connection */
 struct wlock {
@@ -107,10 +112,11 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
 
 	sscanf(buf, "%c 0x%x 0x%x", &cmd, &reg, &val);
 
-	printk(KERN_INFO "[MUIC] LGE: MUIC_proc_write \n");
+	printk(KERN_INFO "[MUIC] LGE: MUIC_proc_write %d\n", cmd);
 
 
 	switch(cmd){
+#if 0
 		 case '3':
             muic_CP_USB_set();
             gpio_set_value(RESET_MDM, 0);
@@ -118,30 +124,36 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
             gpio_set_value(RESET_MDM, 1);
             break;
 		/* AP_UART mode*/
+#endif
+#if 0
 		case '6':
 			muic_AP_UART_set();
 			break;
-		/* CP_UART mode*/
+#endif
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2011-01-06, CP retain mode and Hidden Menu AP CP Switching Retain */
+		/* AP USB */
 		case '7':
 			muic_CP_UART_set();
 			hidden_menu_switching = 7;
 			break;
-
-		/* AP_USB mode*/
+#if 0
+		/* CP_UART mode*/
 		case '8':
 			muic_AP_USB_set();
 			hidden_menu_switching = 8;
 			break;
+#endif
 
 		/* CP_USB mode*/
 		case '9':
 			muic_CP_USB_set();
 			hidden_menu_switching = 9;
 			break;
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2011-01-06, CP retain mode */
 		default :
-			printk(KERN_INFO "[MUIC] LGE: Hub MUIC invalid command\n");
-		        printk(KERN_INFO "[MUIC] 6: AP_UART, 7: CP_UART, 8: AP_USB, 9: CP_USB\n");
-		        printk(KERN_INFO "[MUIC] or \"w address value\"\n");
+			printk(KERN_INFO "[USB_SWTICH] LGE: Bproj USB Switch invalid command %d\n", cmd);
+		        printk(KERN_INFO "[USB_SWITCH] 7: AP_USB, 9: CP_USB\n");
+		        printk(KERN_INFO "[USB_SWITCH] or \"w address value\"\n");
 			break;
 	}
 	return len;
@@ -282,6 +294,7 @@ s32 muic_CP_USB_set(void){
 }
 
 
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 ssize_t muic_store_wake_lock(struct device *dev,
 			  struct device_attribute *attr,
 			  const char *buf,
@@ -307,6 +320,7 @@ ssize_t muic_store_wake_lock(struct device *dev,
 	return count;
 }
 
+/* Shutdown issue at the case of USB booting [kyungyoon.kim@lge.com] 2010-12-25 */
 ssize_t muic_store_charging_mode(struct device *dev, 
 			  struct device_attribute *attr, 
 			  const char *buf, 
@@ -332,9 +346,11 @@ ssize_t muic_store_charging_mode(struct device *dev,
 
 	return count;
 }
-DEVICE_ATTR(charging_mode, 0666, NULL, muic_store_charging_mode);
+DEVICE_ATTR(charging_mode, 0664, NULL, muic_store_charging_mode);
+/* Shutdown issue at the case of USB booting [kyungyoon.kim@lge.com] 2010-12-25 */
 
-DEVICE_ATTR(wake_lock, 0666, NULL, muic_store_wake_lock);
+DEVICE_ATTR(wake_lock, 0664, NULL, muic_store_wake_lock);
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 /*
  * muic_probe() is called in the middle of booting sequence due to '__init'.
  * '__init' causes muic_probe() to be released after the booting.
@@ -364,12 +380,17 @@ static s32 __init muic_probe(struct i2c_client *client, const struct i2c_device_
 
 	/* Prepare a human accessible method to control MUIC */
 	create_hub_muic_proc_file();
+
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 	err = device_create_file(&client->dev, &dev_attr_wake_lock);
 	err = device_create_file(&client->dev, &dev_attr_charging_mode);
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 
+/* LGE_CHANGE_S [LS855:FW:bking.moon@lge.com] 2011-02-16, */ 
 #if 0 /* mbk_temp */ 
 	dp3t_switch_ctrl(DP3T_CP_USB);
 #endif 
+/* LGE_CHANGE_E [LS855:FW:bking.moon@lge.com] 2011-02-16 */
 
 	printk(KERN_INFO "[MUIC] muic_probe(): done!\n");
 
@@ -380,8 +401,10 @@ static s32 muic_remove(struct i2c_client *client){
 	gpio_free(USB_MDM_SW);
 	gpio_free(MDM_USB_VBUS_EN);
 
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 	device_remove_file(&client->dev, &dev_attr_wake_lock);
 	device_remove_file(&client->dev, &dev_attr_charging_mode);
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 	i2c_set_clientdata(client, NULL);	// For what?
 	remove_hub_muic_proc_file();
 
@@ -434,6 +457,7 @@ static void __exit muic_exit(void){
 	i2c_del_driver(&muic_driver);
 }
 
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2010-12-14, CP retain mode */
 #ifdef CP_RETAIN
 static s32 __init muic_state(char *str)
 {
@@ -444,6 +468,7 @@ static s32 __init muic_state(char *str)
 }
 __setup("muic_state=", muic_state);
 #endif
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2010-12-14, CP retain mode */
 module_init(muic_init);
 module_exit(muic_exit);
 

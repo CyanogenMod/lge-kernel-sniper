@@ -27,10 +27,12 @@ static enum {
 	FB_STATE_DRAWING_OK,
 } fb_state;
 
+// prime@sdcmicro.com Temporary - Exports the SurfaceFlinger DRAW state [START]
 int get_fb_state(void)
 {
 	return fb_state;
 }
+// prime@sdcmicro.com Temporary - Exports the SurfaceFlinger DRAW state [END]
 
 /* tell userspace to stop drawing, wait for it to stop */
 static void stop_drawing_early_suspend(struct early_suspend *h)
@@ -46,13 +48,19 @@ static void stop_drawing_early_suspend(struct early_suspend *h)
 #if 1 /*LG_CHANGE_S lee.hyunji@lge.com 20110425 The previous screen visible .*/
 	ret = wait_event_timeout(fb_state_wq,
 				 fb_state == FB_STATE_STOPPED_DRAWING,
+#if defined(CONFIG_MACH_LGE_OMAP3) /* bking.moon@lge.com, patch from b-froyo cause of lcd lockup */
+				 HZ * 3);
+#else
 				 HZ);
+#endif
 #endif
 	if (unlikely(fb_state != FB_STATE_STOPPED_DRAWING))
 		pr_warning("stop_drawing_early_suspend: timeout waiting for "
 			   "userspace to stop drawing\n");
 
+// prime@sdcmicro.com Temporary - Forced state change - UI must stop the draw before here [START]
 	fb_state = FB_STATE_STOPPED_DRAWING;
+// prime@sdcmicro.com Temporary - Forced state change - UI must stop the draw before here [END]
 }
 
 /* tell userspace to start drawing */

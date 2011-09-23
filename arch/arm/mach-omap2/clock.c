@@ -302,6 +302,12 @@ int omap2_clk_enable(struct clk *clk)
 {
 	int ret;
 
+	if (clk->usecount == 127) { /* 20110626 dongyu.gwak@lge.com usecount range check for + value also */
+		WARN(1, "clock: %s: omap2_clk_enable() called, but usecount "
+		     "already 127?", clk->name);
+		return;
+	}
+
 	pr_debug("clock: %s: incrementing usecount\n", clk->name);
 
 	clk->usecount++;

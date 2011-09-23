@@ -1124,7 +1124,15 @@ int _omap_hwmod_idle(struct omap_hwmod *oh)
 
 	if (oh->class->sysc)
 		_sysc_idle(oh);
+
+	/* 
+	 * Customized FIX to deny clearing of sleep dependancy with MPU
+	 * which allows UART module to go sleep as soon as we remove the dependancy
+	 * this is to avoid the kernel crash.
+	 */
+	if (strcmp(oh->name,"uart3"))
 	_del_initiator_dep(oh, mpu_oh);
+
 	_disable_clocks(oh);
 
 	oh->_state = _HWMOD_STATE_IDLE;

@@ -7,7 +7,33 @@
 #ifndef _LINUX_DVS_SUITE_H
 #define _LINUX_DVS_SUITE_H
 
-//#include <linux/times.h>	/* For struct timeval and do_gettimeofday */
+/***************************************************************************
+ * Headers
+ ***************************************************************************/
+#include <asm/current.h>	/* For current macro */
+#include <asm/div64.h>		/* For division */
+
+#include <linux/mm.h>
+#include <linux/vmalloc.h>
+#include <linux/spinlock.h>
+#include <linux/errno.h>	/* For EAGAIN and EWOULDBLOCK */
+#include <linux/kernel.h>	/* For printk */
+#include <linux/sched.h>	/* For struct task_struct and wait_event* macros */
+#include <linux/slab.h>		/* For kmalloc and kfree */
+#include <linux/string.h>	/* To use string functions */
+#include <linux/times.h>	/* For struct timeval and do_gettimeofday */
+#include <linux/cred.h>		/* To get uid */
+#include <linux/workqueue.h>
+
+#include <plat/omap_device.h>
+#include <plat/omap-pm.h>
+
+/*
+ * Including resource34xx.h here causes build error.
+ * This is the reason why we moved ds_update_cpu_op() from here to resource34xx.c.
+ */
+//#include "../../arch/arm/mach-omap2/resource34xx.h"	/* For set_opp() */
+//#include "../../../system/core/include/private/android_filesystem_config.h"	/* For AID_* */
 
 /***************************************************************************
  * Definitions
@@ -173,23 +199,19 @@
  */
 #define DS_HRT_TASK				1	// HRT
 #define DS_SRT_UI_SERVER_TASK	2	// DBSRT
-#define DS_SRT_IA_TASK			3	// DBSRT
-#define DS_SRT_CM_TASK			4	// DBSRT
-#define DS_SRT_KERNEL_THREAD	5	// RBSRT
-#define DS_SRT_DAEMON_TASK		6	// RBSRT
-#define DS_NRT_TASK				7	// NRT
+#define DS_SRT_UI_CLIENT_TASK	3	// DBSRT
+#define DS_SRT_KERNEL_THREAD	4	// RBSRT
+#define DS_SRT_DAEMON_TASK		5	// RBSRT
+#define DS_NRT_TASK				6	// NRT
 
-#define DS_MIN_RT_SCHED_TYPE	DS_SRT_CM_TASK	
+#define DS_MIN_RT_SCHED_TYPE	DS_SRT_UI_CLIENT_TASK	
 
-/* If a DS_SRT_CM_TASK does not interact with DS_SRT_UI_SERVER_TASK
- * for over DS_SRT_MM_TIMEOUT, we re-define its type.
- * Similarily, if a DS_SRT_IA_TASK does not interact with DS_SRT_UI_SERVER_TASK
- * for over DS_SRT_UIE_TIMEOUT, we re-define its type.
+/* If a DS_SRT_UI_CLIENT_TASK does not interact with DS_SRT_UI_SERVER_TASK
+ * for over DS_SRT_UI_IPC_TIMEOUT, we re-define its type.
  * The new type depends on conditions.
  */
-#define DS_SRT_MM_TIMEOUT		100000		// 200 msec. It should not be larger than 1sec.
-#define DS_SRT_UIE_TIMEOUT		100000		// 200 msec. It should not be larger than 1sec.
-
+#define DS_SRT_UI_IPC_NO		3			//
+#define DS_SRT_UI_IPC_TIMEOUT	500000		// 500 msec. It should not be larger than 1sec.
 #define DS_TOUCH_TIMEOUT		980000		// 980 msec. Don't touch this. LG standard.
 
 /* The maximum allowable number of PID. 0 ~ 32767. */
@@ -198,32 +220,39 @@
 /* Definitions for AIDVS */
 /* DS_AIDVS_SPEEDUP_THRESHOLD and DS_AIDVS_SPEEDUP_INTERVAL 
  * should be less than 1000000 */
-#define DS_AIDVS_INTERVAL_WINDOW_SIZE	100			/* 100 intervals in an window */
+#define DS_AIDVS_MOVING_AVG_WEIGHT		3			/* 3 */
+#define DS_AIDVS_INTERVALS_IN_AN_WINDOW	100			/* 100 intervals in an window */
 #define DS_AIDVS_SPEEDUP_THRESHOLD		100000		/* 100 msec in fse */
 #define DS_AIDVS_SPEEDUP_INTERVAL		100000		/* 100 msec in fse */
 
 /* Definitions for GPScheDVS */
 /* Following THRESHOLD and INTERVAL values should be less than 1000000.
  */
-#define DS_GPSCHEDVS_L0_INTERVAL_WINDOW_SIZE	50		/* 50 intervals in an window */
-#define DS_GPSCHEDVS_L0_SPEEDUP_THRESHOLD	50000		/* 50 msec in fse */
-#define DS_GPSCHEDVS_L0_SPEEDUP_INTERVAL	50000		/* 50 msec in fse */
+#define DS_GPSCHEDVS_L0_INTERVALS_IN_AN_WINDOW	100		/* Max. intervals in an window */
+#define DS_GPSCHEDVS_L0_MIN_WINDOW_LENGTH	10000		/* 10 msec in elapsed */
+#define DS_GPSCHEDVS_L0_SPEEDUP_THRESHOLD	3000		/* 3 msec in fse */
+#define DS_GPSCHEDVS_L0_SPEEDUP_INTERVAL	3000		/* 3 msec in fse */
 
-#define DS_GPSCHEDVS_L1_INTERVAL_WINDOW_SIZE	50		/* 50 intervals in an window */
-#define DS_GPSCHEDVS_L1_SPEEDUP_THRESHOLD	100000		/* 100 msec in fse */
-#define DS_GPSCHEDVS_L1_SPEEDUP_INTERVAL	100000		/* 100 msec in fse */
+#define DS_GPSCHEDVS_L1_INTERVALS_IN_AN_WINDOW	100		/* Max. intervals in an window */
+#define DS_GPSCHEDVS_L1_MIN_WINDOW_LENGTH	30000		/* 25 msec in elapsed */
+#define DS_GPSCHEDVS_L1_SPEEDUP_THRESHOLD	5000		/* 5 msec in fse */
+#define DS_GPSCHEDVS_L1_SPEEDUP_INTERVAL	5000		/* 5 msec in fse */
 
-#define DS_GPSCHEDVS_L2_INTERVAL_WINDOW_SIZE	40		/* 40 intervals in an window */
-#define DS_GPSCHEDVS_L2_SPEEDUP_THRESHOLD	200000		/* 200 msec in fse */
-#define DS_GPSCHEDVS_L2_SPEEDUP_INTERVAL	200000		/* 200 msec in fse */
+#define DS_GPSCHEDVS_L2_INTERVALS_IN_AN_WINDOW	100		/* Max. intervals in an window */
+#define DS_GPSCHEDVS_L2_MIN_WINDOW_LENGTH	40000		/* 50 msec in elapsed */
+#define DS_GPSCHEDVS_L2_SPEEDUP_THRESHOLD	50000		/* 10 msec in fse */
+#define DS_GPSCHEDVS_L2_SPEEDUP_INTERVAL	50000		/* 10 msec in fse */
 
-#define DS_GPSCHEDVS_L3_INTERVAL_WINDOW_SIZE	40		/* 40 intervals in an window */
-#define DS_GPSCHEDVS_L3_SPEEDUP_THRESHOLD	50000		/* 400 msec in fse */
-#define DS_GPSCHEDVS_L3_SPEEDUP_INTERVAL	50000		/* 400 msec in fse */
+#define DS_GPSCHEDVS_L3_INTERVALS_IN_AN_WINDOW	100		/* Max. intervals in an window */
+#define DS_GPSCHEDVS_L3_MIN_WINDOW_LENGTH	80000		/* 100 msec in elapsed */
+#define DS_GPSCHEDVS_L3_SPEEDUP_THRESHOLD	100000		/* 20 msec in fse */
+#define DS_GPSCHEDVS_L3_SPEEDUP_INTERVAL	100000		/* 20 msec in fse */
 
-#define DS_MIN_CPU_OP_UPDATE_INTERVAL		10000			/* 10 msec */
+#define DS_MIN_CPU_OP_UPDATE_INTERVAL_U		10000			/* 10 msec */
+#define DS_MIN_CPU_OP_UPDATE_INTERVAL_D		10000			/* 10 msec */
 
-#define DS_INIT_DELAY_SEC					60				/* 1 minute */
+#define DS_INIT_DELAY_SEC					20				/* 20 seconds */
+#define DS_POST_EARLY_SUSPEND_TIMEOUT_USEC	2000000			/* 2 seconds */		
 
 /***************************************************************************
  * Variables and data structures
@@ -372,6 +401,7 @@ struct dvs_suite_status {
 	int type_need_to_be_changed[DS_PID_LIMIT];
 
 	int tgid[DS_PID_LIMIT];
+	char tg_owner_comm[DS_PID_LIMIT][16];
 	int tgid_type_changed[DS_PID_LIMIT];
 	int tgid_type_change_causer[DS_PID_LIMIT];
 
@@ -387,6 +417,13 @@ struct dvs_suite_status {
 	int flag_correct_cpu_op_update_path;
 
 	int flag_post_early_suspend;
+	unsigned long post_early_suspend_sec;
+	unsigned long post_early_suspend_usec;
+	int flag_do_post_early_suspend;
+
+	unsigned long mpu_min_freq_to_lock;
+	unsigned long l3_min_freq_to_lock;
+	unsigned long iva_min_freq_to_lock;
 };
 
 extern DS_STAT ds_status;
@@ -422,9 +459,9 @@ struct dvs_suite_counter {
 
 	unsigned long busy_sec[DS_CPU_OP_LIMIT];
 	unsigned long busy_usec[DS_CPU_OP_LIMIT];
+#endif
 	unsigned long busy_total_sec;
 	unsigned long busy_total_usec;
-#endif
 	unsigned long busy_fse_sec;
 	unsigned long busy_fse_usec;
 	unsigned long busy_fse_usec_fra_fp12;
@@ -519,6 +556,7 @@ extern DS_PARAM ds_parameter;
 struct ds_aidvs_interval_structure {
 	unsigned long time_usec_interval;
 	unsigned long time_usec_work_fse;
+	unsigned long time_usec_work;
 //	struct ds_aidvs_interval_structure *next;
 };
 
@@ -528,28 +566,32 @@ struct ds_aidvs_status_structure {
 
 	unsigned long time_usec_interval;
 	unsigned long time_usec_interval_inc_base;
+	unsigned long time_sec_interval_inc_base;
+
 	unsigned long time_usec_work_fse;
 	unsigned long time_usec_work_fse_inc_base;
-
 	unsigned long time_usec_work_fse_lasting;
 
-	DS_AIDVS_INTERVAL_STRUCT interval_window_array[DS_AIDVS_INTERVAL_WINDOW_SIZE];
+	unsigned long time_usec_work;
+	unsigned long time_usec_work_inc_base;
+	unsigned long time_usec_work_lasting;
+
+	DS_AIDVS_INTERVAL_STRUCT interval_window_array[DS_AIDVS_INTERVALS_IN_AN_WINDOW];
 	int interval_window_index;
 //	DS_AIDVS_INTERVAL_STRUCT *interval_window_head;
 //	DS_AIDVS_INTERVAL_STRUCT *interval_window_tail;
 
 	unsigned long time_usec_interval_in_window;
 	unsigned long time_usec_work_fse_in_window;
+	unsigned long time_usec_work_in_window;
 
 	int consecutive_speedup_count;
 	unsigned long utilization_int_ulong;
 	unsigned long utilization_fra_fp12;
+	unsigned long time_usec_util_calc_base;
+	unsigned long time_sec_util_calc_base;
 
 	unsigned int cpu_op_index;
-
-	int current_interval_window_size;
-	unsigned long current_speedup_threshold;
-	unsigned long current_speedup_interval;
 };
 
 extern DS_AIDVS_STAT_STRUCT ds_aidvs_status;
@@ -602,8 +644,6 @@ extern int ds_fpdiv(unsigned long, unsigned long, unsigned long, unsigned long,
 
 extern unsigned int ds_get_next_high_cpu_op_index(unsigned long, unsigned long);
 extern unsigned int ds_get_next_low_cpu_op_index(unsigned long, unsigned long);
-extern void ds_update_cpu_op(void);
-extern int ds_update_time_counter(void);
 
 /*
  * The functions for each DVS scheme.
@@ -611,10 +651,20 @@ extern int ds_update_time_counter(void);
 
 /* AIDVS */
 extern int ds_do_dvs_aidvs(unsigned int *, DS_AIDVS_STAT_STRUCT *,
-													 int, int, unsigned long, unsigned long);
+							 int, int, unsigned long, unsigned long, unsigned long);
 
 /* GPScheDVS */
 extern int ds_do_dvs_gpschedvs(unsigned int *);
+
+/*
+ * Wrappers to be used in the existing kernel codes 
+ * to call the main dvs suite function.
+ */
+extern asmlinkage void ld_update_cpu_op(void);
+extern int ld_initialize_dvs_suite(int);
+extern int ld_update_time_counter(void);
+extern int ld_update_priority_normal(struct task_struct *);
+extern void ld_do_dvs_suite(void);
 
 /*
  * The main dvs suite function.
@@ -624,10 +674,12 @@ extern int ds_initialize_iaqos_trace(void);
 extern int ds_initialize_cmqos_trace(void);
 extern int ds_initialize_job_trace(void);
 extern int ds_initialize_dvs_scheme(int);
+extern int ds_update_time_counter(void);
 extern int ds_update_priority_normal(struct task_struct *);
 extern int ds_update_priority_rt(struct task_struct *);
-extern int ds_detect_task_type(void);
+//extern void ds_update_cpu_op(void);
 extern asmlinkage void ds_update_cpu_op(void);
+extern int ds_detect_task_type(void);
 extern void do_dvs_suite(void);
 
 #endif /* !(_LINUX_DVS_SUITE_H) */

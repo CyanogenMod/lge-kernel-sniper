@@ -36,7 +36,9 @@
 
 #include "binder.h"
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #include <linux/dvs_suite.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 static DEFINE_MUTEX(binder_lock);
 static DEFINE_MUTEX(binder_deferred_lock);
@@ -1556,132 +1558,218 @@ static void binder_transaction(struct binder_proc *proc,
 	t->buffer->transaction = t;
 	t->buffer->target_node = target_node;
 
-#if 0
+#if 0	// {
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	if(ds_status.flag_run_dvs == 1){
 
-		switch(*(proc->tsk->comm+0)){
+		switch(*(ds_status.tg_owner_comm[proc->tsk->pid]+0)){
+#if 0
 			case 'm':
 				if(
-					*(proc->tsk->comm+1) == 'e' &&
-					*(proc->tsk->comm+2) == 'd' &&
-					*(proc->tsk->comm+3) == 'i' &&
-					*(proc->tsk->comm+4) == 'a' &&
-					*(proc->tsk->comm+5) == 's' &&
-					*(proc->tsk->comm+6) == 'e' &&
-					*(proc->tsk->comm+7) == 'r' &&
-					*(proc->tsk->comm+8) == 'v' &&
-					*(proc->tsk->comm+9) == 'e' &&
-					*(proc->tsk->comm+10) == 'r'
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+1) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+2) == 'd' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+3) == 'i' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+4) == 'a' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+5) == 's' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+6) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+7) == 'r' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+8) == 'v' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+9) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+10) == 'r'
 				)
 				{
-					ds_status.type[t->to_proc->pid] = DS_SRT_CM_TASK;
-					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
-						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec;
-						ds_status.ipc_timeout_usec[t->to_proc->pid] =
-							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
+					if(ds_status.tgid[proc->tsk->pid] != ds_status.tgid[t->to_proc->tsk->pid]){
+						ds_status.type[t->to_proc->tsk->pid] = DS_SRT_UI_CLIENT_TASK;
+						if(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT < 1000000){
+							ds_status.ipc_timeout_sec[t->to_proc->tsk->pid] = ds_counter.elapsed_sec;
+							ds_status.ipc_timeout_usec[t->to_proc->tsk->pid] =
+								ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT;
 					}
 					else{
-						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec + 1;
-						ds_status.ipc_timeout_usec[t->to_proc->pid] =
-							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+							ds_status.ipc_timeout_sec[t->to_proc->tsk->pid] = ds_counter.elapsed_sec + 1;
+							ds_status.ipc_timeout_usec[t->to_proc->tsk->pid] =
+								(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT) - 1000000;
+						}
 					}
 				}
 				break;
+#endif
+#if 1
 			case 's':
 				if(
-					*(proc->tsk->comm+1) == 'y' &&
-					*(proc->tsk->comm+2) == 's' &&
-					*(proc->tsk->comm+3) == 't' &&
-					*(proc->tsk->comm+4) == 'e' &&
-					*(proc->tsk->comm+5) == 'm' &&
-					*(proc->tsk->comm+6) == '_' &&
-					*(proc->tsk->comm+7) == 's' &&
-					*(proc->tsk->comm+8) == 'e' &&
-					*(proc->tsk->comm+9) == 'r' &&
-					*(proc->tsk->comm+10) == 'v' &&
-					*(proc->tsk->comm+11) == 'e' &&
-					*(proc->tsk->comm+12) == 'r'
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+1) == 'y' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+2) == 's' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+3) == 't' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+4) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+5) == 'm' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+6) == '_' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+7) == 's' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+8) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+9) == 'r' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+10) == 'v' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+11) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+12) == 'r'
 				)
 				{
-					ds_status.type[t->to_proc->pid] = DS_SRT_IA_TASK;
-					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
-						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec;
-						ds_status.ipc_timeout_usec[t->to_proc->pid] =
-							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
-					}
-					else{
-						ds_status.ipc_timeout_sec[t->to_proc->pid] = ds_counter.elapsed_sec + 1;
-						ds_status.ipc_timeout_usec[t->to_proc->pid] =
-							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+					if(ds_status.tgid[proc->tsk->pid] != ds_status.tgid[t->to_proc->tsk->pid]){
+						ds_status.type[t->to_proc->tsk->pid] = DS_SRT_UI_CLIENT_TASK;
+						if(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT < 1000000){
+							ds_status.ipc_timeout_sec[t->to_proc->tsk->pid] = ds_counter.elapsed_sec;
+							ds_status.ipc_timeout_usec[t->to_proc->tsk->pid] =
+								ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT;
+						}
+						else{
+							ds_status.ipc_timeout_sec[t->to_proc->tsk->pid] = ds_counter.elapsed_sec + 1;
+							ds_status.ipc_timeout_usec[t->to_proc->tsk->pid] =
+								(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT) - 1000000;
+						}
 					}
 				}
 				break;
+#endif
+#if 0
+			case 'S':
+				if(
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+1) == 'u' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+2) == 'r' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+3) == 'f' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+4) == 'a' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+5) == 'c' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+6) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+7) == 'F' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+8) == 'l' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+9) == 'i' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+10) == 'n' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+11) == 'g' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+12) == 'e' &&
+					*(ds_status.tg_owner_comm[proc->tsk->pid]+13) == 'r'
+				)
+				{
+					if(ds_status.tgid[proc->tsk->pid] != ds_status.tgid[t->to_proc->tsk->pid]){
+						ds_status.type[t->to_proc->tsk->pid] = DS_SRT_UI_CLIENT_TASK;
+						if(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT < 1000000){
+							ds_status.ipc_timeout_sec[t->to_proc->tsk->pid] = ds_counter.elapsed_sec;
+							ds_status.ipc_timeout_usec[t->to_proc->tsk->pid] =
+								ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT;
+					}
+					else{
+							ds_status.ipc_timeout_sec[t->to_proc->tsk->pid] = ds_counter.elapsed_sec + 1;
+							ds_status.ipc_timeout_usec[t->to_proc->tsk->pid] =
+								(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT) - 1000000;
+						}
+					}
+				}
+				break;
+#endif
 			default:
 				break;
 		}
 
-		switch(*(t->to_proc->tsk->comm+0)){
+		switch(*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+0)){
+#if 0
 			case 'm':
 				if(
-					*(t->to_proc->tsk->comm+1) == 'e' &&
-					*(t->to_proc->tsk->comm+2) == 'd' &&
-					*(t->to_proc->tsk->comm+3) == 'i' &&
-					*(t->to_proc->tsk->comm+4) == 'a' &&
-					*(t->to_proc->tsk->comm+5) == 's' &&
-					*(t->to_proc->tsk->comm+6) == 'e' &&
-					*(t->to_proc->tsk->comm+7) == 'r' &&
-					*(t->to_proc->tsk->comm+8) == 'v' &&
-					*(t->to_proc->tsk->comm+9) == 'e' &&
-					*(t->to_proc->tsk->comm+10) == 'r'
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+1) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+2) == 'd' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+3) == 'i' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+4) == 'a' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+5) == 's' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+6) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+7) == 'r' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+8) == 'v' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+9) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+10) == 'r'
 				)
 				{
-					ds_status.type[proc->pid] = DS_SRT_CM_TASK;
-					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
+					if(ds_status.tgid[proc->tsk->pid] != ds_status.tgid[t->to_proc->tsk->pid]){
+						ds_status.type[proc->pid] = DS_SRT_UI_CLIENT_TASK;
+						if(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT < 1000000){
 						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec;
 						ds_status.ipc_timeout_usec[proc->pid] =
-							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
+								ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT;
 					}
 					else{
 						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec + 1;
 						ds_status.ipc_timeout_usec[proc->pid] =
-							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+								(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT) - 1000000;
+						}
 					}
 				}
 				break;
+#endif
+#if 1
 			case 's':
 				if(
-					*(t->to_proc->tsk->comm+1) == 'y' &&
-					*(t->to_proc->tsk->comm+2) == 's' &&
-					*(t->to_proc->tsk->comm+3) == 't' &&
-					*(t->to_proc->tsk->comm+4) == 'e' &&
-					*(t->to_proc->tsk->comm+5) == 'm' &&
-					*(t->to_proc->tsk->comm+6) == '_' &&
-					*(t->to_proc->tsk->comm+7) == 's' &&
-					*(t->to_proc->tsk->comm+8) == 'e' &&
-					*(t->to_proc->tsk->comm+9) == 'r' &&
-					*(t->to_proc->tsk->comm+10) == 'v' &&
-					*(t->to_proc->tsk->comm+11) == 'e' &&
-					*(t->to_proc->tsk->comm+12) == 'r'
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+1) == 'y' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+2) == 's' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+3) == 't' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+4) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+5) == 'm' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+6) == '_' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+7) == 's' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+8) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+9) == 'r' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+10) == 'v' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+11) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+12) == 'r'
 				)
 				{
-					ds_status.type[t->to_proc->pid] = DS_SRT_IA_TASK;
-					if(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT < 1000000){
+					if(ds_status.tgid[proc->tsk->pid] != ds_status.tgid[t->to_proc->tsk->pid]){
+						ds_status.type[t->to_proc->tsk->pid] = DS_SRT_UI_CLIENT_TASK;
+						if(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT < 1000000){
+							ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec;
+							ds_status.ipc_timeout_usec[proc->pid] =
+								ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT;
+						}
+						else{
+							ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec + 1;
+							ds_status.ipc_timeout_usec[proc->pid] =
+								(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT) - 1000000;
+						}
+					}
+				}
+				break;
+#endif
+#if 0
+			case 'S':
+				if(
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+1) == 'u' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+2) == 'r' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+3) == 'f' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+4) == 'a' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+5) == 'c' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+6) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+7) == 'F' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+8) == 'l' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+9) == 'i' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+10) == 'n' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+11) == 'g' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+12) == 'e' &&
+					*(ds_status.tg_owner_comm[t->to_proc->tsk->pid]+13) == 'r'
+				)
+				{
+					if(ds_status.tgid[proc->tsk->pid] != ds_status.tgid[t->to_proc->tsk->pid]){
+						ds_status.type[t->to_proc->tsk->pid] = DS_SRT_UI_CLIENT_TASK;
+						if(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT < 1000000){
 						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec;
 						ds_status.ipc_timeout_usec[proc->pid] =
-							ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT;
+								ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT;
 					}
 					else{
 						ds_status.ipc_timeout_sec[proc->pid] = ds_counter.elapsed_sec + 1;
 						ds_status.ipc_timeout_usec[proc->pid] =
-							(ds_counter.elapsed_usec + DS_SRT_UIE_TIMEOUT) - 1000000;
+								(ds_counter.elapsed_usec + DS_SRT_UI_IPC_TIMEOUT) - 1000000;
+						}
 					}
 				}
 				break;
+#endif
 			default:
 				break;
 		}
 	}
-#endif
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif	// }
 
 	if (target_node)
 		binder_inc_node(target_node, 1, 0, NULL);

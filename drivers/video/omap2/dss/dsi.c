@@ -252,10 +252,12 @@ static struct dsi_struct
 
 	struct dsi_clock_info current_cinfo;
 
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_START]*/
 #if defined(CONFIG_MACH_LGE_HUB)
 #else
 	struct regulator *vdds_dsi_reg;
 #endif
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_END]*/
 	struct {
 		enum dsi_vc_mode mode;
 		struct omap_dss_device *dssdev;
@@ -337,6 +339,7 @@ static inline u32 dsi_read_reg(enum omap_dsi_index ix,
 		return __raw_readl(dsi2.base + idx.idx);
 }
 
+// rsy add
 extern int lcd_off_boot;
 
 
@@ -550,6 +553,7 @@ static void schedule_error_recovery(enum omap_dsi_index ix)
 	struct dsi_struct *p_dsi;
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
+// rsy
 	if(lcd_off_boot)	return;
 
 	if (p_dsi->recover.enabled && !p_dsi->recover.recovering)
@@ -1326,12 +1330,14 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 	dsi_enable_pll_clock(ix, 1);
 
 	if (!cpu_is_omap44xx()) {
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_START]*/
 #if defined(CONFIG_MACH_LGE_HUB)
 #else
 		r = regulator_enable(dsi1.vdds_dsi_reg);
 		if (r)
 			goto err0;
 #endif
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_END]*/
 	}
 
 	/* XXX PLL does not come out of reset without this... */
@@ -1366,11 +1372,13 @@ int dsi_pll_init(struct omap_dss_device *dssdev, bool enable_hsclk,
 
 	return 0;
 err1:
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_START]*/
 #if defined(CONFIG_MACH_LGE_HUB)
 #else
 	if (!cpu_is_omap44xx())
 		regulator_disable(dsi1.vdds_dsi_reg);
 #endif
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_END]*/
 err0:
 	enable_clocks(0);
 	dsi_enable_pll_clock(ix, 0);
@@ -1387,11 +1395,13 @@ void dsi_pll_uninit(enum omap_dsi_index ix)
 
 	p_dsi->pll_locked = 0;
 	dsi_pll_power(ix, DSI_PLL_POWER_OFF);
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_START]*/
 #if defined(CONFIG_MACH_LGE_HUB)
 #else
 	if (!cpu_is_omap44xx())
 		regulator_disable(dsi1.vdds_dsi_reg);
 #endif
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_END]*/
 	DSSDBG("PLL uninit done\n");
 }
 
@@ -2684,6 +2694,7 @@ int dsi_vc_set_max_rx_packet_size(enum omap_dsi_index ix,
 }
 EXPORT_SYMBOL(dsi_vc_set_max_rx_packet_size);
 
+/* 20100623 kyungtae.oh@lge.com hub panel init [LGE_START] */
 int dsi_vc_generic_write(int channel, u8 cmd, u8 *data, int len)
 {
     int r;
@@ -2713,6 +2724,9 @@ int dsi_vc_generic_write_short(int channel, u8 cmd, u8 *data, int len)
         return r;
 }
 EXPORT_SYMBOL(dsi_vc_generic_write_short);
+/* 20100623 kyungtae.oh@lge.com hub panel init [LGE_END] */
+
+/* LGE_CHANGE_S sunggyun.yu@lge.com */
 int dsi_vc_write(enum omap_dsi_index ix, int channel, u8 cmd, u8 *data, int len)
 {
 	int r = -1;
@@ -2753,6 +2767,7 @@ int dsi_vc_write(enum omap_dsi_index ix, int channel, u8 cmd, u8 *data, int len)
 	return r;
 }
 EXPORT_SYMBOL(dsi_vc_write);
+/* LGE_CHANGE_S sunggyun.yu@lge.com */
 
 static void dsi_set_lp_rx_timeout(enum omap_dsi_index ix, unsigned ticks,
 			bool x4, bool x16)
@@ -2888,7 +2903,7 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 	/* XXX what values for the timeouts? */
 	dsi_set_stop_state_counter(ix, 0x1000, false, false);
 	dsi_set_ta_timeout(ix, 0x1fff, true, true);
-	dsi_set_lp_rx_timeout(ix, 0x1fff, true, true);
+	//dsi_set_lp_rx_timeout(ix, 0x1fff, true, true);//OMAPS00246927
 	dsi_set_hs_tx_timeout(ix, 0x1fff, true, true);
 
 	switch (dssdev->ctrl.pixel_size) {
@@ -3268,7 +3283,7 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	if (p_dsi->te_enabled) {
 		/* disable LP_RX_TO, so that we can receive TE.  Time to wait
 		 * for TE is longer than the timer allows */
-		REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15);
+		//REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15);//OMAPS00246927
 
 		if (cpu_is_omap44xx())
 			dsi_vc_send_bta(ix, 0);
@@ -3319,11 +3334,12 @@ static void dsi_handle_framedone(enum omap_dsi_index ix, int error)
 	if (error == -ETIMEDOUT && device->manager)
 		/* Ensures recovery of DISPC after a failed lcd_enable*/
 		device->manager->disable(device->manager);
-
+#if 0 //OMAPS00246927
 	if (p_dsi->te_enabled) {
 		/* enable LP_RX_TO again after the TE */
 		REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15);
 	}
+#endif//OMAPS00246927
 
 	/* RX_FIFO_NOT_EMPTY */
 	if (REG_GET(ix, DSI_VC_CTRL(channel), 20, 20)) {
@@ -3390,12 +3406,12 @@ static void dsi_framedone_irq_callback(void *data, u32 mask)
 	/* Note: We get FRAMEDONE when DISPC has finished sending pixels and
 	 * turns itself off. However, DSI still has the pixels in its buffers,
 	 * and is sending the data. */
-
+#if 0//OMAPS00246927
 	if (p_dsi->te_enabled)
 		/* enable LP_RX_TO again after the TE */
 		REG_FLD_MOD(DSI1, DSI_TIMING2,
 					cpu_is_omap44xx() ? 0 : 1, 15, 15);
-
+#endif//OMAPS00246927
 	/* Send BTA after the frame. We need this for the TE to work, as TE
 	 * trigger is only sent for BTAs without preceding packet. Thus we need
 	 * to BTA after the pixel packets so that next BTA will cause TE
@@ -3581,6 +3597,7 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 
 
 	if (lcd_off_boot) return 0;
+// rsy add end
 
 	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
@@ -3894,7 +3911,8 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 		goto err1;
 
 #if 1
-	if(lcd_off_boot == 1){
+// rsy
+	if(lcd_off_boot==1) {
 		goto err1;
 	}
 #endif
@@ -3931,7 +3949,7 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 	p_dsi = (ix == DSI1) ? &dsi1 : &dsi2;
 
 #if 0
-	if(lcd_off_boot) return;
+	if(lcd_off_boot) return; // rsy
 #endif
 
 	DSSDBG("dsi_display_disable\n");
@@ -3942,7 +3960,7 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 
 	dsi_display_uninit_dispc(dssdev);
 
-	if(!lcd_off_boot){
+	if(!lcd_off_boot) {
 	dsi_display_uninit_dsi(dssdev);
 
 	enable_clocks(0);
@@ -4150,6 +4168,7 @@ int dsi_init(struct platform_device *pdev)
 	dsi1.recover.enabled = false;
 	dsi1.recover.recovering = false;
 
+// rsy
 	if(lcd_off_boot == 0){
 	INIT_WORK(&dsi1.recover.recovery_work,
 		dsi_error_recovery_worker);
@@ -4174,6 +4193,7 @@ int dsi_init(struct platform_device *pdev)
 	}
 
 	if (!cpu_is_omap44xx()) {
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_START]*/
 #if defined(CONFIG_MACH_LGE_HUB)
 #else
 		dsi1.vdds_dsi_reg = dss_get_vdds_dsi();
@@ -4184,6 +4204,7 @@ int dsi_init(struct platform_device *pdev)
 			goto err2;
 		}
 #endif
+/* 20100623 kyungtae.oh@lge.com hub didn't use vdds [LGE_END]*/
 	}
 
 	enable_clocks(1);
@@ -4250,6 +4271,7 @@ int dsi2_init(struct platform_device *pdev)
 	dsi2.recover.enabled = false;
 	dsi2.recover.recovering = false;
 
+// rsy
 	if(lcd_off_boot == 0){
 	INIT_WORK(&dsi2.recover.recovery_work,
 		dsi_error_recovery_worker);

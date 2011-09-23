@@ -50,7 +50,9 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/timer.h>
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #include <linux/dvs_suite.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 u64 jiffies_64 __cacheline_aligned_in_smp = INITIAL_JIFFIES;
 
@@ -1261,7 +1263,9 @@ void update_process_times(int user_tick)
 	struct task_struct *p = current;
 	int cpu = smp_processor_id();
 
-	ds_update_cpu_op();
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	//ds_update_cpu_op();
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	/* Note: this timer irq context must be accounted for as well. */
 	account_process_tick(p, user_tick);

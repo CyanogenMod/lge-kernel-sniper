@@ -307,7 +307,11 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			 * The limit is really 250 ms, but that is
 			 * insufficient for some crappy cards.
 			 */
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+			limit_us = 500000;
+#else
 			limit_us = 300000;
+#endif
 		else
 			limit_us = 100000;
 
@@ -902,7 +906,11 @@ void mmc_set_timing(struct mmc_host *host, unsigned int timing)
  * If a host does all the power sequencing itself, ignore the
  * initial MMC_POWER_UP stage.
  */
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+void mmc_power_up(struct mmc_host *host)
+#else
 static void mmc_power_up(struct mmc_host *host)
+#endif
 {
 	int bit;
 
@@ -925,11 +933,14 @@ static void mmc_power_up(struct mmc_host *host)
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
 
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+	printk("%s: mmc power up\n", mmc_hostname(host));
+#endif
 	/*
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
-	mmc_delay(10);
+	mmc_delay(20);
 
 	host->ios.clock = host->f_min;
 
@@ -940,10 +951,17 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
-	mmc_delay(10);
+	mmc_delay(20);
 }
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+EXPORT_SYMBOL(mmc_power_up);
+#endif
 
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+void mmc_power_off(struct mmc_host *host)
+#else
 static void mmc_power_off(struct mmc_host *host)
+#endif
 {
 	host->ios.clock = 0;
 	host->ios.vdd = 0;
@@ -955,7 +973,13 @@ static void mmc_power_off(struct mmc_host *host)
 	host->ios.bus_width = MMC_BUS_WIDTH_1;
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+	printk("%s: mmc power down\n", mmc_hostname(host));
+#endif
 }
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+EXPORT_SYMBOL(mmc_power_off);
+#endif
 
 /*
  * Cleanup when the last reference to the bus operator is dropped.
@@ -1378,9 +1402,19 @@ int mmc_suspend_host(struct mmc_host *host)
 	}
 	mmc_bus_put(host);
 
+// BEGIN : munho.lee@lge.com 2010-12-27
+// MOD: 0013091: SD card stability patch 
+#if 1
+	if (strcmp(mmc_hostname(host), "mmc1")){
+		if (!err)
+			mmc_power_off(host);
+	} else
+		printk("sd card suspend...\n");
+#else
 	if (!err && !(host->pm_flags & MMC_PM_KEEP_POWER))
 		mmc_power_off(host);
-
+#endif
+// END : munho.lee@lge.com 2010-12-27
 	return err;
 }
 

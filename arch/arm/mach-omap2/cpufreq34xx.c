@@ -27,7 +27,9 @@
 #include <plat/cpu.h>
 #include <plat/clock.h>
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #include <linux/dvs_suite.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 #include "cm-regbits-34xx.h"
 #include "prm.h"
@@ -84,27 +86,27 @@ static u32 omap34xx_opp_def_size = ARRAY_SIZE(omap34xx_opp_def_list);
 
 static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	/* MPU OPP1 - OPP50 */
-	OMAP_OPP_DEF("mpu", true,  300000000, 930000),
+	OMAP_OPP_DEF("mpu", true,  300000000, 1000000),
 	/* MPU OPP2 - OPP100 */
-	OMAP_OPP_DEF("mpu", true,  600000000, 1100000),
+	OMAP_OPP_DEF("mpu", true,  600000000, 1162500),
 	/* MPU OPP3 - OPP-Turbo */
-	OMAP_OPP_DEF("mpu", true, 800000000, 1260000),
+	OMAP_OPP_DEF("mpu", false, 800000000, 1300000),
 	/* MPU OPP4 - OPP-SB */
-	OMAP_OPP_DEF("mpu", true, 1000000000, 1350000),
+	OMAP_OPP_DEF("mpu", false, 1000000000, 1350000),
 
 	/* L3 OPP1 - OPP50 */
-	OMAP_OPP_DEF("l3_main", true, 100000000, 930000),
+	OMAP_OPP_DEF("l3_main", true, 100000000, 975000),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
-	OMAP_OPP_DEF("l3_main", true, 200000000, 1137500),
+	OMAP_OPP_DEF("l3_main", true, 200000000, 1162500),
 
 	/* DSP OPP1 - OPP50 */
-	OMAP_OPP_DEF("iva", true,  260000000, 930000),
+	OMAP_OPP_DEF("iva", true,  260000000, 1000000),
 	/* DSP OPP2 - OPP100 */
-	OMAP_OPP_DEF("iva", true,  520000000, 1100000),
+	OMAP_OPP_DEF("iva", true,  520000000, 1162500),
 	/* DSP OPP3 - OPP-Turbo */
-	OMAP_OPP_DEF("iva", true, 660000000, 1260000),
+	OMAP_OPP_DEF("iva", false, 660000000, 1300000),
 	/* DSP OPP4 - OPP-SB */
-	OMAP_OPP_DEF("iva", true, 800000000, 1350000),
+	OMAP_OPP_DEF("iva", false, 800000000, 1350000),
 };
 static u32 omap36xx_opp_def_size = ARRAY_SIZE(omap36xx_opp_def_list);
 
@@ -135,17 +137,35 @@ static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
 {
 	unsigned long cur_rate = omap3_mpu_get_rate(dev);
 	int ret;
+	/*LGE_CHANGE_S, mg.jeong@lge.com, 2011-01-, Reason*/
 	//printk("MPU: Current %lu ,Next %lu\n",cur_rate, rate);
 
 #ifdef CONFIG_CPU_FREQ
 	struct cpufreq_freqs freqs_notify;
 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	freqs_notify.old = cur_rate / 1000;
 	freqs_notify.new = rate / 1000;
 	freqs_notify.cpu = 0;
+
 	/* Send pre notification to CPUFreq */
-	if(ds_status.flag_correct_cpu_op_update_path == 0)
+	//cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
+
+	if(ds_status.flag_run_dvs == 0){
+		freqs_notify.old = cur_rate / 1000;
+		freqs_notify.new = rate / 1000;
+		freqs_notify.cpu = 0;
+		cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
+	}
+	else{	// LG-DVFS is runnig.
+		if(ds_status.flag_correct_cpu_op_update_path == 0){	// Called by cpufreq.
+			freqs_notify.old = ds_status.cpu_op_index / 1000;
+			freqs_notify.new = ds_status.target_cpu_op_index / 1000;
+			freqs_notify.cpu = 0;
 	cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
+		}
+	}
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 	ret = clk_set_rate(dpll1_clk, rate);
 	if (ret) {
@@ -155,9 +175,19 @@ static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
 	}
 
 #ifdef CONFIG_CPU_FREQ
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	/* Send a post notification to CPUFreq */
-	if(ds_status.flag_correct_cpu_op_update_path == 0)
+	//cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
+
+	if(ds_status.flag_run_dvs == 0){
 	cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
+	}
+	else{	// LG-DVFS is runnig.
+		if(ds_status.flag_correct_cpu_op_update_path == 0){	// Called by cpufreq.
+			cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
+		}
+	}
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 
 #ifndef CONFIG_CPU_FREQ

@@ -409,7 +409,12 @@ static ssize_t display_device_connected_show(struct device *dev,
 	return snprintf(buf, PAGE_SIZE, "%d\n", device_connected);
 }
 
-extern int reset_status; 
+/* LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
+/* 20100601 jugwan.eom@lge.com for hidden reset [START_LGE] */
+//extern void dsi_wake_up_update_thread(void);
+/* LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
+extern int reset_status; /* 20100601 jugwan.eom@lge.com for hidden reset */
+/* LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
 static ssize_t boot_completed_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
@@ -429,6 +434,8 @@ static ssize_t boot_completed_show(struct device *dev,
 	printk("[BCH][%s][%s()] (L:%d) \n",  __FILE__, __func__, __LINE__);
 	return snprintf(buf, PAGE_SIZE, "%u\n", 0);
 }
+/* 20100601 jugwan.eom@lge.com for hidden reset [END_LGE] */
+/* LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
 
 static ssize_t display_edid_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -505,8 +512,12 @@ static DEVICE_ATTR(device_detect_enabled, S_IRUGO|S_IWUSR,
 static DEVICE_ATTR(device_connected, S_IRUGO,
 		display_device_connected_show,
 		NULL);
+/* LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
+/* 20100601 jugwan.eom@lge.com for hidden reset [START_LGE] */
 static DEVICE_ATTR(boot_completed, 0664,
 		boot_completed_show, boot_completed_store);  // /sys/devices/omapdss/display0/boot_completed
+/* 20100601 jugwan.eom@lge.com for hidden reset [END_LGE] */
+/* LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
 
 static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_enabled,
@@ -521,7 +532,9 @@ static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_hpd_enabled,
 	&dev_attr_device_detect_enabled,
 	&dev_attr_device_connected,
-	&dev_attr_boot_completed, 
+/* LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
+	&dev_attr_boot_completed, /* 20100601 jugwan.eom@lge.com for hidden reset */
+/* LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-05-10. Modify a hidden reset fuction. */
 	NULL
 };
 

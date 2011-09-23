@@ -64,6 +64,7 @@ obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o pm_bus.o cpuidle44xx.o \
 obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
 obj-$(CONFIG_OMAP_SMARTREFLEX)          += sr_device.o smartreflex.o
 obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS3)	+= smartreflex-class3.o
+obj-$(CONFIG_OMAP_SMARTREFLEX_CLASS1P5)	+= smartreflex-class1p5.o
 
 AFLAGS_sleep24xx.o			:=-Wa,-march=armv6
 AFLAGS_sleep34xx.o			:=-Wa,-march=armv7-a
@@ -187,11 +188,6 @@ obj-$(CONFIG_MACH_LGE_HUB)		+= board-hub.o \
 					   board-hub-ers.o \
 					   board-sniper-mmc.o \
 					   hsmmc.o
-# LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-03-26, Modify for AT%FBOOT & AT%SWVCHECK.
-#110111 dongjin.sim@lge.com %SWV AP [START]
-obj-$(CONFIG_MACH_LGE_HUB)		+= lge_emmc_direct_access.o					   
-#110111 dongjin.sim@lge.com %SWV AP [END]
-# LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-03-26, Modify for AT%FBOOT & AT%SWVCHECK.
 obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   board-zoom-peripherals.o \
 					   board-zoom2-camera.o \
@@ -235,3 +231,4 @@ obj-y					+= $(smc91x-m) $(smc91x-y)
 obj-$(CONFIG_ARCH_OMAP4)		+= hwspinlocks.o
 obj-$(CONFIG_OMAP_HSI_DEVICE)           += omap_hsi.o
 obj-$(CONFIG_ARCH_OMAP3)		+= twl4030.o
+obj-$(CONFIG_MACH_LGE_OMAP3) += lge/

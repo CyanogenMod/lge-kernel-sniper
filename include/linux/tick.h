@@ -53,6 +53,11 @@ struct tick_sched {
 	ktime_t				idle_tick;
 	int				inidle;
 	int				tick_stopped;
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-16, */ 
+#if 1 /* TI Patch 14591 by Tushar */
+	int				tick_nohz_idle;
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-16 */
 	unsigned long			idle_jiffies;
 	unsigned long			idle_calls;
 	unsigned long			idle_sleeps;

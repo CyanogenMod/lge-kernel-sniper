@@ -37,6 +37,11 @@ void mmc_set_bus_width_ddr(struct mmc_host *host, unsigned int width, int ddr);
 u32 mmc_select_voltage(struct mmc_host *host, u32 ocr);
 void mmc_set_timing(struct mmc_host *host, unsigned int timing);
 
+#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+void mmc_power_up(struct mmc_host *host);
+void mmc_power_off(struct mmc_host *host);
+#endif
+
 static inline void mmc_delay(unsigned int ms)
 {
 	if (ms < 1000 / HZ) {

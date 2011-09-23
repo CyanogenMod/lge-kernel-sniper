@@ -86,8 +86,15 @@ struct power_state {
 	struct list_head node;
 };
 struct list_head *mg_omap_clk_clocks_list_head(void);
+//jungsoo1221.lee - [Call Wake lock Start]
 u8 reg_save_TWL_KEYP_IMR1=0;
 extern int voice_get_curmode(void);
+//junyeop.kim@lge.com, 20100826 get codec status [END_LGE]
+
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [START] 
+extern int fmradio_get_curmode(void);
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [END] 
+//jungsoo1221.lee - [Call Wake lock End]
 
 static LIST_HEAD(pwrst_list);
 
@@ -528,13 +535,16 @@ void omap_sram_idle(void)
 		}
 		if (per_next_state == PWRDM_POWER_OFF)
     { 
+// 20100615 sookyoung.kim@lge.com TI patch for sleep current optimizaiton [START_LGE]
 				hgg_padconf_save();	// pad configuration value save
+// 20100615 sookyoung.kim@lge.com TI patch for sleep current optimizaiton [END_LGE]
 
 			omap2_gpio_prepare_for_idle(true);
     }
 		else
 			omap2_gpio_prepare_for_idle(false);
 		omap_uart_prepare_idle(2);
+		omap_uart_prepare_idle(3);	//2011_01_13 by seunghyun.yi@lge.com for UART4 sleep 
 	}
 
 	/* CORE */
@@ -639,16 +649,21 @@ void omap_sram_idle(void)
 	//if (per_next_state < PWRDM_POWER_ON) {
 	if ((per_next_state < PWRDM_POWER_ON) &&(core_next_state < PWRDM_POWER_ON)) { //TOUCH_PERFORMANCE
 		omap_uart_resume_idle(2);
+		omap_uart_resume_idle(3); //2011_01_13 by seunghyun.yi@lge.com for UART4 idle off UART ON
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
 		if (per_prev_state == PWRDM_POWER_OFF)
 		{ 
+// 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [START_LGE]
 				hgg_padconf_restore();	// pad configuration value restore
+// 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [END_LGE]
 
 			omap2_gpio_resume_after_idle(true);
 		}
 		else
 		{
+// 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [START_LGE]
 				hgg_padconf_restore();	// pad configuration value restore
+// 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [END_LGE]
 
 			omap2_gpio_resume_after_idle(false);
 		}
@@ -910,20 +925,28 @@ static int omap3_pm_prepare(void)
 
 	disable_hlt();
 
+// jungsoo1221.lee [Call Wake Lock Start]
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x01, 0x22);
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x01, 0x2a);
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x0f, 0x88);
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0xff, 0x8a);
-
-
-	if(voice_get_curmode() != 0)
+#if 0 //Original Code 
+	omap_ctrl_writel(omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) & ~(1 << 6), OMAP2_CONTROL_DEVCONF0); 
+	omap_mcbsp_disable_fclk(1);
+#else
+	if(voice_get_curmode() != 0 || fmradio_get_curmode()!=0) //20101222 inbang.park@lge.com Wake lock for  FM Radio [START] 
 	{
-		printk("[mg.jeong] Wake state of Call");
+		//Call Mode or FM Radio Mode
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x41); //VINTANA1_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x45); //VINTANA2_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x49); //VINTDIG_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x87); //CLKEN_REMAP
+		/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-02-09, Bug Fix: insufficient RF Clock when FMR+Call both using */
+		if (voice_get_curmode() != 0)
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x8D); //HFCLKOUT_REMAP
+		else
+			twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x8D); //HFCLKOUT_REMAP
+		/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-02-09, Bug Fix: insufficient RF Clock when FMR+Call both using */
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x35); //VPLL2_REMAP
 	}
 	else
@@ -935,12 +958,24 @@ static int omap3_pm_prepare(void)
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x87); //CLKEN_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x8D); //HFCLKOUT_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x35); //VPLL2_REMAP
+		/*LGE_CHANGE_S, mg.jeong@lge.com, 2011-04-24, Only pwr-key awake sleep*/
 		twl_i2c_read_u8(TWL4030_MODULE_KEYPAD, &reg_save_TWL_KEYP_IMR1, 0x12);
 		twl_i2c_write_u8(TWL4030_MODULE_KEYPAD, 0xff, 0x12);
 	}
+#endif
+// jungsoo1221.lee [Call Wake Lock End]
+
 
 	return 0;
 }
+
+#if defined(CONFIG_MACH_LGE_OMAP3)
+#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+extern void lock_scratchpad_sem(void);
+extern void unlock_scratchpad_sem(void);
+#endif
+#endif
+
 
 static int omap3_pm_suspend(void)
 {
@@ -989,12 +1024,22 @@ static int omap3_pm_suspend(void)
 	omap_uart_prepare_suspend();
 	omap3_intc_suspend();
 
+// prime@sdcmicro.com Enable PM dump [START]
 //	pm_dump_on_suspend = 1;
-lock_scratchpad_sem();
+
+#if defined(CONFIG_MACH_LGE_OMAP3)
+#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+	lock_scratchpad_sem();
+#endif
 	omap3_save_scratchpad_contents();
-unlock_scratchpad_sem();
+#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
+	unlock_scratchpad_sem();
+#endif
+#endif	
+
 	omap_sram_idle();
 //	pm_dump_on_suspend = 0;
+// prime@sdcmicro.com Enable PM dump [END]
 
 restore:
 #if 1
@@ -1549,7 +1594,24 @@ static int __init omap3_pm_init(void)
 	pm_idle = omap3_pm_idle;
 	omap3_idle_init();
 
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-15, */ 
+#if 1 /* OMAPS00244637 - realted to "cm: Module associated with clock dss1_alwon_fck didn't enable in 100000 tries" */
+	omap3_pm_off_mode_enable(1); /* Add this line of code*/
+#endif 
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-15 */
+
 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
+	if (cpu_is_omap3630())
+		pm34xx_errata |= RTA_ERRATA_i608;
+	/*
+	 * RTA is disabled during initialization as per errata i608
+	 * it is safer to disable rta by the bootloader, but we would like
+	 * to be doubly sure here and prevent any mishaps.
+	 */
+	if (IS_PM34XX_ERRATA(RTA_ERRATA_i608))
+		omap_ctrl_writel(OMAP36XX_RTA_DISABLE,
+				OMAP36XX_CONTROL_MEM_RTA_CTRL);
+
 	omap3_save_scratchpad_contents();
 #if defined(CONFIG_MACH_LGE_OMAP3)
 	register_reboot_notifier(&prcm_notifier);

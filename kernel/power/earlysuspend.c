@@ -21,8 +21,10 @@
 #include <linux/wakelock.h>
 #include <linux/workqueue.h>
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #include <linux/dvs_suite.h>
 #include <linux/delay.h>
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 #include "power.h"
 
@@ -73,6 +75,10 @@ void unregister_early_suspend(struct early_suspend *handler)
 }
 EXPORT_SYMBOL(unregister_early_suspend);
 
+/* LGE_CHANGE [LS855:bking.moon@lge.com] 2011-04-09, */ 
+#ifdef CONFIG_LGE_OMAP3_POWER_SAVE_DEBUG
+int early_suspend_process = 0;
+#endif
 static void early_suspend(struct work_struct *work)
 {
 	struct early_suspend *pos;
@@ -107,12 +113,24 @@ static void early_suspend(struct work_struct *work)
 
 	sys_sync();
 
-	if(ds_status.flag_run_dvs == 1) ds_status.flag_post_early_suspend = 1;
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	if(ds_status.flag_run_dvs == 1){
+		ds_status.flag_post_early_suspend = 1;
+		ds_status.post_early_suspend_sec = ds_counter.elapsed_sec;
+		ds_status.post_early_suspend_usec = ds_counter.elapsed_usec;
+	}
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 abort:
 	spin_lock_irqsave(&state_lock, irqflags);
+#ifdef CONFIG_LGE_OMAP3_POWER_SAVE_DEBUG
+	early_suspend_process = 1;
+#endif
 	if (state == SUSPEND_REQUESTED_AND_SUSPENDED)
 		wake_unlock(&main_wake_lock);
+#ifdef CONFIG_LGE_OMAP3_POWER_SAVE_DEBUG
+	early_suspend_process = 0;
+#endif
 	spin_unlock_irqrestore(&state_lock, irqflags);
 }
 
@@ -136,7 +154,14 @@ static void late_resume(struct work_struct *work)
 		goto abort;
 	}
 
-	if(ds_status.flag_run_dvs == 1) ds_status.flag_post_early_suspend = 0;
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	if(ds_status.flag_run_dvs == 1){
+		ds_status.flag_post_early_suspend = 0;
+		ds_status.post_early_suspend_sec = 0;
+		ds_status.post_early_suspend_usec = 0;
+		ds_status.flag_do_post_early_suspend = 0;
+	}
+    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("late_resume: call handlers\n");

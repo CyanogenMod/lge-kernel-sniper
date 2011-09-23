@@ -25,31 +25,34 @@
 #define CHG_STATUS_N_OMAP 		15
 
 #ifdef CONFIG_LGE_CHARGE_CONTROL_BATTERY_FET
-#define CHAR_CONTROL 			39
+#define CHAR_CONTROL 			69
 #endif 
 
 typedef enum {
-  CHARGING_IC_DEACTIVE,    		
+  CHARGING_IC_DEACTIVE,    		/* 0  */
   CHARGING_IC_ACTIVE_DEFAULT,
   CHARGING_IC_TA_MODE,
   CHARGING_IC_FACTORY_MODE,
 
-  CHARGING_IC_MAX_MODE			
+  CHARGING_IC_MAX_MODE			/* 4  */
 } max8922_status;
 
-
+/* Function Prototype */
 void charging_ic_active_default(void);
 void charging_ic_set_ta_mode(void);
 void charging_ic_set_usb_mode(void);
 void charging_ic_set_factory_mode(void);
 void charging_ic_deactive(void);
-
+/* Shutdown issue at the case of USB booting [kyungyoon.kim@lge.com] 2010-12-25 */
 void charging_ic_set_usb_mode_from_ta_mode(void);
-
+/* Shutdown issue at the case of USB booting [kyungyoon.kim@lge.com] 2010-12-25 */
 max8922_status get_charging_ic_status(void);
 
 #ifdef CONFIG_LGE_CHARGE_CONTROL_BATTERY_FET
 extern void lge_battery_fet_onoff(int on);
 #endif 
-
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+extern int get_external_power_status(void);
 #endif 
+
+#endif /* __HUB_CHARGING_IC_H__ */

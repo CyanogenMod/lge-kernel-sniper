@@ -698,7 +698,8 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 	omap_uart_smart_idle_enable(uart, 0);
 
 	if (cpu_is_omap34xx()) {
-		u32 mod = (uart->num == 2) ? OMAP3430_PER_MOD : CORE_MOD;
+//2011_01_13 by seunghyun.yi@lge.com for UART4:  uart->num==2  ->  uart->num>=2 
+		u32 mod = (uart->num >= 2) ? OMAP3430_PER_MOD : CORE_MOD;
 		u32 wk_mask = 0;
 		u32 padconf = 0;
 
@@ -717,6 +718,12 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 			wk_mask = OMAP3430_ST_UART3_MASK;
 			padconf = 0x19e;
 			break;
+//2011_01_13 by seunghyun.yi@lge.com for UART4 [START] : for 0x0d2 => 0x00 UART4 CTS,RTS연결 안되므로 0으로 setting 
+		case 3:
+			wk_mask = OMAP3630_ST_UART4_MASK;
+			padconf = 0x0;
+			break;
+//2011_01_13 by seunghyun.yi@lge.com for UART4 [END]
 		}
 		uart->wk_mask = wk_mask;
 		uart->padconf = padconf;

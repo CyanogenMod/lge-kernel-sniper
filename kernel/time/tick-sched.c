@@ -333,6 +333,16 @@ void tick_nohz_stop_sched_tick(int inidle)
 		next_jiffies = get_next_timer_interrupt(last_jiffies);
 		delta_jiffies = next_jiffies - last_jiffies;
 	}
+
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-16, */ 
+#if 1 /* TI Patch 14591 by Tushar */
+	if (ts->tick_nohz_idle) {
+		delta_jiffies = 1;
+		goto out;
+	}
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-16 */
+
 	/*
 	 * Do not stop the tick, if we are only one off
 	 * or if the cpu is required for rcu
@@ -825,6 +835,24 @@ void tick_cancel_sched_timer(int cpu)
 	ts->nohz_mode = NOHZ_MODE_INACTIVE;
 }
 #endif
+
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-16, */ 
+#if 1 /* TI Patch 14591 by Tushar */
+void tick_nohz_disable(int tick_nohz)
+{
+	int cpu;
+	struct tick_sched *ts;
+
+	local_irq_disable();
+	for_each_possible_cpu(cpu) {
+		ts = &per_cpu(tick_cpu_sched, cpu);
+		ts->tick_nohz_idle = tick_nohz;
+	}
+	local_irq_enable();
+}
+EXPORT_SYMBOL(tick_nohz_disable);
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-16 */
 
 /**
  * Async notification about clocksource changes

@@ -142,9 +142,43 @@ void dump_spi_simple(char *data)
 			SPI_DEBUG_PRINT("%x ", data_start[i]);
 	}
 	SPI_DEBUG_PRINT("\n");  
+
+	for(i=0; i<20; i++) //leehy_msg
+	{
+	    if( data_start[i] <= 31 || data_start[i] >= 127 )
+	    {
+             data_start[i] = '_';
+		SPI_DEBUG_PRINT("%c", data_start[i]);
+	    }
+	    else
+	    {
+		SPI_DEBUG_PRINT("%c", data_start[i]);
+	    }
+	}
+	SPI_DEBUG_PRINT("\n");  
+
+
 }
 /*---------------------------------------------------------------------------*/
 
+
+
+/* LG_RIL_SPIMUX  feature 
+
+	Author		: sungjoong.kang@lge.com
+	Description	: Aggregates DLC packets into a single SPI frame when possible.
+				  Currently,  implemented only for CP->AP transmission.
+
+*/
+
+#define LG_RIL_SPIMUX // 20110501 enabled
+
+#ifdef LG_RIL_SPIMUX
+#define SPIMUX_MASTER_HDR_TYPE u8
+#define SPIMUX_MASTER_HDR_SIZE (sizeof(SPIMUX_MASTER_HDR_TYPE))
+#define SPIMUX_PACKET_HDR_TYPE u16
+#define SPIMUX_PACKET_HDR_SIZE (sizeof(SPIMUX_PACKET_HDR_TYPE))
+#endif
 
 
 
@@ -392,13 +426,13 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	ifx_spi_buffer_initialization(spi_data);	
 
 	//ifx_spi_setup_transmission(spi_data);
-	omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, 800000);	//LGE_CHANGE Song Won jong 200MHz L3 clk
+	//omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, 800000);	//LGE_CHANGE Song Won jong 200MHz L3 clk
 
 	ifx_spi_setup_transmit_and_receive(spi_data);
 	//gpio_set_value(127 ,1);
 	ifx_spi_send_and_receive_data(spi_data);
 
-	omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, -1);	//LGE_CHANGE Song Won jong 200MHz L3 clk
+	//omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, -1);	//LGE_CHANGE Song Won jong 200MHz L3 clk
 	//gpio_set_value(127 ,0);
 	
     ret = spi_data->ifx_ret_count;
@@ -939,6 +973,13 @@ ifx_spi_tty_callback( struct ifx_spi_data *spi_data)
 {
 
 	unsigned int rx_valid_buf_size;
+#ifdef LG_RIL_SPIMUX 
+	int spimux_packet_num = 0;
+	u32 spimux_current_packet_size = 0;
+	u32 spimux_packet_offset = 0;
+	int spimux_current_packet;
+	u8 * data = NULL;
+#endif	
 	/* Handling Received data */
 #ifdef SPI_TEST
 #else
@@ -954,7 +995,31 @@ ifx_spi_tty_callback( struct ifx_spi_data *spi_data)
 #ifdef LGE_DUMP_SPI_BIFFUER
 		dump_spi_buffer("SPI[R]", &(spi_data->ifx_rx_buffer[4]), COL_SIZE);
 #endif
+#ifdef LG_RIL_SPIMUX
+	data = (u8*)(spi_data->ifx_rx_buffer);
+	spimux_packet_offset = IFX_SPI_HEADER_SIZE;
 
+	spimux_packet_num = *(SPIMUX_MASTER_HDR_TYPE*)(&data[spimux_packet_offset]);
+	//printk("ifx_spi_tty_callback: rx_valid_buf_size(%d) spimux_pkt_num(%d)\n",rx_valid_buf_size, spimux_packet_num); 
+
+	spimux_packet_offset += SPIMUX_MASTER_HDR_SIZE;
+	for (spimux_current_packet=1 ; spimux_current_packet<=spimux_packet_num ; spimux_current_packet++)
+	{
+		spimux_current_packet_size = *(SPIMUX_PACKET_HDR_TYPE*)(&data[spimux_packet_offset]);
+
+		spimux_packet_offset += SPIMUX_PACKET_HDR_SIZE;
+
+		//printk("   current packet #(%d) size(%d) offset(%d)\n",spimux_current_packet, spimux_current_packet_size, spimux_packet_offset); 		
+
+
+		tty_insert_flip_string(spi_data->ifx_tty, spi_data->ifx_rx_buffer + spimux_packet_offset, spimux_current_packet_size);
+		tty_flip_buffer_push(spi_data->ifx_tty);
+		spimux_packet_offset += spimux_current_packet_size;
+	}
+
+
+
+#else //LGE_RIL_SPIMUX
 #ifdef SPI_TEST
 		tty_insert_flip_string(spi_data->ifx_tty, spi_data->ifx_rx_buffer, 2048);
 #else
@@ -978,6 +1043,7 @@ ifx_spi_tty_callback( struct ifx_spi_data *spi_data)
 		tty_insert_flip_string(spi_data->ifx_tty, spi_data->ifx_rx_buffer+IFX_SPI_HEADER_SIZE, rx_valid_buf_size);
 #endif
 		tty_flip_buffer_push(spi_data->ifx_tty);
+#endif//LGE_RIL_SPIMUX
 	}  
 }
 
@@ -1025,6 +1091,7 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	}
 #endif
 
+// TODO:[EBS] LGE_UPDATE_S eungbo.shim@lge.com 20110713 For Ril recovery 
 	if(status > 0) //Status is not clear, I think in case of something TX this should be m.actual_length
 	{
 		memset(spi_data->ifx_tx_buffer,0,IFX_SPI_MAX_BUF_SIZE+IFX_SPI_HEADER_SIZE);
@@ -1032,6 +1099,14 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 		// deinsala if Ok just set the ifx_ret_count to what I wrote (i.e.ifx_spi_count)
 		spi_data->ifx_ret_count = spi_data->ifx_spi_count;
 	}
+	else
+	{
+		printk("[EBS-SPI] TX SPI Failure !! STATUS = %d\n", status);
+		return ;
+		
+	}
+// TODO:[EBS] LGE_UPDATE_E eungbo.shim@lge.com 20110713 For Ril recovery 	
+
 #if 0
 	if(*((int*)spi_data->ifx_rx_buffer) == 0xFFFFFFFF)
 	{
@@ -1056,6 +1131,7 @@ ifx_spi_receive_data(struct ifx_spi_data *spi_data)
 	//status = ifx_spi_sync_read(spi_data, spi_data->ifx_current_frame_size+IFX_SPI_HEADER_SIZE); /* 4 bytes for header */                       
 	status = ifx_spi_sync_read(spi_data, IFX_SPI_MAX_BUF_SIZE+IFX_SPI_HEADER_SIZE); /* 4 bytes for header */
 
+// TODO:[EBS] LGE_UPDATE_S eungbo.shim@lge.com 20110713 For Ril recovery 
 	if(status > 0) //Status is not clear, I think in case of something TX this should be m.actual_length
 	{
 		memset(spi_data->ifx_tx_buffer,0,IFX_SPI_MAX_BUF_SIZE+IFX_SPI_HEADER_SIZE);
@@ -1063,6 +1139,13 @@ ifx_spi_receive_data(struct ifx_spi_data *spi_data)
 		// deinsala if Ok just set the ifx_ret_count to what I wrote (i.e.ifx_spi_count)
 		spi_data->ifx_ret_count = spi_data->ifx_spi_count;
 	}
+	else
+	{
+		printk("[EBS-SPI] RX Failure !! STATUS = %d\n", status);
+		return;
+	}
+// TODO:[EBS] LGE_UPDATE_E eungbo.shim@lge.com 20110713 For Ril recovery 
+
 	ifx_spi_tty_callback(spi_data);
 }
 
@@ -1175,7 +1258,7 @@ ifx_spi_handle_work(struct work_struct *work)
 	printk("[IFX_SPI_WRITE] - CP - [S] \n");
 #endif
 
-	omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, 800000);	//LGE_CHANGE Song Won jong 200MHz L3 clk
+	//omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, 800000);	//LGE_CHANGE Song Won jong 200MHz L3 clk
 
 	ifx_spi_buffer_initialization(spi_data);	
 	//ifx_spi_setup_transmission(spi_data);
@@ -1184,7 +1267,7 @@ ifx_spi_handle_work(struct work_struct *work)
 	//mutex_lock(&mspi_tx_rx_mutex);
 	ifx_spi_receive_data(spi_data);
 
-	omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, -1);	//LGE_CHANGE 200MHz L3 clk
+	//omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT, -1);	//LGE_CHANGE 200MHz L3 clk
 
 	
 #ifdef SPI_LOG_ENABLE_SHIM
@@ -1315,6 +1398,9 @@ int status = 0;
 		put_tty_driver(ifx_spi_tty_driver);
 		return status;
 	}
+#ifdef LG_RIL_SPIMUX
+	printk(KERN_ERR "==== SPI with Enhanced MUX enabled ====");
+#endif
 	return status;
 }
 

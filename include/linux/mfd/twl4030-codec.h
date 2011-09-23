@@ -264,7 +264,8 @@ enum twl4030_codec_res {
 	TWL4030_CODEC_RES_APLL,
 	TWL4030_CODEC_RES_MAX,
 };
- #if defined(CONFIG_MACH_LGE_HUB)  
+// 20110106 prime@sdcmicro.com copy from sound/codecs/twl4030.h [START]
+#if defined(CONFIG_MACH_LGE_HUB) /* LGE_CHANGE_S [iggikim@lge.com] 2009-08-06, audio path */
 typedef enum {
 	TWL4030_AUDIO_MODE,
 	TWL4030_HEADSET_CALL_MODE,
@@ -290,6 +291,10 @@ typedef struct
 int voice_get_curmode(void);
 void voice_configure_path(voice_mode_enum mode);
 void twl4030_set_mic_switch(int mic); //jongik2.kim 20101220 add mic2 control
+#if defined (CONFIG_LGE_LAB3_BOARD) //[LG_FW_AUDIO_TTY] - jungsoo1221.lee
+void twl4030_set_tty_mode(int mode); 
+#endif 
+
 // 20100426 junyeop.kim@lge.com Add the mic mute [START_LGE]
 typedef enum {
 	TWL4030_OFF_MIC_MODE,

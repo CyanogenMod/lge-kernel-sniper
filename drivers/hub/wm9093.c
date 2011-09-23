@@ -10,6 +10,7 @@
 #include <asm/system.h>
 #include <mach/wm9093.h>
 #include <mach/hub_headset_det.h> 
+#include <linux/workqueue.h>	
 
 struct wm9093_i2c_device *wm9093_i2c_dev = NULL;
 struct wm9093_device *wm9093_amp_dev = NULL;
@@ -17,15 +18,20 @@ struct wm9093_device *wm9093_amp_dev = NULL;
 #include <linux/i2c/twl.h>
 #include <linux/regulator/consumer.h>
 
-#define VPLL2_DEV_GRP       0x33  
+extern int voice_get_curmode(void);
+
+#define VPLL2_DEV_GRP       0x33  //junyeop.kim@lge.com, vpll2 power domain grp
 
 static struct regulator *wm9093_reg; 
 static wm9093_fmvolume_enum s_volume =  LEVEL_4;
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [START] //jungsoo1221.lee - P970 Merge
+static wm9093_fmvolume_enum s_modes = LEVEL_OFF;
+unsigned int cur_fmradio_mode = 0;
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [END] 
 
-int wm9093_control_status = 0;		
+int wm9093_call_status = 1;		//20101209 junyeop.kim@lge.com, reduce the outgoing call noise (0 : incoming call, 1 :other case) [START_LGE]
 
-static const wm9093_reg_type wm9093_in1_to_out_tab[] =
-{
+static const wm9093_reg_type wm9093_in1_to_out_tab[] = {
   	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x60C0},
 	{WM9093_CMD ,0x16, 0x0001},
@@ -44,8 +50,52 @@ static const wm9093_reg_type wm9093_in1_to_out_tab[] =
 
 static const wm9093_reg_type wm9093_in1_to_hp_tab[] =
 {
-#if 1	
+#if 1	// 20100528 junyeop.kim@lge.com, remove the pop noise - wolfson path 4 [START_LGE]
 	{WM9093_DELAY,0x39, 0x0050},
+	{WM9093_CMD ,0x39, 0x000D},
+	{WM9093_CMD ,0x01, 0x000B},
+	{WM9093_DELAY,0x00, 50}, //jongik2.kim 20101216 headset pop noise
+	{WM9093_CMD ,0x02, 0x60C0},
+	{WM9093_CMD ,0x16, 0x0001},
+	{WM9093_CMD ,0x18, 0x0100},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x19, 0x0100},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x2D, 0x0040},
+	{WM9093_CMD ,0x2E, 0x0010},
+	{WM9093_CMD ,0x03, 0x0030},
+	{WM9093_CMD ,0x2F, 0x0000},
+	{WM9093_CMD ,0x30, 0x0000},
+	{WM9093_CMD ,0x16, 0x0000},
+	{WM9093_CMD ,0x1C, 0x0131},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1D, 0x0131},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x0131},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x46, 0x0100},
+	{WM9093_CMD ,0x49, 0x0100},
+    {WM9093_END_SEQ,0x00,0x00}
+#else
+    {WM9093_CMD ,0x01, 0x000B},
+	{WM9093_CMD ,0x02, 0x60C0},
+	{WM9093_CMD ,0x16, 0x0001},
+	{WM9093_CMD ,0x18, 0x0000},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x19, 0x0000},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x18, 0x0101},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x2D, 0x0040},
+	{WM9093_CMD ,0x2E, 0x0010},
+	{WM9093_CMD ,0x03, 0x0030},
+	{WM9093_CMD ,0x2F, 0x0000},
+	{WM9093_CMD ,0x30, 0x0000},
+	{WM9093_CMD ,0x16, 0x0000},
+	{WM9093_CMD ,0x1C, 0x0036},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1D, 0x0036},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x0136},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x46, 0x0100},
+	{WM9093_CMD ,0x49, 0x0100},
+    {WM9093_END_SEQ,0x00,0x00}
+#endif    
+};
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
+static const wm9093_reg_type wm9093_in1_to_FMhp_tab[] =
+{
+       {WM9093_DELAY,0x39, 0x0050},
 	{WM9093_CMD ,0x39, 0x000D},
 	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_DELAY,0x00, 50}, 
@@ -59,52 +109,11 @@ static const wm9093_reg_type wm9093_in1_to_hp_tab[] =
 	{WM9093_CMD ,0x2F, 0x0000},
 	{WM9093_CMD ,0x30, 0x0000},
 	{WM9093_CMD ,0x16, 0x0000},
-	{WM9093_CMD ,0x1C, 0x0133},	
-	{WM9093_CMD ,0x1D, 0x0135},	
-//	{WM9093_CMD ,0x1C, 0x0131},	
-	{WM9093_CMD ,0x46, 0x0100},
-	{WM9093_CMD ,0x49, 0x0100},
-    {WM9093_END_SEQ,0x00,0x00}
-#else
-    {WM9093_CMD ,0x01, 0x000B},
-	{WM9093_CMD ,0x02, 0x60C0},
-	{WM9093_CMD ,0x16, 0x0001},
-	{WM9093_CMD ,0x18, 0x0000},	
-	{WM9093_CMD ,0x19, 0x0000},	
-	{WM9093_CMD ,0x18, 0x0101},
-	{WM9093_CMD ,0x2D, 0x0040},
-	{WM9093_CMD ,0x2E, 0x0010},
-	{WM9093_CMD ,0x03, 0x0030},
-	{WM9093_CMD ,0x2F, 0x0000},
-	{WM9093_CMD ,0x30, 0x0000},
-	{WM9093_CMD ,0x16, 0x0000},
-	{WM9093_CMD ,0x1C, 0x0036},	
-	{WM9093_CMD ,0x1D, 0x0036},	
-	{WM9093_CMD ,0x1C, 0x0136},	
-	{WM9093_CMD ,0x46, 0x0100},
-	{WM9093_CMD ,0x49, 0x0100},
-    {WM9093_END_SEQ,0x00,0x00}
-#endif    
-};
-
-static const wm9093_reg_type wm9093_in1_to_FMhp_tab[] =
-{
-       {WM9093_DELAY,0x39, 0x0050},
-	{WM9093_CMD ,0x39, 0x000D},
-	{WM9093_CMD ,0x01, 0x000B},
-	{WM9093_CMD ,0x02, 0x60C0},
-	{WM9093_CMD ,0x16, 0x0001},
-	{WM9093_CMD ,0x18, 0x0100},	
-	{WM9093_CMD ,0x19, 0x0100},	
-	{WM9093_CMD ,0x2D, 0x0040},
-	{WM9093_CMD ,0x2E, 0x0010},
-	{WM9093_CMD ,0x03, 0x0030},
-	{WM9093_CMD ,0x2F, 0x0000},
-	{WM9093_CMD ,0x30, 0x0000},
-	{WM9093_CMD ,0x16, 0x0000},
-	//{WM9093_CMD ,0x1C, 0x011C},	//initial value
-	//{WM9093_CMD ,0x1D, 0x011C},	//initial value
-	//{WM9093_CMD ,0x1C, 0x0135},	
+	{WM9093_CMD ,0x2f, 0x0000}, 
+	{WM9093_CMD ,0x30, 0x0000}, 
+	{WM9093_CMD ,0x1C, 0x0100},	//initial value 
+	{WM9093_CMD ,0x1D, 0x0100},	//initial value
+	{WM9093_CMD ,0x1C, 0x0100},	
 	{WM9093_CMD ,0x46, 0x0100},
 	{WM9093_CMD ,0x49, 0x0100},
        {WM9093_END_SEQ,0x00,0x00}
@@ -123,13 +132,15 @@ static const wm9093_reg_type wm9093_in1_to_FMout_tab[] =
 	{WM9093_CMD ,0x03, 0x0108},
 	{WM9093_CMD ,0x25, 0x0178},		
 	{WM9093_CMD ,0x24, 0x0010},			
-	//{WM9093_CMD ,0x26, 0x011C},	//initial value	
+	{WM9093_CMD ,0x2f, 0x0000}, 
+	{WM9093_CMD ,0x30, 0x0000}, 	
+	{WM9093_CMD ,0x26, 0x0100},	//initial value	
 	{WM9093_CMD ,0x17, 0x0000},
 	{WM9093_CMD ,0x01, 0x100B},	
     {WM9093_END_SEQ,0x00,0x00}
 };
-
-
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
+//20101120 junyeop.kim@lge.com, voip call tuning[START_LGE]
 static const wm9093_reg_type wm9093_in1_to_hp_voip_tab[] =
 {
 	{WM9093_DELAY,0x39, 0x0050},
@@ -137,27 +148,27 @@ static const wm9093_reg_type wm9093_in1_to_hp_voip_tab[] =
 	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x60C0},
 	{WM9093_CMD ,0x16, 0x0001},
-	{WM9093_CMD ,0x18, 0x0100},	
-	{WM9093_CMD ,0x19, 0x0100},	
+	{WM9093_CMD ,0x18, 0x0100},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x19, 0x0100},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x2D, 0x0040},
 	{WM9093_CMD ,0x2E, 0x0010},
 	{WM9093_CMD ,0x03, 0x0030},
 	{WM9093_CMD ,0x2F, 0x0000},
 	{WM9093_CMD ,0x30, 0x0000},
 	{WM9093_CMD ,0x16, 0x0000},
-	{WM9093_CMD ,0x1C, 0x0033},	
-	{WM9093_CMD ,0x1D, 0x0033},	
-	{WM9093_CMD ,0x1C, 0x0133},	
+	{WM9093_CMD ,0x1C, 0x0131},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1D, 0x0131},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x0131},	// 20100517 junyeop.kim@lge.com, headset tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x46, 0x0100},
 	{WM9093_CMD ,0x49, 0x0100},
     {WM9093_END_SEQ,0x00,0x00}
 };
-
+//20101120 junyeop.kim@lge.com, voip call tuning[END_LGE]
 
 
 static const wm9093_reg_type wm9093_in2_to_out_hp_tab[] =
 {
-#if 0	
+#if 0	// 20100531 junyeop.kim@lge.com, remove the pop noise - wolfson path 12[START_LGE]
 	{WM9093_CMD ,0x39, 0x000D},
 	{WM9093_CMD ,0x01, 0x100B},
 	{WM9093_CMD ,0x02, 0x6030},
@@ -168,13 +179,13 @@ static const wm9093_reg_type wm9093_in2_to_out_hp_tab[] =
 	{WM9093_CMD ,0x36, 0x0005},
 	{WM9093_CMD ,0x22, 0x0005},
 	{WM9093_CMD ,0x25, 0x0178},
-//	{WM9093_CMD ,0x26, 0x003a},		
+//	{WM9093_CMD ,0x26, 0x003a},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
 	{WM9093_CMD ,0x2D, 0x0004},
 	{WM9093_CMD ,0x2E, 0x0001},
 	{WM9093_CMD ,0x03, 0x0138},
-	{WM9093_CMD ,0x1C, 0x001c},	
-	{WM9093_CMD ,0x1D, 0x011c},	
-	{WM9093_CMD ,0x1C, 0x011c},	
+	{WM9093_CMD ,0x1C, 0x001c},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1D, 0x011c},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x011c},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x2F, 0x0000},	
 	{WM9093_CMD ,0x30, 0x0000},
 	{WM9093_CMD ,0x17, 0x0000},
@@ -182,36 +193,37 @@ static const wm9093_reg_type wm9093_in2_to_out_hp_tab[] =
 	{WM9093_CMD ,0x49, 0x0100},
     {WM9093_END_SEQ,0x00,0x00}
 #else
-#if 0	
+#if 0	//20101018 junyeop.kim@lge.com, dual path success - wolfson path 6[START_LGE]
  	{WM9093_CMD ,0x39, 0x000D},
     {WM9093_CMD ,0x01, 0x130B},
 	{WM9093_CMD ,0x02, 0x60c0},
     {WM9093_CMD ,0x16, 0x0001},
-	{WM9093_CMD ,0x18, 0x0002},	
-	{WM9093_CMD ,0x19, 0x0002},	
+	{WM9093_CMD ,0x18, 0x0002},	// 20100517 junyeop.kim@lge.com, headset/spk tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x19, 0x0002},	// 20100517 junyeop.kim@lge.com, headset/spk tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x18, 0x0102},	
     {WM9093_CMD ,0x36, 0x0050},	
 	{WM9093_CMD ,0x22, 0x0050},    
-	{WM9093_CMD ,0x25, 0x0178},  
+	{WM9093_CMD ,0x25, 0x0178},  // 20100522 junyeop.kim@lge.com, headset/spk tuning for media(HW require) [START_LGE]	
 	{WM9093_CMD ,0x2D, 0x0040},
 	{WM9093_CMD ,0x2E, 0x0010},
     {WM9093_CMD ,0x03, 0x0138},
-	{WM9093_CMD ,0x1C, 0x001c},	
-	{WM9093_CMD ,0x1D, 0x011c},	
-	{WM9093_CMD ,0x1C, 0x011c},	
+	{WM9093_CMD ,0x1C, 0x001c},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1D, 0x011c},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x011c},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x2F, 0x0000},
 	{WM9093_CMD ,0x30, 0x0000},
     {WM9093_CMD ,0x16, 0x0000},    
 	{WM9093_CMD ,0x46, 0x0100},
 	{WM9093_CMD ,0x49, 0x0100},
     {WM9093_END_SEQ,0x00,0x00}
-#else	
+#else	//dual path in1 -> headset, in2->spk
  	{WM9093_CMD ,0x39, 0x000D},
     {WM9093_CMD ,0x01, 0x130B},
+	{WM9093_DELAY,0x00, 50}, //jiwon.seo@lge.com 20101228 dual path pop noise
 	{WM9093_CMD ,0x02, 0x60f0},
     {WM9093_CMD ,0x16, 0x0001},
-	{WM9093_CMD ,0x18, 0x0002},	
-	{WM9093_CMD ,0x19, 0x0002},	
+	{WM9093_CMD ,0x18, 0x0002},	// 20100517 junyeop.kim@lge.com, headset/spk tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x19, 0x0002},	// 20100517 junyeop.kim@lge.com, headset/spk tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x18, 0x0102},
 	{WM9093_CMD ,0x17, 0x0001},
 	{WM9093_CMD ,0x1A, 0x0002},
@@ -223,9 +235,9 @@ static const wm9093_reg_type wm9093_in2_to_out_hp_tab[] =
 	{WM9093_CMD ,0x2D, 0x0040},
 	{WM9093_CMD ,0x2E, 0x0010},
     {WM9093_CMD ,0x03, 0x0138},	
-	{WM9093_CMD ,0x1C, 0x0023},	
-	{WM9093_CMD ,0x1D, 0x0123},	
-	{WM9093_CMD ,0x1C, 0x0123},	
+	{WM9093_CMD ,0x1C, 0x0123},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1D, 0x0123},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x0123},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x2F, 0x0000},
 	{WM9093_CMD ,0x30, 0x0000},
     {WM9093_CMD ,0x16, 0x0000},    
@@ -241,100 +253,98 @@ static const wm9093_reg_type wm9093_in2_to_out_hp_tab[] =
 
 static const wm9093_reg_type wm9093_in2_to_out_call_tab[] =	//spk call
 {
-#if 1	
-	{WM9093_CMD ,0x39, 0x000D},		
+#if 1	//spk call mono, wolfson path 8 & modify the mono, single-ended
+	{WM9093_CMD ,0x39, 0x000D},		//20100720 junyeop.kim@lge.com, fix the call mute
  	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x6020},
-//	{WM9093_CMD ,0x1A, 0x0000},
-//	{WM9093_CMD ,0x1B, 0x0000},
 	{WM9093_CMD ,0x1A, 0x0102},     
-	{WM9093_CMD ,0x1B, 0x0102},		
+	{WM9093_CMD ,0x1B, 0x0102},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x36, 0x0004},
 	{WM9093_CMD ,0x03, 0x0008},
-	{WM9093_CMD ,0x22, 0x0000},		
+	{WM9093_CMD ,0x22, 0x0000},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x03, 0x0108},
 	{WM9093_CMD ,0x24, 0x0010},
-	{WM9093_CMD ,0x25, 0x0168},		
-	{WM9093_CMD ,0x26, 0x0137},		
+	{WM9093_CMD ,0x25, 0x0178},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x26, 0x013F /* 0x013A*/},		/* jiwon.seo@lge.com 20100121 : spk tuning 0x13F-> 0x13A */
 	{WM9093_CMD ,0x17, 0x0000},
 	{WM9093_CMD ,0x01, 0x100B},
     {WM9093_END_SEQ,0x00,0x00}
 #else	//spk call stereo
-	{WM9093_CMD ,0x39, 0x000D},		
+	{WM9093_CMD ,0x39, 0x000D},		//20100720 junyeop.kim@lge.com, fix the call mute
  	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x6030},
-	{WM9093_CMD ,0x1A, 0x0005},		
-	{WM9093_CMD ,0x1B, 0x0005},		
-	{WM9093_CMD ,0x1A, 0x0105},		
-	{WM9093_CMD ,0x1B, 0x0105},		
+	{WM9093_CMD ,0x1A, 0x0005},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1B, 0x0005},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1A, 0x0105},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1B, 0x0105},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x36, 0x0005},
 	{WM9093_CMD ,0x03, 0x0008},
-	{WM9093_CMD ,0x22, 0x0011},		
+	{WM9093_CMD ,0x22, 0x0011},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x03, 0x0108},
 	{WM9093_CMD ,0x24, 0x0010},
-	{WM9093_CMD ,0x25, 0x0170},		
-	{WM9093_CMD ,0x26, 0x0039},		
+	{WM9093_CMD ,0x25, 0x0170},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x26, 0x0039},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x17, 0x0000},
 	{WM9093_CMD ,0x01, 0x100B},
     {WM9093_END_SEQ,0x00,0x00}
 
 #endif
 };
-
+//20101120 junyeop.kim@lge.com, voip call tuning[START_LGE]
 static const wm9093_reg_type wm9093_in2_to_out_voip_tab[] =
 {
 	{WM9093_CMD ,0x39, 0x000D},
 	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x6030},
 	{WM9093_CMD ,0x17, 0x0001},
-	{WM9093_CMD ,0x1A, 0x0100},		
-	{WM9093_CMD ,0x1B, 0x0100},		
+	{WM9093_CMD ,0x1A, 0x0100},		// 20100604 junyeop.kim@lge.com, spk tuning for media(wolfson require) [START_LGE]
+	{WM9093_CMD ,0x1B, 0x0100},		// 20100604 junyeop.kim@lge.com, spk tuning for media(wolfson require) [START_LGE]
 	{WM9093_CMD ,0x36, 0x0005},	
 	{WM9093_CMD ,0x03, 0x0008},
-	{WM9093_CMD ,0x22, 0x0000},		
+	{WM9093_CMD ,0x22, 0x0000},		// 20100709 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x03, 0x0108},
-	{WM9093_CMD ,0x25, 0x0178},		
-	{WM9093_CMD ,0x24, 0x0010},		
-//	{WM9093_CMD ,0x26, 0x003F},		
+	{WM9093_CMD ,0x25, 0x0178},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
+	{WM9093_CMD ,0x24, 0x0010},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]	
+//	{WM9093_CMD ,0x26, 0x003F},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
 	{WM9093_CMD ,0x17, 0x0000},
 	{WM9093_CMD ,0x01, 0x100B},	
     {WM9093_END_SEQ,0x00,0x00}	
 };
-
+//20101120 junyeop.kim@lge.com, voip call tuning[END_LGE]
 
 static const wm9093_reg_type wm9093_in2_to_out_tab[] =
 {
-#if 1 
+#if 1 // 20100531 junyeop.kim@lge.com, remove the pop noise - wolfson path 11[START_LGE]
 	{WM9093_CMD ,0x39, 0x000D},
 	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x6030},
 	{WM9093_CMD ,0x17, 0x0001},
-	{WM9093_CMD ,0x1A, 0x0100},		
-	{WM9093_CMD ,0x1B, 0x0100},		
+	{WM9093_CMD ,0x1A, 0x0100},		// 20100604 junyeop.kim@lge.com, spk tuning for media(wolfson require) [START_LGE]
+	{WM9093_CMD ,0x1B, 0x0100},		// 20100604 junyeop.kim@lge.com, spk tuning for media(wolfson require) [START_LGE]
 	{WM9093_CMD ,0x36, 0x0005},	
 	{WM9093_CMD ,0x03, 0x0008},
-	{WM9093_CMD ,0x22, 0x0000},		
+	{WM9093_CMD ,0x22, 0x0000},		// 20100709 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x03, 0x0108},
-	{WM9093_CMD ,0x25, 0x0178},		
-	{WM9093_CMD ,0x24, 0x0010},		
-	{WM9093_CMD ,0x26, 0x0137},		
+	{WM9093_CMD ,0x25, 0x0178},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
+	{WM9093_CMD ,0x24, 0x0010},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]	
+	{WM9093_CMD ,0x26, 0x0138},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
 	{WM9093_CMD ,0x17, 0x0000},
 	{WM9093_CMD ,0x01, 0x100B},	
     {WM9093_END_SEQ,0x00,0x00}	
 #else
  	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x6030},
-	{WM9093_CMD ,0x1A, 0x0000},		
-	{WM9093_CMD ,0x1B, 0x0000},		
-	{WM9093_CMD ,0x1A, 0x0100},		
-	{WM9093_CMD ,0x1B, 0x0100},		
+	{WM9093_CMD ,0x1A, 0x0000},		// 20100515 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1B, 0x0000},		// 20100515 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1A, 0x0100},		// 20100515 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x1B, 0x0100},		// 20100515 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x36, 0x0005},
 	{WM9093_CMD ,0x03, 0x0008},
-	{WM9093_CMD ,0x22, 0x0000},		
+	{WM9093_CMD ,0x22, 0x0000},		// 20100515 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x03, 0x0108},
 	{WM9093_CMD ,0x24, 0x0010},
-	{WM9093_CMD ,0x25, 0x0170},		
-	{WM9093_CMD ,0x26, 0x0039},		
+	{WM9093_CMD ,0x25, 0x0170},		// 20100515 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
+	{WM9093_CMD ,0x26, 0x0039},		// 20100515 junyeop.kim@lge.com, spk tuning for media(HW require) [START_LGE]
 	{WM9093_CMD ,0x17, 0x0000},
 	{WM9093_CMD ,0x01, 0x100B},
     {WM9093_END_SEQ,0x00,0x00}
@@ -367,67 +377,67 @@ static const wm9093_reg_type wm9093_test_tab[] =
 };
 
 
-
+/* LGE_CHANGE_S [iggikim@lge.com] 2009-11-10, rev a headset */
 static const wm9093_reg_type wm9093_in2_to_hp_tab[] =	// headset call
 {
-#if 0	
+#if 0	// 20100528 junyeop.kim@lge.com, remove the pop noise - wolfson path 4 [START_LGE]  //stereo
     {WM9093_CMD ,0x39, 0x000D},
     {WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x60C0},
 	{WM9093_CMD ,0x16, 0x0001},
-	{WM9093_CMD ,0x18, 0x0101},	
-	{WM9093_CMD ,0x19, 0x0101},	
+	{WM9093_CMD ,0x18, 0x0101},	// 20100910 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x19, 0x0101},	// 20100910 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x2D, 0x0040},
 	{WM9093_CMD ,0x2E, 0x0010},
     {WM9093_CMD ,0x03, 0x0030},
-    {WM9093_CMD ,0x2F, 0x0040},	
-    {WM9093_CMD ,0x30, 0x0010},	
+    {WM9093_CMD ,0x2F, 0x0040},	// 20100816 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
+    {WM9093_CMD ,0x30, 0x0010},	// 20100816 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
     {WM9093_CMD ,0x16, 0x0000},
-	{WM9093_CMD ,0x1C, 0x002f},	
-	{WM9093_CMD ,0x1D, 0x002f},	
-	{WM9093_CMD ,0x1C, 0x012f},	
+	{WM9093_CMD ,0x1C, 0x002f},	// 20100910 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1D, 0x002f},	// 20100910 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x012f},	// 20100910 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
     {WM9093_CMD ,0x46, 0x0100},
     {WM9093_CMD ,0x49, 0x0100},
     {WM9093_END_SEQ,0x00,0x00}
-#else	
+#else	// 20100920 junyeop.kim@lge.com, remove the pop noise - wolfson path 1 [START_LGE]  //mono
     {WM9093_CMD ,0x39, 0x000D},
     {WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x6040},
 	{WM9093_CMD ,0x16, 0x0001},
-	{WM9093_CMD ,0x18, 0x0100},	
-	{WM9093_CMD ,0x19, 0x0100},	
+	{WM9093_CMD ,0x18, 0x0100},	// 20100910 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x19, 0x0100},	// 20100910 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x2D, 0x0010},
 	{WM9093_CMD ,0x2E, 0x0010},
 	{WM9093_CMD ,0x03, 0x0030},
-    {WM9093_CMD ,0x2F, 0x0000},	
-    {WM9093_CMD ,0x30, 0x0000},	
+    {WM9093_CMD ,0x2F, 0x0000},	// 20100816 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
+    {WM9093_CMD ,0x30, 0x0000},	// 20100816 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x16, 0x0000},
-	{WM9093_CMD ,0x1C, 0x0133},	
-	{WM9093_CMD ,0x1D, 0x0133},	
-	{WM9093_CMD ,0x1C, 0x0133},	
+	{WM9093_CMD ,0x1C, 0x0131},	// 2010212 HW Require
+	{WM9093_CMD ,0x1D, 0x0131},	// 2010212 HW Require
+	{WM9093_CMD ,0x1C, 0x0131},	// 2010212 HW Require
 	{WM9093_CMD ,0x46, 0x0100},
 	{WM9093_CMD ,0x49, 0x0100},
     {WM9093_END_SEQ,0x00,0x00}
 #endif
 };
-
+/* LGE_CHANGE_E [iggikim@lge.com] */
 static const wm9093_reg_type wm9093_in3_to_out_tab[] =
 {
-	{WM9093_CMD ,0x39, 0x000D},		
+	{WM9093_CMD ,0x39, 0x000D},		//20100720 junyeop.kim@lge.com, fix the call mute
 	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x22, 0x1100},
 	{WM9093_CMD ,0x24, 0x0020},
 	{WM9093_CMD ,0x15, 0x0000},
-//	{WM9093_CMD ,0x25, 0x01e0},     
-	{WM9093_CMD ,0x25, 0x01d8},     
+//	{WM9093_CMD ,0x25, 0x01e0},     //20100912 junyeop.kim@lge.com, receiver tuning (HW request)
+	{WM9093_CMD ,0x25, 0x01d8},     //20100912 junyeop.kim@lge.com, receiver tuning (HW request)
 	{WM9093_CMD ,0x01, 0x100B},
     {WM9093_END_SEQ,0x00,0x00}
 };
 
-
+//20101120 junyeop.kim@lge.com, voip call tuning[START_LGE]
 static const wm9093_reg_type wm9093_in3_to_out_voip_tab[] =
 {
-	{WM9093_CMD ,0x39, 0x000D},		
+	{WM9093_CMD ,0x39, 0x000D},		//20100720 junyeop.kim@lge.com, fix the call mute
 	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x22, 0x1100},
 	{WM9093_CMD ,0x24, 0x0020},
@@ -436,7 +446,7 @@ static const wm9093_reg_type wm9093_in3_to_out_voip_tab[] =
 	{WM9093_CMD ,0x01, 0x100B},
     {WM9093_END_SEQ,0x00,0x00}
 };
-
+//20101120 junyeop.kim@lge.com, voip call tuning[END_LGE]
 
 static const wm9093_reg_type wm9093_pwroff_tab[] =
 {
@@ -446,14 +456,29 @@ static const wm9093_reg_type wm9093_pwroff_tab[] =
     {WM9093_CMD ,0x00, 0x0000}, 
     {WM9093_CMD ,0x02, 0x6000},
     {WM9093_CMD ,0x39, 0x0000},
-
+//    {WM9093_DELAY,0x39, 0x0200},    //added by jykim
 #else
     {WM9093_CMD ,0x00, 0x9093},
 #endif    
-    {WM9093_END_SEQ,0x00,0x00}};
+    {WM9093_END_SEQ,0x00,0x00}
+};
 
 static unsigned int wm9093_read_reg(struct i2c_client *client, unsigned char reg)
 {
+#if 1	// dajin.kim temp code
+	int ret;
+
+	ret = i2c_smbus_read_word_data(client, reg);
+
+	if (ret < 0) {
+		dev_err(&client->dev, "%s: err %d\n", __func__, ret);
+		return ret;
+	}
+
+	ret = ((ret & 0xFF00) >> 8) | ((ret & 0xFF) << 8);
+
+	return ret;
+#else	// original code
 	struct i2c_msg xfer[2];
 	u16 data = 0xffff;
 	int ret;
@@ -473,10 +498,24 @@ static unsigned int wm9093_read_reg(struct i2c_client *client, unsigned char reg
 	ret = i2c_transfer(client->adapter, xfer, 2);
 
 	return (data >> 8) | ((data & 0xff) << 8);
+#endif
 }
 
-static void wm9093_write_reg(struct i2c_client *client, u8 reg, int val)
+static int wm9093_write_reg(struct i2c_client *client, u8 reg, int val)
 {
+#if 1	// dajin.kim temp code
+	int ret;
+
+	val = ((val & 0xFF00) >> 8) | ((val & 0xFF) << 8);
+
+	ret = i2c_smbus_write_word_data(client, reg, val);
+
+	if (ret < 0)
+		dev_err(&client->dev, "%s: err %d\n", __func__, ret);			
+
+	return ret;
+
+#else	// original code
 	int err;
 
 	struct i2c_msg	msg;
@@ -496,15 +535,15 @@ static void wm9093_write_reg(struct i2c_client *client, u8 reg, int val)
 		dev_err(&client->dev, "i2c write error\n");
 	}
 
-	return;
+	return err;
+#endif
 }
 
 void wm_delay_msec(int msec)
 {
     unsigned long start;
 	start = jiffies;
-	while (time_before(jiffies, start+(msec*HZ)/1000))
-	{
+	while (time_before(jiffies, start + (msec * HZ) / 1000)) {
         udelay(10);
 	}
 }
@@ -512,39 +551,69 @@ void wm_delay_msec(int msec)
 void wm9093_write_table(wm9093_reg_type* table)
 {
     int i;
+	int result =0;
 
-	for(i=0; table[i].irc!= WM9093_END_SEQ; i++) {
-        if(table[i].irc == WM9093_DELAY){
+	for (i = 0; table[i].irc != WM9093_END_SEQ; i++) {
+		if (table[i].irc == WM9093_DELAY) {
 			wm_delay_msec(table[i].data);
-	    }
-        else{
-			if(wm9093_i2c_dev != NULL)
-			    wm9093_write_reg(wm9093_i2c_dev->client, table[i].address, table[i].data);
+		} else {
+			if (wm9093_i2c_dev != NULL)
+				result= wm9093_write_reg(wm9093_i2c_dev->client, table[i].address, table[i].data);
 			else
 				printk(KERN_ERR "wm9093 i2c_dev is null");
 	    }
+
+		if (result < 0) break;
 	}
 }
+
+int pre_voice_curmode = 0x00;	//audio mode
+
+#if 1	//junyeop.kim@lge.com, call initial noise workaround
+static void callmode_set_work(struct work_struct *work)
+{
+	printk("[LUCKYJUN77] CALLMODE_SET_WORK\n");
+	
+	switch(wm9093_amp_dev->wm9093_mode) {
+	case RECEIVER_CALL_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
+		break;
+
+	case SPEAKER_CALL_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_call_tab[0]);
+		break;
+
+	case HEADSET_CALL_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_hp_tab[0]);
+		break;
+	default:
+		break;
+	}
+}
+#endif
 
 int wm9093_get_curmode(void)
 {
     return (int)wm9093_amp_dev->wm9093_mode;
 }
-int boot_cnt =0;
+
+//int boot_cnt =0;
 void wm9093_configure_path(wm9093_mode_enum mode)
 {
 	printk("[LUCKYJUN77] wm9093_configure_path : %d\n", mode);
 
-    if(wm9093_amp_dev->wm9093_mode == mode)
+	if (wm9093_amp_dev->wm9093_mode == mode)
 		return;
 
-
-	if(wm9093_control_status == 1)
+#if 0
+//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
+	if(wm9093_call_status == 1)
 	{
-		printk("[LUCKYJUN77] wm9093_control_status : %d\n", wm9093_control_status);
+		printk("[LUCKYJUN77] wm9093_control_status : %d\n", wm9093_call_status);
 		return;
 	}
-
+//20100705 junyeop.kim@lge.com, amp control on/off[END_LGE]
+#endif
 	
 #if 0
 	if(mode == OFF_MODE){
@@ -556,12 +625,11 @@ void wm9093_configure_path(wm9093_mode_enum mode)
 	}
 #endif
 
-
-	   	if(wm9093_amp_dev->wm9093_mode != OFF_MODE && mode != OFF_MODE) 	
+// 20100812 junyeop.kim@lge.com, reduce the pop noise when changing devices[START_LGE]
+	if (wm9093_amp_dev->wm9093_mode != OFF_MODE && mode != OFF_MODE) 	
             wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
-
-
-    switch(mode){
+// 20100812 junyeop.kim@lge.com, reduce the pop noise when changing devices[END_LGE]
+	switch (mode) {
 #if 0    
         case OFF_MODE : if(wm9093_amp_dev->wm9093_pstatus == 0){
 			                wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
@@ -569,30 +637,36 @@ void wm9093_configure_path(wm9093_mode_enum mode)
         	            }
 						break;
 #else
-        case OFF_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
+	case OFF_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
 						wm9093_amp_dev->wm9093_mode = OFF_MODE;
-						wm_delay_msec(100);								
+	//	wm_delay_msec(100);	//20110712.jungsoo1221.lee - when Call Answer, too Slow	// 20100601 junyeop.kim@lge.com, remove the pop noise in the shut down[START_LGE]
 						break;
-
 #endif						
-	    case HEADSET_AUDIO_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_tab[0]);
+	case HEADSET_AUDIO_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_tab[0]);
 						    wm9093_amp_dev->wm9093_mode = HEADSET_AUDIO_MODE;
 							break;
-	    case SPEAKER_AUDIO_MODE :
-			                if(boot_cnt < 10)
+	case SPEAKER_AUDIO_MODE:
+#if 0
+		if (boot_cnt < 10)
 								boot_cnt++;
-			                if((get_headset_type() != 0) && (boot_cnt < 4)){
+		if ((get_headset_type() != 0) && (boot_cnt < 4)) {
 								wm9093_write_table((wm9093_reg_type*)&wm9093_test_tab[0]);
 								printk(KERN_INFO "@@WM9093@@ BOOT SOUND HEADSETv\n");
-							}
-							else{
+		} else {
+#endif
+		{
 			                    wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_tab[0]);
 							}
 	                        wm9093_amp_dev->wm9093_mode = SPEAKER_AUDIO_MODE;
 							break;
-	    case SPEAKER_HEADSET_DUAL_AUDIO_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_hp_tab[0]);
+
+	case SPEAKER_HEADSET_DUAL_AUDIO_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_hp_tab[0]);
 						 wm9093_amp_dev->wm9093_mode = SPEAKER_HEADSET_DUAL_AUDIO_MODE;
 			             break;
+#if 1//20110324 jisun.kwon :TD89115 we don't need to use 'delay'//jungsoo1221.lee - P970 Merge             
 	    case RECEIVER_CALL_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = RECEIVER_CALL_MODE;
 						   break;
@@ -602,202 +676,158 @@ void wm9093_configure_path(wm9093_mode_enum mode)
 		case HEADSET_CALL_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_hp_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = HEADSET_CALL_MODE;
 						   break;
-	    case RECEIVER_VOIP_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_voip_tab[0]);
+#else
+	case RECEIVER_CALL_MODE: 
+		if (pre_voice_curmode == 0 && voice_get_curmode() != 0x00 && wm9093_call_status != 0) {	//first call setting 
+			printk("[LUCKYJUN77] RECEIVER_CALL_MODE first call setting\n");
+			wm9093_amp_dev->wm9093_mode = RECEIVER_CALL_MODE;	
+			schedule_delayed_work(&wm9093_i2c_dev->delayed_work, msecs_to_jiffies(2000));							   
+		} else {
+			printk("[LUCKYJUN77] RECEIVER_CALL_MODE not initial\n");
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
+			wm9093_amp_dev->wm9093_mode = RECEIVER_CALL_MODE;
+		}
+		break;
+
+	case SPEAKER_CALL_MODE: 
+		if (pre_voice_curmode == 0 && voice_get_curmode() != 0x00 && wm9093_call_status != 0) {	//first call setting
+			printk("[LUCKYJUN77] SPEAKER_CALL_MODE first call setting\n");						   
+			wm9093_amp_dev->wm9093_mode = SPEAKER_CALL_MODE;	
+			schedule_delayed_work(&wm9093_i2c_dev->delayed_work, msecs_to_jiffies(2000));							   
+		} else {
+			printk("[LUCKYJUN77] SPEAKER_CALL_MODE not initial\n");
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_call_tab[0]);
+			wm9093_amp_dev->wm9093_mode = SPEAKER_CALL_MODE;
+		}
+		break;
+
+	case HEADSET_CALL_MODE: 
+		if (pre_voice_curmode == 0 && voice_get_curmode() != 0x00 && wm9093_call_status != 0) {	//first call setting
+			printk("[LUCKYJUN77] HEADSET_CALL_MODE first call setting\n");
+			wm9093_amp_dev->wm9093_mode = HEADSET_CALL_MODE;	
+			schedule_delayed_work(&wm9093_i2c_dev->delayed_work, msecs_to_jiffies(2000));							   
+		} else {
+			printk("[LUCKYJUN77] HEADSET_CALL_MODE not initial\n");
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_hp_tab[0]);
+			wm9093_amp_dev->wm9093_mode = HEADSET_CALL_MODE;
+		}		
+		break;
+#endif						   
+	case RECEIVER_VOIP_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_voip_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = RECEIVER_VOIP_MODE;
 						   break;
-		case SPEAKER_VOIP_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_voip_tab[0]);
+
+	case SPEAKER_VOIP_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_voip_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = SPEAKER_VOIP_MODE;
 						   break;
-		case HEADSET_VOIP_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_voip_tab[0]);
+
+	case HEADSET_VOIP_MODE:
+		wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_voip_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = HEADSET_VOIP_MODE;
 						   break;
-        case SPEAKER_FMR_MODE : wm9093_fmradio_volume(s_volume);
-			               wm_delay_msec(50);
+		//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START]
+	case SPEAKER_FMR_MODE:
 			  	           wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMout_tab[0]);
+		wm_delay_msec(50);
+		wm9093_fmradio_volume(s_volume);			  
 			               wm9093_amp_dev->wm9093_mode = SPEAKER_FMR_MODE;
 							break;								 
-		case HEADSET_FMR_MODE : wm9093_fmradio_volume(s_volume); 
-		                   wm_delay_msec(50);
+								 
+	case HEADSET_FMR_MODE:
 			               wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMhp_tab[0]);
+		wm_delay_msec(50);
+		wm9093_fmradio_volume(s_volume); 
 		                   wm9093_amp_dev->wm9093_mode = HEADSET_FMR_MODE;
 							break;				   
-		default :
+	      //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 				   
+	default:
 			     break;
     }
-
+	pre_voice_curmode = voice_get_curmode();
 }
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
+#define SET_FM_VOL(headphone, speaker) do { \
+			wm9093_write_reg(wm9093_i2c_dev->client, 0x1C, headphone); \
+			wm9093_write_reg(wm9093_i2c_dev->client, 0x1D, headphone); \
+			wm9093_write_reg(wm9093_i2c_dev->client, 0x1C, headphone); \
+			wm9093_write_reg(wm9093_i2c_dev->client, 0x26, speaker); \
+			} while (0)
 
 void wm9093_fmradio_volume(wm9093_fmvolume_enum volume)
 {      
  s_volume = volume;
-        if(wm9093_i2c_dev != NULL)
-        {
-           switch(volume)
-           {
-               case OFF : 
-				   printk(KERN_INFO "FMvolume_OFF");
-				   wm_delay_msec(50);
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x113);
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x113);	  
-		                 wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x113);
-				   break;
-		 case LEVEL_1: 
-		 	          wm_delay_msec(50);
-		 	          wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x113);
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x113);	  
-		                 wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x113);
-				   printk(KERN_INFO "FMvolume_1");	
-				   break;
-		 case LEVEL_2: 
-		 	          wm_delay_msec(50);
-		 	          wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x116);
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x116);	  
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x116);
-				   printk(KERN_INFO "FMvolume_2");
-				   break;
-		 case LEVEL_3: 
-		 	          wm_delay_msec(50);
-		 	          wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x119);
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x119);	  	  
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x119); 
-				   printk(KERN_INFO "FMvolume_3");
-				   break;
-		 case LEVEL_4: 
-		 	          wm_delay_msec(50);
-		 	          wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x11C);
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x11C);	 	  
-				   wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x11C);	 
-				   printk(KERN_INFO "FMvolume_4");
-				   break;
-		 case LEVEL_5:
-		 	           wm_delay_msec(50);
-		 	           wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x11E);
-				    wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x11E);	 	   
-				    wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x11E);	 
-				   printk(KERN_INFO "FMvolume_5");	
-				   break;
-		 case LEVEL_6: 
-		 	            wm_delay_msec(50);
-		 	            wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x122);
-				     wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x122);	 		
-				     wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x122);
-				    printk(KERN_INFO "FMvolume_6");
-				    break;
-		 case LEVEL_7: 
-		 	            wm_delay_msec(50);
-		 	            wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x124);
-				     wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x124);	 		
-				     wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x124);
-				     printk(KERN_INFO "FMvolume_7");
-				    break;	 
-			 		 
-		 case LEVEL_8: 
-		 	             wm_delay_msec(50);
-		 	             wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x126);
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x126);	 		 
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x126);
-				     printk(KERN_INFO "FMvolume_8");
-                                 break;					  
-		 case LEVEL_9: 
-		 	             wm_delay_msec(50);
-		 	             wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x129);
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x129);	 		 
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x129);
-				      printk(KERN_INFO "FMvolume_9");
-				      break; 
-		 case LEVEL_10: 
-		 	             wm_delay_msec(50);
-		 	             wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x12A);
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x12A);	 	 
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x12A);	
-				      printk(KERN_INFO "FMvolume_10");
-				      break;	  
-		 case LEVEL_11: 
-		 	             wm_delay_msec(50);
-		 	             wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x12C);
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x12C);		 
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x12C);	
-				      printk(KERN_INFO "FMvolume_11");
-				      break;	  
-		 case LEVEL_12: 
-		 	             wm_delay_msec(50);
-		 	             wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x12E);
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x12E);	 	 
-				      wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x12E);	
-				      printk(KERN_INFO "FMvolume_12");
-				      break;	   
-		 case LEVEL_13: 
-		 	              wm_delay_msec(50);
-		 	              wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x132);
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x132);	 	  
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x132);
-					printk(KERN_INFO "FMvolume_13");
-					break;
-		 case LEVEL_14: 
-		 	              wm_delay_msec(50);
-		 	              wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x134);
-				       wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x134);	 		  
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x134);	
-					printk(KERN_INFO "FMvolume_14");
-					break;
-		 case LEVEL_15: 
-		 	              wm_delay_msec(50);
-		 	              wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x137);
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x137);	 	  
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x137);	
-					printk(KERN_INFO "FMvolume_15");
-					break;
-		 case LEVEL_reset : 
-		 	             wm_delay_msec(50);
-		 	              wm9093_write_reg(wm9093_i2c_dev->client, 0x1C,0x12d);
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x1D,0x12d);	 	  
-					wm9093_write_reg(wm9093_i2c_dev->client, 0x26,0x139);
-					printk(KERN_INFO "FMRadop_reset");
-					break;
+	s_modes = volume;//20101225 inbang.park@lge.com Wake lock for FM radio
 		 	
+	if (wm9093_i2c_dev != NULL) {
+		switch (volume) {
+		case LEVEL_15: SET_FM_VOL(0x12C, 0x134); break;
+		case LEVEL_14: SET_FM_VOL(0x129, 0x132); break;
+		case LEVEL_13: SET_FM_VOL(0x126, 0x130); break;
+		case LEVEL_12: SET_FM_VOL(0x123, 0x12E); break;
+		case LEVEL_11: SET_FM_VOL(0x120, 0x12C); break;
+		case LEVEL_10: SET_FM_VOL(0x11D, 0x12A); break;
+		case LEVEL_9 : SET_FM_VOL(0x11A, 0x128); break;
+		case LEVEL_8 : SET_FM_VOL(0x117, 0x126); break;
+		case LEVEL_7 : SET_FM_VOL(0x114, 0x124); break;
+		case LEVEL_6 : SET_FM_VOL(0x111, 0x122); break;
+		case LEVEL_5 : SET_FM_VOL(0x10E, 0x120); break;
+		case LEVEL_4 : SET_FM_VOL(0x10B, 0x11E); break;
+		case LEVEL_3 : SET_FM_VOL(0x108, 0x11C); break;
+		case LEVEL_2 : SET_FM_VOL(0x105, 0x11A); break;
+		case LEVEL_1 : SET_FM_VOL(0x102, 0x118); break;
+		case LEVEL_OFF:SET_FM_VOL(0x140, 0x140); break;
+		case LEVEL_reset: break;
            }
-        }
-	 else
+ 		printk(KERN_INFO "FMvolume_%d\n", volume);
+	} else {
 	    printk(KERN_ERR "wm9093 i2c_dev is null");
+	}
 }
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
 
 int wm9093_ext_suspend()
 {
+	if (wm9093_amp_dev->wm9093_mode != 0)
 	wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
 	return 0;
 }
 
 int wm9093_ext_resume()
 {
-	switch(wm9093_amp_dev->wm9093_mode){
-        case OFF_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
+	switch (wm9093_amp_dev->wm9093_mode) {
+	case OFF_MODE: //wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
 						break;
-	    case HEADSET_AUDIO_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_tab[0]);
+	case HEADSET_AUDIO_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_tab[0]);
 						    	break;
-	    case SPEAKER_AUDIO_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_tab[0]);
+	case SPEAKER_AUDIO_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_tab[0]);
 	                        	break;
-	    case SPEAKER_HEADSET_DUAL_AUDIO_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_hp_tab[0]);
+	case SPEAKER_HEADSET_DUAL_AUDIO_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_hp_tab[0]);
 						 		             break;
-	    case RECEIVER_CALL_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
+	case RECEIVER_CALL_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
 						   		   break;
-		case SPEAKER_CALL_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_call_tab[0]);
+	case SPEAKER_CALL_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_call_tab[0]);
 						   		   break;
-		case HEADSET_CALL_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_hp_tab[0]);
+	case HEADSET_CALL_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_hp_tab[0]);
 						   		   break;
-	    case RECEIVER_VOIP_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_voip_tab[0]);
+	case RECEIVER_VOIP_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_voip_tab[0]);
 								break;
-		case SPEAKER_VOIP_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_voip_tab[0]);
+	case SPEAKER_VOIP_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_voip_tab[0]);
 								break;
-		case HEADSET_VOIP_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_voip_tab[0]);
+	case HEADSET_VOIP_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_voip_tab[0]);
 								break;
-        case SPEAKER_FMR_MODE : wm9093_fmradio_volume(s_volume);
-			                                    wm_delay_msec(100);
-			  	                             wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMout_tab[0]);
+	     //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START]
+	case SPEAKER_FMR_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMout_tab[0]);
+		wm_delay_msec(50); 
+		wm9093_fmradio_volume(s_volume);
 								break;								 
-		case HEADSET_FMR_MODE : wm9093_fmradio_volume(s_volume); 
-		                                           wm_delay_msec(100);
-			                                   wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMhp_tab[0]);
+	case HEADSET_FMR_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMhp_tab[0]);
+		wm_delay_msec(50); 
+		wm9093_fmradio_volume(s_volume); 		  
 								break;		
+	      //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
+		
 		default :
 			     break;
     }
@@ -805,13 +835,39 @@ int wm9093_ext_resume()
 	return 0;
 }
 
-
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [START] - jungsoo1221.lee - P970 Merge
+void fmradio_configure_path(wm9093_fmvolume_enum mode)
+{
+	printk("[inbangpark] :fmradio_configure_path %d\n",mode);
+	switch (mode) {
+	case LEVEL_reset:
+		cur_fmradio_mode= 0;
+		printk("[inbangpark] :fmradio_configure_path %d\n", cur_fmradio_mode);
+		break;
+	default:
+		cur_fmradio_mode= 1;
+		printk("[inbangpark] :fmradio_configure_path %d\n", cur_fmradio_mode);
+		break;
+	}
+}
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [START] //jungsoo1221.lee - P970 Merge
+int fmradio_get_curmode()
+{
+	return cur_fmradio_mode;
+}
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
 EXPORT_SYMBOL(wm9093_get_curmode);
 EXPORT_SYMBOL(wm9093_configure_path);
 EXPORT_SYMBOL(wm9093_ext_suspend);
 EXPORT_SYMBOL(wm9093_ext_resume);
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
 EXPORT_SYMBOL(wm9093_fmradio_volume);
-
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [START]
+EXPORT_SYMBOL(fmradio_configure_path);
+EXPORT_SYMBOL(fmradio_get_curmode);
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
 
 ssize_t wm9093_show_level(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -820,41 +876,41 @@ ssize_t wm9093_show_level(struct device *dev, struct device_attribute *attr, cha
 
 	wm9093_dev = dev_get_drvdata(dev);
 
-	r += sprintf(buf+r, "wm9093 mode is : %d\n",wm9093_dev->wm9093_dev->wm9093_mode);
+	r += sprintf(buf + r, "wm9093 mode is : %d\n", wm9093_dev->wm9093_dev->wm9093_mode);
 
 	return r;
 
 }
+
 ssize_t wm9093_store_level(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     int level;
 
 	level = simple_strtoul(buf, NULL, 10);
 
-	switch(level){
+	switch (level) {
 		//turn off
-		case 0 : wm9093_configure_path(OFF_MODE);
+	case 0: wm9093_configure_path(OFF_MODE);
 			    break;
 		//set spk mode
-		case 1 : wm9093_configure_path(SPEAKER_AUDIO_MODE);
+	case 1: wm9093_configure_path(SPEAKER_AUDIO_MODE);
 			    break;
 		//set headset mode
-		case 2 : wm9093_configure_path(HEADSET_AUDIO_MODE);
+	case 2: wm9093_configure_path(HEADSET_AUDIO_MODE);
 			    break;
 		//set bypass mode
-		case 3 : wm9093_configure_path(RECEIVER_CALL_MODE);
+	case 3: wm9093_configure_path(RECEIVER_CALL_MODE);
 			    break;
 		//set dual mode
-		case 4 : wm9093_configure_path(SPEAKER_HEADSET_DUAL_AUDIO_MODE);
+	case 4: wm9093_configure_path(SPEAKER_HEADSET_DUAL_AUDIO_MODE);
 			    break;
-		case 5 : wm9093_configure_path(SPEAKER_CALL_MODE);
+	case 5: wm9093_configure_path(SPEAKER_CALL_MODE);
 			    break;
-		case 6 : wm9093_configure_path(HEADSET_CALL_MODE);
+	case 6: wm9093_configure_path(HEADSET_CALL_MODE);
 			    break;
-		default :
+	default:
 			    break;
 	}
-
 	return count;
 }
 
@@ -864,6 +920,7 @@ static ssize_t wm9093_reg_show(struct device *dev, struct device_attribute *attr
 {
     int r =0;
 	int r_data;
+
 	r_data = wm9093_read_reg(wm9093_i2c_dev->client, 0);
 	r += sprintf(buf+r, "wm9093 reg 0 : 0x%4x\n",r_data);
 
@@ -986,26 +1043,25 @@ ssize_t wm9093_reg_store(struct device *dev, struct device_attribute *attr, cons
 	return count;
 }
 
-#if 1	
+#if 1	// 20100429 junyeop.kim@lge.com [START_LGE]
 static DEVICE_ATTR(wm9093_data, 0644, wm9093_reg_show, wm9093_reg_store);
 #else
 static DEVICE_ATTR(wm9093_data, 0666, wm9093_reg_show, wm9093_reg_store);
-#endif	
+#endif	// 20100426 junyeop.kim@lge.com [END_LGE]
 
-
+//20101209 junyeop.kim@lge.com, reduce the outgoing call noise (0 : incoming call, 1 :other case) [START_LGE]
 ssize_t wm9093_show_status(struct device *dev, struct device_attribute *attr, char *buf)
 {
-
     struct wm9093_i2c_device *wm9093_dev;
 	int r = 0;
 
 	wm9093_dev = dev_get_drvdata(dev);
 
-	r += sprintf(buf+r, "wm9093 status is : %d\n", wm9093_control_status);
+	r += sprintf(buf + r, "wm9093 status is : %d\n", wm9093_call_status);
 
 	return r;
-
 }
+
 ssize_t wm9093_store_status(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
 {
     int status;
@@ -1014,20 +1070,18 @@ ssize_t wm9093_store_status(struct device *dev, struct device_attribute *attr, c
 
 	printk("[LUCKYJUN77] status: %d\n", status);
 
-	if(status == 0 || status == 1)
-	{
-		wm9093_control_status = status;
+	if (status == 0 || status == 1) {
+		wm9093_call_status = status;
 	}
 
 	return count;
 }
 
-DEVICE_ATTR(wm9093_status, 0644, wm9093_show_status, wm9093_store_status);
-
+DEVICE_ATTR(wm9093_status, 0664, wm9093_show_status, wm9093_store_status);	
+//20101209 junyeop.kim@lge.com, reduce the outgoing call noise (0 : incoming call, 1 :other case) [END_LGE]
 
 static void wm9093_init(struct i2c_client *client)
 {
-
     wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
 	wm9093_amp_dev->wm9093_mode = OFF_MODE;
     wm9093_amp_dev->wm9093_pstatus = 0;
@@ -1046,7 +1100,7 @@ static int __init wm9093_probe(struct i2c_client *client, const struct i2c_devic
 	wm9093_i2c_dev->client = client;
 	wm9093_i2c_dev->wm9093_dev = wm9093_amp_dev;
 
-
+//junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
     struct device *wm9093_dev = &client->dev;
     wm9093_reg = regulator_get(wm9093_dev,"vpll2");
     if (wm9093_reg == NULL) {
@@ -1054,7 +1108,7 @@ static int __init wm9093_probe(struct i2c_client *client, const struct i2c_devic
 	}
 
     regulator_enable(wm9093_reg);
-
+//junyeop.kim@lge.com, codec power enable for vpll2 [END_LGE]
 
 	i2c_set_clientdata(client, wm9093_i2c_dev);
 
@@ -1062,10 +1116,12 @@ static int __init wm9093_probe(struct i2c_client *client, const struct i2c_devic
 
     err = device_create_file(&client->dev, &dev_attr_wm9093_path);
 	err = device_create_file(&client->dev, &dev_attr_wm9093_data);
-	err = device_create_file(&client->dev, &dev_attr_wm9093_status);	
+	err = device_create_file(&client->dev, &dev_attr_wm9093_status);	//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
 
+#if 1	//junyeop.kim@lge.com, call initial noise workaround
+	INIT_DELAYED_WORK(&wm9093_i2c_dev->delayed_work, callmode_set_work);
+#endif
 	return 0;
-
 }
 
 static int wm9093_remove(struct i2c_client *client)
@@ -1073,48 +1129,45 @@ static int wm9093_remove(struct i2c_client *client)
 	i2c_set_clientdata(client, NULL);
     device_remove_file(&client->dev, &dev_attr_wm9093_path);
 	device_remove_file(&client->dev, &dev_attr_wm9093_data);
-	device_remove_file(&client->dev, &dev_attr_wm9093_status);		
+	device_remove_file(&client->dev, &dev_attr_wm9093_status);		//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
 
 	kfree(wm9093_amp_dev);
 	kfree(wm9093_i2c_dev);
 	return 0;
 }
 
-
+//junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
 static int wm9093_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-	printk("[LUCKYJUN77]wm9093_suspend\n");
-	if(wm9093_amp_dev->wm9093_mode == OFF_MODE)	
-	{
+//For_Resume_Speed	printk("[LUCKYJUN77]wm9093_suspend\n");
+	if (wm9093_amp_dev->wm9093_mode == OFF_MODE) {	//junyeop.kim@lge.com
+		printk("%s : WM9093 Sleep State \n", __func__);
     regulator_disable(wm9093_reg);	
-    }
-    else
-    {
-		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0xee, VPLL2_DEV_GRP );   
+	} else {
+		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0xee, VPLL2_DEV_GRP );   //junyeop.kim@lge.com, 20100826 change vpll2 power grp [START_LGE]
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x35 );  
+		printk("%s : WM9093 Wake State \n",__func__);
 	}
-
 	return 0;
-
 }
 
 static int wm9093_resume(struct i2c_client *client)
 {
-	printk("[LUCKYJUN77]wm9093_resume\n");
-	if(wm9093_amp_dev->wm9093_mode == OFF_MODE)	
+//For_Resume_Speed	printk("[LUCKYJUN77]wm9093_resume\n");
+	if(wm9093_amp_dev->wm9093_mode == OFF_MODE)	//junyeop.kim@lge.com, test
     regulator_enable(wm9093_reg);		
 
 	return 0;
 }
+//junyeop.kim@lge.com, codec power enable for vpll2 [END_LGE]
 
-
-
+//junyeop.kim@lge.com, 20100826 get codec status [START_LGE]
 unsigned int get_wm9093_mode(void)
 {    
 	return (unsigned int)wm9093_amp_dev->wm9093_mode;
 }
 EXPORT_SYMBOL_GPL(get_wm9093_mode);
-
+//junyeop.kim@lge.com, 20100826 get codec status [END_LGE]
 
 static const struct i2c_device_id wm9093_ids[] = {
 	{ WM9093_I2C_NAME, 0 },	/*wm9093*/
@@ -1124,8 +1177,10 @@ static const struct i2c_device_id wm9093_ids[] = {
 static struct i2c_driver wm9093_i2c_driver = {
 	.probe = wm9093_probe,
 	.remove = wm9093_remove,
+//junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
 	.suspend	= wm9093_suspend,
 	.resume		= wm9093_resume,
+//junyeop.kim@lge.com, codec power enable for vpll2 [END_LGE]
 	.id_table	= wm9093_ids,
 	.driver = {
 		.name = WM9093_I2C_NAME,
@@ -1153,5 +1208,4 @@ module_exit(ext_amp_wm9093_exit);
 MODULE_AUTHOR("LG Electronics");
 MODULE_DESCRIPTION("wm9093 audio ext amp Driver");
 MODULE_LICENSE("GPL");
-
 

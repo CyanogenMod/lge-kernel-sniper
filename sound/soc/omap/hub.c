@@ -387,10 +387,33 @@ static const struct soc_enum mic_switch_soc_enum =
 	SOC_ENUM_SINGLE_EXT(2, mic_switch_texts);
 static const struct snd_kcontrol_new mic_switch_control =
 	SOC_ENUM_EXT("Route", mic_switch_soc_enum, get_mic_switch, set_mic_switch);
+//jongik2.kim 20101220 add mic2 control [end]
 
+#if defined (CONFIG_LGE_LAB3_BOARD) //[LG_FW_AUDIO_TTY Start] - jungsoo1221.lee
+static int set_tty_mode(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+       twl4030_set_tty_mode((int)ucontrol->value.integer.value[0]);
+	return 1;
+}
+
+static int get_tty_mode(struct snd_kcontrol *kcontrol, struct snd_ctl_elem_value *ucontrol)
+{
+         return 0;
+}  
+static const char *Tty_mode_texts[]={
+  "TTY_OFF",
+  "TTY_VCO",
+  "TTY_HCO",
+  "TTY_FULL"
+};
+static const struct soc_enum Tty_mode_soc_enum =
+SOC_ENUM_SINGLE_EXT(4, Tty_mode_texts);
+static const struct snd_kcontrol_new tty_mode_control =
+SOC_ENUM_EXT("Route", Tty_mode_soc_enum, get_tty_mode, set_tty_mode);
+#endif //[LG_FW_AUDIO_TTY End] 
 
 static const struct snd_soc_dapm_widget hub_twl4030_dapm_widgets[] = {
-#if 0 
+#if 0  //jongik2.kim@lge.com
 	SND_SOC_DAPM_MIC("Ext Mic", NULL),
 #else
 	SND_SOC_DAPM_MIC("Ext Mic1", NULL),
@@ -399,23 +422,26 @@ static const struct snd_soc_dapm_widget hub_twl4030_dapm_widgets[] = {
 	SND_SOC_DAPM_SPK("Ext Spk", NULL),
 	SND_SOC_DAPM_SPK("Receiver", NULL),
 	SND_SOC_DAPM_HP("Headset Jack", NULL),
-	SND_SOC_DAPM_MIC("Ext Headset Mic", NULL),   
+	SND_SOC_DAPM_MIC("Ext Headset Mic", NULL),   //jongik2.kim@lge.com
 	SND_SOC_DAPM_LINE("Aux In", NULL),
 	SND_SOC_DAPM_MUX("ExtAmp", SND_SOC_NOPM, 0, 0, &ext_amp_mode_control),
-	SND_SOC_DAPM_MUX("Voice", SND_SOC_NOPM, 0, 0, &voice_mode_control),
-	SND_SOC_DAPM_MUX("Mic", SND_SOC_NOPM, 0, 0, &mic_mode_control),		
-	SND_SOC_DAPM_MUX("CallRec", SND_SOC_NOPM, 0, 0, &callrec_mode_control),		
-
+	SND_SOC_DAPM_MUX("Voice", SND_SOC_NOPM, 0, 0, &voice_mode_control), /* LGE_CHANGE_S [iggikim@lge.com] 2009-08-06, audio path */
+	SND_SOC_DAPM_MUX("Mic", SND_SOC_NOPM, 0, 0, &mic_mode_control),		// 20100426 junyeop.kim@lge.com Add the mic mute [START_LGE]
+	SND_SOC_DAPM_MUX("CallRec", SND_SOC_NOPM, 0, 0, &callrec_mode_control),		// 20100521 junyeop.kim@lge.com call recording path [START_LGE]
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
 	SND_SOC_DAPM_MUX("FMradio", SND_SOC_NOPM, 0, 0, &FM_volume_control),
-
-	SND_SOC_DAPM_MUX("MIC Switch", SND_SOC_NOPM, 0, 0, &mic_switch_control),  
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
+	SND_SOC_DAPM_MUX("MIC Switch", SND_SOC_NOPM, 0, 0, &mic_switch_control),  //jongik2.kim 20101220 add mic2 control
+#if defined (CONFIG_LGE_LAB3_BOARD) //[LG_FW_AUDIO_TTY] - jungsoo1221.lee
+	SND_SOC_DAPM_MUX("TTY Mode", SND_SOC_NOPM, 0, 0, &tty_mode_control),
+#endif
 };
 
 static const struct snd_soc_dapm_route audio_map[] = {
 	/* External Mics: MAINMIC, SUBMIC with bias*/
 	{"MAINMIC", NULL, "Mic Bias 1"},
 	{"SUBMIC", NULL, "Mic Bias 2"},
-#if 0 
+#if 0 //jongik2.kim@lge.com
 	{"Mic Bias 1", NULL, "Ext Mic"},
 	{"Mic Bias 2", NULL, "Ext Mic"},
 #else

@@ -306,7 +306,12 @@ static void z_decomp_free(void *arg)
 
 	if (state) {
 		zlib_inflateEnd(&state->strm);
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-11, */ 
+#if 0  /* Delete Warning Log - OMAPS00243976 */
 		kfree(state->strm.workspace);
+#else
+		vfree(state->strm.workspace);
+#endif
 		kfree(state);
 	}
 }
@@ -346,8 +351,14 @@ static void *z_decomp_alloc(unsigned char *options, int opt_len)
 
 	state->w_size         = w_size;
 	state->strm.next_out  = NULL;
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-11, */ 
+#if 0  /* Delete Warning Log - OMAPS00243976 */
 	state->strm.workspace = kmalloc(zlib_inflate_workspacesize(),
 					GFP_KERNEL|__GFP_REPEAT);
+#else
+	state->strm.workspace = vmalloc(zlib_inflate_workspacesize());
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-11 */
 	if (state->strm.workspace == NULL)
 		goto out_free;
 

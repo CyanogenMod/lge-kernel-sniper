@@ -1,0 +1,35 @@
+menu "LGE Device-Specific Changes"
+
+menu "LGE Board Selection"
+
+config LGE_ATS_INPUT_DEVICE
+	bool "Support LGE ATS input device"
+	default n
+	depends on MACH_LGE_OMAP3
+	help
+	 Choose if use ATS input device used for generating input event from user space
+
+config LGE_DIAG_TESTMODE
+	bool "Support LGE diag TESTMODE"
+	default n
+	depends on MACH_LGE_OMAP3 
+	help
+	  LGE diag TESTMODE enable
+
+config LGE_DIAG_ICD
+	bool "Support LGE diag ICD"
+	default n
+	depends on MACH_LGE_OMAP3
+	help
+	  LGE diag LCD ICD enable
+
+config LGE_OMAP3_POWER_SAVE_DEBUG
+	bool "Support Debug Message for Power Save"
+	default n
+	depends on MACH_LGE_OMAP3
+	help
+	  Debug Message for Power Save
+
+endmenu
+
+endmenu

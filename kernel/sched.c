@@ -79,12 +79,14 @@
 
 #include "sched_cpupri.h"
 
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 #include <asm/current.h>	/* For current macro */
 #include <linux/dvs_suite.h>
 #include <linux/kernel.h>   /* For printk */
 #include <linux/list.h>	 /* For struct list_head */
 #include <linux/sched.h>	/* For struct task_struct */
 #include <linux/slab.h>	 /* For kmalloc and kfree */
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
@@ -2804,12 +2806,14 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
 #endif
 
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	if(ds_configuration.on_dvs == 1){
 		ds_parameter.entry_type = DS_ENTRY_SWITCH_TO;
 		ds_parameter.prev_p = prev;
 		ds_parameter.next_p = next;
-		do_dvs_suite();
+		ld_do_dvs_suite();
 	}
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	/* Here we just switch the register state and the stack. */
 	switch_to(prev, next, prev);
@@ -3597,13 +3601,17 @@ asmlinkage void __sched schedule(void)
 	struct rq *rq;
 	int cpu;
 
-	struct sched_param lc_sched_param;
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	//struct sched_param lc_sched_param;
 
+#if 0
 	if(ds_configuration.on_dvs == 1){
 		//ds_counter.schedule_no ++;	// Not needed unless we want statistics.
-		ds_update_time_counter();
+		ld_update_time_counter();
 		ds_status.cpu_mode = DS_CPU_MODE_SCHEDULE;
 	}
+#endif
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 need_resched:
 	preempt_disable();
@@ -3670,8 +3678,9 @@ need_resched_nonpreemptible:
 	if (need_resched())
 		goto need_resched;
 
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	if(ds_configuration.on_dvs == 1){
-		ds_update_time_counter();
+		ld_update_time_counter();
 
 		if(next->pid == 0)
 			ds_status.cpu_mode = DS_CPU_MODE_IDLE;
@@ -3699,6 +3708,7 @@ next->static_prio
 );
 #endif
 	}
+/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 }
 EXPORT_SYMBOL(schedule);
 
@@ -7734,13 +7744,15 @@ void __init sched_init(void)
 
 	scheduler_running = 1;
 
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	ds_configuration.sched_scheme = DS_SCHED_GPSCHED;
 	ds_configuration.dvs_scheme = DS_DVS_GPSCHEDVS;
 	ds_configuration.gpschedvs_strategy = 0;
-	ds_configuration.aidvs_interval_window_size = DS_AIDVS_INTERVAL_WINDOW_SIZE;
+	ds_configuration.aidvs_interval_window_size = DS_AIDVS_INTERVALS_IN_AN_WINDOW;
 	ds_configuration.aidvs_speedup_threshold = DS_AIDVS_SPEEDUP_THRESHOLD;
 	ds_configuration.aidvs_speedup_interval = DS_AIDVS_SPEEDUP_INTERVAL;
-	ds_initialize_dvs_suite(DS_CPU_MODE_TASK);
+	ld_initialize_dvs_suite(DS_CPU_MODE_TASK);
+/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 }
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP

@@ -226,12 +226,19 @@
 #define OMAP36XX_CONTROL_PROG_IO_WKUP1 (OMAP343X_CONTROL_GENERAL_WKUP + 0x020)
 #define OMAP36XX_CONTROL_VBBLDO_EFUSE_CTRL (OMAP343X_CONTROL_GENERAL_WKUP + 0X02C)
 
+/* 36xx-only RTA - Retention till Accesss control registers and bits */
+#define OMAP36XX_CONTROL_MEM_RTA_CTRL  0x40C
+#define OMAP36XX_RTA_ENABLE            0x1
+#define OMAP36XX_RTA_DISABLE           0x0
+
 /* 34xx D2D idle-related pins, handled by PM core */
 #define OMAP3_PADCONF_SAD2D_MSTANDBY   0x250
 #define OMAP3_PADCONF_SAD2D_IDLEACK    0x254
 
+/* LGE_CHANGE_S <skykrkrk@lge.com> 3630*/
 #define OMAP36XX_CONTROL_WKUP_CTRL (0x0A5C)
 #define OMAP36XX_GPIO_IO_PWRDNZ (1<<6)
+/* LGE_CHANGE_E <skykrkrk@lge.com> 3630*/
 
 
 /* 44xx control efuse offsets */
@@ -321,6 +328,12 @@
 
 /* CONTROL_PROG_IO2 bits on omap3630 */
 #define OMAP3630_PRG_I2C3_PULLUPRESX    (1 << 7)
+
+/* 20110801 dongyu.gwak@lge.com using internal I2C pull up */
+#define OMAP3630_PRG_I2C2_FS_SHIFT 10
+#define OMAP3630_PRG_I2C2_FS_MASK (3 << OMAP3630_PRG_I2C2_FS_SHIFT )   
+#define OMAP3630_PRG_I2C3_FS_SHIFT 8
+#define OMAP3630_PRG_I2C3_FS_MASK (3 << OMAP3630_PRG_I2C3_FS_SHIFT )   
 
 /* CONTROL_PROG_IO_WKUP1 bits on omap3630 */
 #define OMAP3630_PRG_SR_PULLUPRESX      (1 << 5)
@@ -414,6 +427,7 @@ extern void omap3_save_scratchpad_contents(void);
 extern void omap3_clear_scratchpad_contents(void);
 extern u32 *get_restore_pointer(void);
 extern u32 *get_es3_restore_pointer(void);
+extern u32 *get_omap3630_restore_pointer(void);
 extern u32 omap3_arm_context[128];
 extern void omap3_control_save_context(void);
 extern void omap3_control_restore_context(void);

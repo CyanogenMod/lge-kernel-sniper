@@ -10,7 +10,7 @@
 
 #define EVDEV_MINOR_BASE	64
 #define EVDEV_MINORS		32
-#define EVDEV_BUFFER_SIZE	64
+#define EVDEV_BUFFER_SIZE	256 // 20110111 seven.kim@lge.com buffer changed 64 -> 256 for DV2 Touch Sensing TEST
 
 #include <linux/poll.h>
 #include <linux/sched.h>

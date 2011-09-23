@@ -240,12 +240,16 @@ void OMAPLFBFlip(OMAPLFB_SWAPCHAIN *psSwapChain, unsigned long aPhyAddr)
 	omapfb_unlock(fbdev);
 }
 
+// prime@sdcmicro.com For sync-up framedone before enter suspend [START]
+#if defined(CONFIG_MACH_LGE_OMAP3)
 static struct omap_dss_device *Prev_disp;
 void _FrameDone_Sync(void)
 {
 	if (Prev_disp && Prev_disp->driver && Prev_disp->driver->sync)
 		Prev_disp->driver->sync(Prev_disp);
 }
+// prime@sdcmicro.com For sync-up framedone before enter suspend [END]
+#endif
 
 /*
  * Present frame and synchronize with the display to prevent tearing
@@ -266,8 +270,13 @@ void OMAPLFBPresentSync(OMAPLFB_DEVINFO *psDevInfo,
 
 	omapfb_lock(fbdev);
 
-////	display = fb2display(framebuffer);
+// prime@sdcmicro.com Backup the Display device for using later [START]
+#if defined(CONFIG_MACH_LGE_OMAP3)
 	Prev_disp = display = fb2display(framebuffer);
+#else
+	display = fb2display(framebuffer);
+#endif	
+// prime@sdcmicro.com Backup the Display device for using later [END]
 	/* The framebuffer doesn't have a display attached, just bail out */
 	if (!display) {
 		omapfb_unlock(fbdev);
@@ -388,7 +397,12 @@ static void OMAPLFBDriverSuspend_Entry(struct early_suspend *ea_event)
 {
 	DEBUG_PRINTK("Requested driver suspend");
 
+// prime@sdcmicro.com For sync-up framedone before enter suspend [START]
+#if defined(CONFIG_MACH_LGE_OMAP3)
 	_FrameDone_Sync();
+#endif
+// prime@sdcmicro.com For sync-up framedone before enter suspend [END]
+
 	OMAPLFBCommonSuspend();
 }
 

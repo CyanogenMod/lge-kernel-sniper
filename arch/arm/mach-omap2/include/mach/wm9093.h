@@ -12,14 +12,17 @@ typedef enum {
 	RECEIVER_CALL_MODE,
 	SPEAKER_CALL_MODE,
 	HEADSET_CALL_MODE,
-	RECEIVER_VOIP_MODE,
+	RECEIVER_VOIP_MODE,		//20101120 junyeop.kim@lge.com, voip call tuning[START_LGE]
 	SPEAKER_VOIP_MODE,
-	HEADSET_VOIP_MODE,
+	HEADSET_VOIP_MODE,//20101120 junyeop.kim@lge.com, voip call tuning[END_LGE]
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
        SPEAKER_FMR_MODE,
        HEADSET_FMR_MODE
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
 }wm9093_mode_enum;
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
 typedef enum{
-  OFF,
+  LEVEL_OFF,//201022 inbang.park@lge.com Wake lock for FM radio
   LEVEL_1,
   LEVEL_2,
   LEVEL_3,
@@ -37,6 +40,7 @@ typedef enum{
   LEVEL_15,
   LEVEL_reset
 }wm9093_fmvolume_enum;
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
 
 typedef enum
 {
@@ -61,10 +65,17 @@ struct wm9093_device {
 struct wm9093_i2c_device {
 	struct i2c_client *client;
 	struct wm9093_device *wm9093_dev;
+	struct delayed_work delayed_work;		//20110206 jisun.kwon@lge.com, call initial noise workaround
 };
 
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [START] //jungsoo1221.lee - P970 Merge
+extern void fmradio_configure_path(wm9093_fmvolume_enum mode);
+extern int fmradio_get_curmode(void);
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
 extern void wm9093_configure_path(wm9093_mode_enum mode);
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
 extern void wm9093_fmradio_volume(wm9093_fmvolume_enum volume);
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
 extern int wm9093_get_curmode(void);
 extern int wm9093_ext_suspend(void);
 extern int wm9093_ext_resume(void);

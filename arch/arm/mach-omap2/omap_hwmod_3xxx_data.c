@@ -144,6 +144,7 @@ static struct omap_hwmod omap3xxx_l4_wkup_hwmod;
 static struct omap_hwmod omap3xxx_uart1_hwmod;
 static struct omap_hwmod omap3xxx_uart2_hwmod;
 static struct omap_hwmod omap3xxx_uart3_hwmod;
+static struct omap_hwmod omap34xx_uart4;  //2011_01_13 by seunghyun.yi@lge.com for UART4
 static struct omap_hwmod omap3xxx_mmc1_hwmod;
 static struct omap_hwmod omap3xxx_mmc2_hwmod;
 static struct omap_hwmod omap3xxx_mmc3_hwmod;
@@ -217,7 +218,25 @@ static struct omap_hwmod_ocp_if omap3_l4_per__uart3 = {
 	.addr_cnt	= ARRAY_SIZE(omap3xxx_uart3_addr_space),
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 };
+//2011_01_13 by seunghyun.yi@lge.com for UART4 [START] 
+/* L4 PER -> UART4 interface */
+static struct omap_hwmod_addr_space omap34xx_uart4_addr_space[] = {
+	{
+		.pa_start	= OMAP_UART4_BASE,
+		.pa_end		= OMAP_UART4_BASE + SZ_1K - 1,
+		.flags		= ADDR_MAP_ON_INIT | ADDR_TYPE_RT,
+	},
+};
 
+static struct omap_hwmod_ocp_if omap3_l4_per__uart4 = {
+	.master		= &omap3xxx_l4_per_hwmod,
+	.slave		= &omap34xx_uart4,
+	.clk  = "uart4_ick",
+	.addr		= omap34xx_uart4_addr_space,
+	.addr_cnt	= ARRAY_SIZE(omap34xx_uart4_addr_space),
+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+};
+//2011_01_13 by seunghyun.yi@lge.com for UART4 [END] 
 /* I2C IP block address space length (in bytes) */
 #define OMAP2_I2C_AS_LEN		128
 
@@ -473,6 +492,15 @@ static struct omap_hwmod_ocp_if omap3xxx_l4_core__mmc3 = {
 	},
 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 	.flags		= OMAP_FIREWALL_L4
+};
+
+
+static struct omap_hwmod_irq_info omap3_smartreflex_mpu_irqs[] = {
+	{.name = "sr1_irq", .irq = 18},
+};
+
+static struct omap_hwmod_irq_info omap3_smartreflex_core_irqs[] = {
+	{.name = "sr2_irq", .irq = 19},
 };
 
 /* L4 CORE -> SR1 interface */
@@ -1175,6 +1203,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_l4_per_slaves[] = {
 /* Master interfaces on the L4_PER interconnect */
 static struct omap_hwmod_ocp_if *omap3xxx_l4_per_masters[] = {
 	&omap3_l4_per__uart3,
+	&omap3_l4_per__uart4, /*2011_01_13 by seunghyun.yi@lge.com for UART4 */		
 };
 
 /* L4 PER */
@@ -2110,6 +2139,44 @@ static struct omap_hwmod omap3xxx_uart3_hwmod = {
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
 };
 
+
+// 2011_01_13 by seunghyun.yi@lge.com for UART4  [START]
+static struct omap_hwmod_irq_info uart4_mpu_irqs[] = {
+	{ .irq = INT_34XX_UART4_IRQ, },
+};
+
+static struct omap_hwmod_dma_info uart4_sdma_chs[] = {
+	{ .name = "tx",	.dma_req = OMAP34XX_DMA_UART4_TX, },
+	{ .name = "rx",	.dma_req = OMAP34XX_DMA_UART4_RX, },
+};
+
+static struct omap_hwmod_ocp_if *omap34xx_uart4_slaves[] = {
+	&omap3_l4_per__uart4,
+};
+
+static struct omap_hwmod omap34xx_uart4 = {
+	.name		= "uart4",
+	.mpu_irqs	= uart4_mpu_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(uart4_mpu_irqs),
+	.sdma_reqs	= uart4_sdma_chs,
+	.sdma_reqs_cnt	= ARRAY_SIZE(uart4_sdma_chs),
+	.main_clk	= "uart4_fck",
+	.prcm		= {
+		.omap2 = {
+			.module_offs = OMAP3430_PER_MOD,
+			.prcm_reg_id = 1,
+			.module_bit = OMAP3630_EN_UART4_SHIFT,
+			.idlest_reg_id = 1,
+            .idlest_idle_bit = OMAP3630_EN_UART4_SHIFT,
+		},
+	},
+	.slaves		= omap34xx_uart4_slaves,
+	.slaves_cnt	= ARRAY_SIZE(omap34xx_uart4_slaves),
+	.class		= &uart_class,
+	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430),
+};
+ //2011_01_13 by seunghyun.yi@lge.com for UART4 [END] 
+
 /*
  * USBHSOTG (USBHS)
  */
@@ -2641,6 +2708,8 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
 					CHIP_IS_OMAP3430ES3_0 |
 					CHIP_IS_OMAP3430ES3_1),
 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
+	.mpu_irqs	= omap3_smartreflex_mpu_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_mpu_irqs),
 };
 
 static u32 omap36xx_sr1_efuse_offs[] = {
@@ -2679,6 +2748,8 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
 	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1|
 					CHIP_IS_OMAP3630ES1_1|
 					CHIP_IS_OMAP3630ES1_2),
+	.mpu_irqs	= omap3_smartreflex_mpu_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_mpu_irqs),
 };
 
 /* SR2 */
@@ -2725,6 +2796,8 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
 					CHIP_IS_OMAP3430ES3_0 |
 					CHIP_IS_OMAP3430ES3_1),
+	.mpu_irqs	= omap3_smartreflex_core_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_core_irqs),
 	.flags		= HWMOD_SET_DEFAULT_CLOCKACT,
 };
 
@@ -2763,6 +2836,8 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
 	.omap_chip      = OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1|
 					CHIP_IS_OMAP3630ES1_1|
 					CHIP_IS_OMAP3630ES1_2),
+	.mpu_irqs	= omap3_smartreflex_core_irqs,
+	.mpu_irqs_cnt	= ARRAY_SIZE(omap3_smartreflex_core_irqs),
 };
 
 /*
@@ -3541,6 +3616,7 @@ static __initdata struct omap_hwmod *omap3xxx_hwmods[] = {
 	&omap3xxx_uart1_hwmod,
 	&omap3xxx_uart2_hwmod,
 	&omap3xxx_uart3_hwmod,
+	&omap34xx_uart4, /* 2011_01_13 by seunghyun.yi@lge.com for UART4  */
 	&omap3xxx_usbhsotg_hwmod,
 	&omap3xxx_gpio1_hwmod,
 	&omap3xxx_gpio2_hwmod,

@@ -410,12 +410,16 @@ static int fb_mode_to_dss_mode(struct fb_var_screeninfo *var,
 		dssmode = OMAP_DSS_COLOR_RGB24P;
 		break;
 	case 32:
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
+   /*LG_CHANGE_S lee.hyunji@lge.com 20110228 restore*/
 #if 0
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110228 restore*/
 		dssmode = OMAP_DSS_COLOR_RGB24U;
 #else
      //          dssmode = OMAP_DSS_COLOR_RGB24U; // for kernel panic message
 		dssmode = OMAP_DSS_COLOR_ARGB32;
 #endif
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
 		break;
 	default:
 		return -EINVAL;
@@ -650,6 +654,13 @@ int dss_mode_to_fb_mode(enum omap_color_mode dssmode,
 	}
 	return -ENOENT;
 }
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
+   /*LG_CHANGE_S lee.hyunji@lge.com 20110228 restore*/
+#if 0
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110228 restore*/
+#define DSS_BASE                        0x58000000
+#endif
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
 
 void set_fb_fix(struct fb_info *fbi)
 {
@@ -692,6 +703,14 @@ void set_fb_fix(struct fb_info *fbi)
 
 	fix->smem_start = omapfb_get_region_paddr(ofbi);
 	fix->smem_len = rg->size;
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
+   /*LG_CHANGE_S lee.hyunji@lge.com 20110228 restore*/
+#if 0
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110228 restore*/
+	fix->mmio_start = DSS_BASE;
+	fix->mmio_len = 0x00000200; 
+#endif
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
 
 	fix->type = FB_TYPE_PACKED_PIXELS;
 
@@ -1188,12 +1207,15 @@ static int omapfb_pan_display(struct fb_var_screeninfo *var,
 
 	DBG("pan_display(%d)\n", FB2OFB(fbi)->id);
 
- #if defined(CONFIG_MACH_LGE_OMAP3)
+// LGE_UPDATE
+#if defined(CONFIG_MACH_LGE_OMAP3)
 	if ( boot_status == false )
 		return 0;
 #endif
+// LGE_UPDATE
  
- //	if (var->xoffset == fbi->var.xoffset &&
+// prime@sdcmicro.com Temporary
+//	if (var->xoffset == fbi->var.xoffset &&
 //	    var->yoffset == fbi->var.yoffset)
 //		return 0;
 
@@ -1582,12 +1604,16 @@ static int omapfb_alloc_fbmem(struct fb_info *fbi, unsigned long size,
 			w = fbi->fix.line_length /
 				(fbi->var.bits_per_pixel >> 3);
 			h = size / fbi->fix.line_length;
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
+   /*LG_CHANGE_S lee.hyunji@lge.com 20110228 restore*/
 #if 1
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110228 restore*/
 			if (fbi->var.bits_per_pixel == 16)
 				err = tiler_alloc(TILFMT_16BIT, w, h,
 							(u32 *)&paddr);
 			else
 #endif
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
 				err = tiler_alloc(TILFMT_32BIT, w, h,
 							(u32 *)&paddr);
 			if (err != 0x0)
@@ -1676,7 +1702,10 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 	}
 
 	if (ofbi->rotation_type == OMAP_DSS_ROT_TILER) {
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
+   /*LG_CHANGE_S lee.hyunji@lge.com 20110228 restore*/
 #if 1
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110228 restore*/
 		if (bytespp == 2) {
 			fbi->var.bits_per_pixel = 16;
 			bytespp = fbi->var.bits_per_pixel >> 3;
@@ -1686,6 +1715,7 @@ static int omapfb_alloc_fbmem_display(struct fb_info *fbi, unsigned long size,
 			bytespp = fbi->var.bits_per_pixel >> 3;
 		}
 #endif
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
 	}
 
 	display->driver->get_resolution(display, &w, &h);
@@ -1999,7 +2029,11 @@ void resume(struct early_suspend *h)
 	struct fb_info *fbi = info->fbi;
 	struct omap_dss_device *display = fb2display(fbi);
 
+// LGE_CHANGE_S [hj.eum@lge.com] 2011-05-01, for fixing youtube resume issue
+	/* 20110308 TI FIX : Added for youtube suspend-resume broken screen issue [START] */
 	omap_vrfb_restore_context();  
+	/* 20110308 TI FIX : Added for youtube suspend-resume broken screen issue [END] */
+/// LGE_CHANGE_E [hj.eum@lge.com] 2011-05-01, for fixing youtube resume issue
 
 
 		if (!cpu_is_omap44xx() && display->driver->resume)
@@ -2101,6 +2135,15 @@ static int omapfb_fb_init(struct omapfb2_device *fbdev, struct fb_info *fbi)
 				var->bits_per_pixel = 16;
 				break;
 			case 24:
+  /*LG_CHANGE_S lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
+ /*LG_CHANGE_S lee.hyunji@lge.com 20110228 restore*/
+#if 0
+/*LG_CHANGE_E lee.hyunji@lge.com 20110228 restore*/
+#ifdef CONFIG_FB_OMAP2_32_BPP //naji
+			 case 32:
+#endif
+#endif
+  /*LG_CHANGE_E lee.hyunji@lge.com 20110223 Gamma setting:Gamma tuning 3rd values*/
 				var->bits_per_pixel = 32;
 				break;
 			default:

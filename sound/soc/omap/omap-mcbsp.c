@@ -828,9 +828,8 @@ static int mcbsp_dai_probe(struct snd_soc_dai *dai)
 	snd_soc_dai_set_drvdata(dai, &mcbsp_data[dai->id].bus_id);
 	return 0;
 }
-
-static struct snd_soc_dai_driver omap_mcbsp_dai =
-{
+#if 0 
+static struct snd_soc_dai_driver omap_mcbsp_dai = {
 	.probe = mcbsp_dai_probe,
 	.playback = {
 		.channels_min = 1,
@@ -848,6 +847,103 @@ static struct snd_soc_dai_driver omap_mcbsp_dai =
 	.resume = omap_mcbsp_dai_resume,
 	.ops = &mcbsp_dai_ops,
 };
+#else   //20110425 minyoung1.kim@lge.com BT SCO Resampling
+static struct snd_soc_dai_driver omap_mcbsp_dai[] = {
+	{
+		.probe = mcbsp_dai_probe,
+		.playback = {
+			.channels_min = 1,
+			.channels_max = 16,
+			.rates = OMAP_MCBSP_RATES,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.capture = {
+			.channels_min = 1,
+			.channels_max = 16,
+			.rates = OMAP_MCBSP_RATES,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.suspend = omap_mcbsp_dai_suspend,
+		.resume = omap_mcbsp_dai_resume,
+		.ops = &mcbsp_dai_ops,
+	},
+	{
+	.probe = mcbsp_dai_probe,
+	.playback = {
+		.channels_min = 1,
+		.channels_max = 16,
+		.rates = OMAP_MCBSP_RATES,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+	},
+	.capture = {
+		.channels_min = 1,
+		.channels_max = 16,
+		.rates = OMAP_MCBSP_RATES,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+	},
+	.suspend = omap_mcbsp_dai_suspend,
+	.resume = omap_mcbsp_dai_resume,
+	.ops = &mcbsp_dai_ops,
+	},
+	////20110422 anthony.park@lge.com BT SCO Resampling [START]
+	{								
+		.probe = mcbsp_dai_probe,
+		.playback = {						
+			.channels_min = 1,				
+			.channels_max = 4,				
+			.rates = SNDRV_PCM_RATE_8000,			
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},							
+		.capture = {						
+			.channels_min = 1,				
+			.channels_max = 4,				
+			.rates = SNDRV_PCM_RATE_8000,			
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+		},							
+		.suspend = omap_mcbsp_dai_suspend,			
+		.resume = omap_mcbsp_dai_resume,			
+		.ops = &mcbsp_dai_ops,			
+	},
+	//20110422 anthony.park@lge.com BT SCO Resampling [END]
+	{
+		.probe = mcbsp_dai_probe,
+		.playback = {
+			.channels_min = 1,
+			.channels_max = 16,
+			.rates = OMAP_MCBSP_RATES,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.capture = {
+			.channels_min = 1,
+			.channels_max = 16,
+			.rates = OMAP_MCBSP_RATES,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.suspend = omap_mcbsp_dai_suspend,
+		.resume = omap_mcbsp_dai_resume,
+		.ops = &mcbsp_dai_ops,
+	},
+
+	{
+	.probe = mcbsp_dai_probe,
+	.playback = {
+		.channels_min = 1,
+		.channels_max = 16,
+		.rates = OMAP_MCBSP_RATES,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+	},
+	.capture = {
+		.channels_min = 1,
+		.channels_max = 16,
+		.rates = OMAP_MCBSP_RATES,
+		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S32_LE,
+	},
+	.suspend = omap_mcbsp_dai_suspend,
+	.resume = omap_mcbsp_dai_resume,
+	.ops = &mcbsp_dai_ops,
+	}
+};
+#endif
 
 EXPORT_SYMBOL_GPL(omap_mcbsp_dai);
 
@@ -983,7 +1079,15 @@ EXPORT_SYMBOL_GPL(omap_mcbsp_st_add_controls);
 
 static __devinit int asoc_mcbsp_probe(struct platform_device *pdev)
 {
-	return snd_soc_register_dai(&pdev->dev, &omap_mcbsp_dai);
+#if 0  
+return snd_soc_register_dai(&pdev->dev, &omap_mcbsp_dai);
+#else   //20110425 minyoung1.kim@lge.com BT SCO Resampling
+	static int omap_mcbsp_dai_index  = 0;
+
+//	printk("[%s]dev name index : %d\n", __func__, omap_mcbsp_dai_index);
+//	printk("[%s]channel max : %d\n", __func__, omap_mcbsp_dai[omap_mcbsp_dai_index].playback.channels_max);
+	return snd_soc_register_dai(&pdev->dev, &omap_mcbsp_dai[omap_mcbsp_dai_index++]);
+#endif	
 }
 
 static int __devexit asoc_mcbsp_remove(struct platform_device *pdev)

@@ -34,10 +34,12 @@
 
 #include "mux.h"
 #include "sdram-hynix-h8mbx00u0mer-0em.h"
-#include "smartreflex-class3.h"
+#include "smartreflex-class1p5.h"
 #include "pm.h"
 
+/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-05-04, <add Setting enable Wifi Host wakeup> */
 #include "board-hub-wifi.h"
+/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-05-04, <add Setting enable Wifi Host wakeup> */
 
 
 #ifndef CONFIG_LGE_SLEEP_HUB
@@ -110,7 +112,7 @@ static struct omap_volt_pmic_info omap_pmic_mpu = { /* and iva */
 	.sleep_cmd = omap_twl_sleep_cmd,
 	.vp_config_erroroffset = 0,
 	.vp_vstepmin_vstepmin = 0x01,
-	.vp_vstepmax_vstepmax = 0x04,
+	.vp_vstepmax_vstepmax = 0x08, /* 20110812 dongyu.gwak@lge.com SmartReflex 0x4->0x8 */
 	.vp_vlimitto_timeout_us = 0x200,
 	.vp_vlimitto_vddmin = 0x14,
 	.vp_vlimitto_vddmax = 0x44,
@@ -132,7 +134,7 @@ static struct omap_volt_pmic_info omap_pmic_core = {
 	.vp_vstepmin_vstepmin = 0x01,
 	.vp_vstepmax_vstepmax = 0x04,
 	.vp_vlimitto_timeout_us = 0x200,
-	.vp_vlimitto_vddmin = 0x18,
+	.vp_vlimitto_vddmin = 0x13, /* 20110812 dongyu.gwak@lge.com 0x18->0x13*/
 	.vp_vlimitto_vddmax = 0x42,
 };
 #endif /* CONFIG_TWL4030_CORE */
@@ -268,14 +270,16 @@ static struct opp_frequencies opp_freq_add_table[] __initdata = {
 static void __init omap_hub_init(void)
 {
 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBP);
+	/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-05-04, <add Setting enable Wifi Host wakeup> */
 	config_wlan_mux();
+	/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-05-04, <add Setting enable Wifi Host wakeup> */
 	hub_peripherals_init();
 
 #if defined(CONFIG_MTD_ONENAND_OMAP2) || \
 	defined(CONFIG_MTD_ONENAND_OMAP2_MODULE)
 	hub_onenand_init();
 #endif
-	sr_class3_init();
+	sr_class1p5_init();
 
 #ifdef CONFIG_PM
 #ifdef CONFIG_TWL4030_CORE

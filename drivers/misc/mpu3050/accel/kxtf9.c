@@ -326,12 +326,10 @@ static int kxtf9_suspend(void *mlsl_handle,
 			 struct ext_slave_platform_data *pdata)
 {
 	int result;
-	unsigned char data;
-	struct kxtf9_private_data *private_data = pdata->private_data;
 
-	/* Wake up */
 	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address,
 				KXTF9_CTRL_REG1, 0x00);
+
 	ERROR_CHECK(result);
 
 	return result;

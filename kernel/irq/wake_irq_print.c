@@ -38,6 +38,12 @@ EXPORT_SYMBOL_GPL(wakeup_irq_record_reset);
 void wakeup_irq_record_one(unsigned int irq)
 {
 	if (wakeup_irq_record_index < WAKEUP_IRQ_RECORD_COUNT) {
+		if( irq != 56 ) /* i2c_omap */
+			if( irq != 57 ) /* i2c_omap */
+				if( irq != 61 ) /* i2c_omap */
+					if( irq != 37 ) /* gp timer */
+						if( irq != 86 ) /* mmc0 */
+							if( irq != 83 ) /* mmc1 */
 		wakeup_irq_record_array[wakeup_irq_record_index++] = irq;
 	}
 
@@ -53,10 +59,11 @@ void wakeup_irq_record_print(void)
 {
 	int i;
 
+	printk("############## Checking irq");
 	for (i = 0; i < WAKEUP_IRQ_RECORD_COUNT; i++) {
-		printk(KERN_DEBUG "Checking irq %d\n", 
-				wakeup_irq_record_array[i]);
+		printk(", %d", wakeup_irq_record_array[i]);
 	}
+	printk("\n");
 
 	return;
 }

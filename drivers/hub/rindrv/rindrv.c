@@ -57,6 +57,20 @@ struct rin_work
 	struct sk_buff*      skb;
 };
 
+/********************************
+*  Buffer administration routines:
+*	rin_alloc_bufs()
+*	rin_free_bufs()
+*	rin_realloc_bufs()
+*
+* NOTE: rin_realloc_bufs != rin_free_bufs + rin_alloc_bufs, because
+*	rin_realloc_bufs provides strong atomicity and reallocation
+*	on actively running device.
+*********************************/
+
+/*
+   Allocate channel buffers.
+ */
 
 static int rin_alloc_bufs(struct rin_st *sl, int mtu)
 {
@@ -65,10 +79,20 @@ static int rin_alloc_bufs(struct rin_st *sl, int mtu)
 	char *rbuff = NULL;
 	char *xbuff = NULL;
 
-
+	/*
+	 * Allocate the RIN frame buffers:
+	 *
+	 * rbuff	Receive buffer.
+	 * xbuff	Transmit buffer.
+	 * cbuff        Temporary compression buffer.
+	 */
 	len = mtu * 2;
 
-	
+	/*
+	 * allow for arrival of larger UDP packets, even if we say not to
+	 * also fixes a bug in which SunOS sends 512-byte packets even with
+	 * an MSS of 128
+	 */
 	if (len < 576 * 2)
 		len = 576 * 2;
 	rbuff = kmalloc(len + 4, GFP_KERNEL);
@@ -92,21 +116,24 @@ static int rin_alloc_bufs(struct rin_st *sl, int mtu)
 	spin_unlock_bh(&sl->lock);
 	err = 0;
 
-	
+	/* Cleanup */
 err_exit:
 	kfree(xbuff);
 	kfree(rbuff);
 	return err;
 }
 
-
+/* Free a RIN channel buffers. */
 static void rin_free_bufs(struct rin_st *sl)
 {
-	
+	/* Free all RIN frame buffers. */
 	kfree(xchg(&sl->rbuff, NULL));
 	kfree(xchg(&sl->xbuff, NULL));
 }
 
+/*
+   Reallocate rin channel buffers.
+ */
 
 static int rin_realloc_bufs(struct rin_st *sl, int mtu)
 {
@@ -115,7 +142,11 @@ static int rin_realloc_bufs(struct rin_st *sl, int mtu)
 	unsigned char *xbuff, *rbuff;
 	int len = mtu * 2;
 
-
+/*
+ * allow for arrival of larger UDP packets, even if we say not to
+ * also fixes a bug in which SunOS sends 512-byte packets even with
+ * an MSS of 128
+ */
 	if (len < 576 * 2)
 		len = 576 * 2;
 
@@ -125,7 +156,8 @@ static int rin_realloc_bufs(struct rin_st *sl, int mtu)
 
 	if (xbuff == NULL || rbuff == NULL)  {
 		if (mtu >= sl->mtu) {
-			
+			printk(KERN_WARNING "%s: unable to grow rin buffers, MTU change cancelled.\n",
+			       dev->name);
 			err = -ENOBUFS;
 		}
 		goto done;
@@ -172,33 +204,33 @@ done:
 }
 
 
-
+/* Set the "sending" flag.  This must be atomic hence the set_bit. */
 static inline void rin_lock(struct rin_st *sl)
 {
 	netif_stop_queue(sl->dev);
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: sl_locked\n", sl->dev->name);
 #endif
 }
 
 
-
+/* Clear the "sending" flag.  This must be atomic, hence the ASM. */
 static inline void rin_unlock(struct rin_st *sl)
 {
 	netif_wake_queue(sl->dev);
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: sl_UNlocked\n", sl->dev->name);
 #endif
 }
 
-
+/* Encapsulate one IP datagram and stuff into a TTY queue. */
 static void rin_encaps(struct rin_st *sl, unsigned char *icp, int len)
 {
 	unsigned char *p;
-	int actual, count = len;	
-
-	if (len > sl->mtu) {		
+	int actual, count = len;	//LGE_GB_TELECA_RIL_INTEGRATION
 		
+	if (len > sl->mtu) {		/* Sigh, shouldn't occur BUT ... */
+		printk(KERN_WARNING "%s: truncating oversized transmit packet!\n", sl->dev->name);
 		sl->tx_dropped++;
 		rin_unlock(sl);
 		return;
@@ -208,11 +240,18 @@ static void rin_encaps(struct rin_st *sl, unsigned char *icp, int len)
 
 
 	memcpy(sl->xbuff,p,len);
-	
+	/* Order of next two lines is *very* important.
+	 * When we are sending a little amount of data,
+	 * the transfer may be completed inside the ops->write()
+	 * routine, because it's running with interrupts enabled.
+	 * In this case we *never* got WRITE_WAKEUP event,
+	 * if we did not request it before write operation.
+	 *       14 Oct 1994  Dmitry Gorodchanin.
+	 */
 	set_bit(TTY_DO_WRITE_WAKEUP, &sl->tty->flags);
 	actual = sl->tty->ops->write(sl->tty, sl->xbuff, len);
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: rin_encaps: sent %d bytes of packet of %d bytes to TTY\n", sl->dev->name, actual, len);
 #endif
 
 #ifdef RIN_CHECK_TRANSMIT
@@ -220,11 +259,15 @@ static void rin_encaps(struct rin_st *sl, unsigned char *icp, int len)
 #endif
 	sl->xleft = count - actual;
 #ifdef RIN_DEINSALA_DEBUG
-    if(sl->xleft>0) 
+    if(sl->xleft>0) printk(KERN_INFO "%s: rin_encaps: remaining %d bytes\n", sl->dev->name, sl->xleft);
 #endif
 	sl->xhead = sl->xbuff + actual;
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: rin_encaps: tty_chars_in_buffer(sl->tty): %d\n", sl->dev->name, tty_chars_in_buffer(sl->tty));
+    printk(KERN_INFO "%s: rin_encaps: sl->xleft: %d\n", sl->dev->name, sl->xleft);
+    printk(KERN_INFO "%s: rin_encaps: sl->rcount: %d\n", sl->dev->name, sl->rcount);
+    printk(KERN_INFO "%s: rin_encaps: sl->mtu: %d\n", sl->dev->name, sl->mtu);
+    printk(KERN_INFO "%s: rin_encaps: sl->buffsize: %d\n", sl->dev->name, sl->buffsize);
 #endif
 }
 
@@ -239,7 +282,7 @@ static void rin_write_wakeup(struct tty_struct *tty)
 
 	/* First make sure we're connected. */
 	if (!sl || sl->magic != RIN_MAGIC || !netif_running(sl->dev))
-        
+        printk(KERN_INFO "rin_write_wakeup: not connected!!!");
 		return;
 
 	if (sl->xleft <= 0)  {
@@ -248,7 +291,12 @@ static void rin_write_wakeup(struct tty_struct *tty)
 		sl->tx_packets++;
 		clear_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
 #ifdef RIN_DEINSALA_DEBUG
-        
+        printk(KERN_INFO "%s: rin_write_wakeup: tty_chars_in_buffer(sl->tty): %d\n", sl->dev->name, tty_chars_in_buffer(sl->tty));
+        printk(KERN_INFO "%s: rin_write_wakeup: sl->xleft: %d\n", sl->dev->name, sl->xleft);
+        printk(KERN_INFO "%s: rin_write_wakeup: sl->rcount: %d\n", sl->dev->name, sl->rcount);
+        printk(KERN_INFO "%s: rin_write_wakeup: sl->mtu: %d\n", sl->dev->name, sl->mtu);
+        printk(KERN_INFO "%s: rin_write_wakeup: sl->buffsize: %d\n", sl->dev->name, sl->buffsize);
+        printk(KERN_INFO "%s: rin_write_wakeup: unlocking net queue\n", sl->dev->name);
 #endif
 		rin_unlock(sl);
 		return;
@@ -256,12 +304,16 @@ static void rin_write_wakeup(struct tty_struct *tty)
 
 	actual = tty->ops->write(tty, sl->xhead, sl->xleft);
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: rin_write_wakeup: sent remaining %d bytes of packet to TTY\n", sl->dev->name, sl->xleft);
 #endif
 	sl->xleft -= actual;
 	sl->xhead += actual;
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: rin_write_wakeup: tty_chars_in_buffer(sl->tty): %d\n", sl->dev->name, tty_chars_in_buffer(sl->tty));
+    printk(KERN_INFO "%s: rin_write_wakeup: sl->xleft: %d\n", sl->dev->name, sl->xleft);
+    printk(KERN_INFO "%s: rin_write_wakeup: sl->rcount: %d\n", sl->dev->name, sl->rcount);
+    printk(KERN_INFO "%s: rin_write_wakeup: sl->mtu: %d\n", sl->dev->name, sl->mtu);
+    printk(KERN_INFO "%s: rin_write_wakeup: sl->buffsize: %d\n", sl->dev->name, sl->buffsize);
 #endif
 }
 
@@ -269,7 +321,11 @@ static void rin_nd_tx_timeout(struct net_device *dev)
 {
 	struct rin_st *sl = netdev_priv(dev);
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: rin_nd_tx_timeout: tty_chars_in_buffer(sl->tty): %d\n", sl->dev->name, tty_chars_in_buffer(sl->tty));
+    printk(KERN_INFO "%s: rin_nd_tx_timeout: sl->xleft: %d\n", sl->dev->name, sl->xleft);
+    printk(KERN_INFO "%s: rin_nd_tx_timeout: sl->rcount: %d\n", sl->dev->name, sl->rcount);
+    printk(KERN_INFO "%s: rin_nd_tx_timeout: sl->mtu: %d\n", sl->dev->name, sl->mtu);
+    printk(KERN_INFO "%s: rin_nd_tx_timeout: sl->buffsize: %d\n", sl->dev->name, sl->buffsize);
 #endif
 	spin_lock(&sl->lock);
 
@@ -277,13 +333,18 @@ static void rin_nd_tx_timeout(struct net_device *dev)
 		if (!netif_running(dev))
 			goto out;
 
-		
+		/* May be we must check transmitter timeout here ?
+		 *      14 Oct 1994 Dmitry Gorodchanin.
+		 */
 #ifdef RIN_CHECK_TRANSMIT
 		if (time_before(jiffies, dev->trans_start + 20 * HZ))  {
-			
+			/* 20 sec timeout not reached */
 			goto out;
 		}
-		
+		printk(KERN_WARNING "%s: transmit timed out, %s?\n",
+			dev->name,
+			(tty_chars_in_buffer(sl->tty) || sl->xleft) ?
+				"bad line quality" : "driver error");
 		sl->xleft = 0;
 		clear_bit(TTY_DO_WRITE_WAKEUP, &sl->tty->flags);
 		rin_unlock(sl);
@@ -293,27 +354,27 @@ out:
 	spin_unlock(&sl->lock);
 }
 
-
+/* async tx task */
 static void rin_tx_task(struct work_struct *pwork)
 {
 	struct rin_work *work = container_of(pwork, struct rin_work, work);
         struct sk_buff* skb;
 	struct net_device *dev;
 	struct rin_st *sl;
-        
+        /**/
         skb = work->skb;
 	dev = work->dev;
         sl = netdev_priv(dev);
-	
+	/* release work */
 	kfree(work);
-        
+        /* handle packet */
 	rin_encaps(sl, skb->data, skb->len);
 	dev_kfree_skb(skb);
-        
+        /* resume TX */
 	rin_unlock(sl);
 }
 
-
+/* Encapsulate an IP datagram and kick it into a TTY queue. */
 static int
 rin_nd_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -323,7 +384,7 @@ rin_nd_xmit(struct sk_buff *skb, struct net_device *dev)
 	spin_lock(&sl->lock);
 	if (!netif_running(dev)) {
 		spin_unlock(&sl->lock);
-		
+		printk(KERN_WARNING "%s: xmit call when iface is down\n", dev->name);
 		dev_kfree_skb(skb);
 		return 0;
 	}
@@ -356,6 +417,11 @@ rin_nd_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 
+/******************************************
+ *   Routines looking at netdevice side.
+ ******************************************/
+
+/* Netdevice UP -> DOWN routine */
 
 static int
 rin_nd_close(struct net_device *dev)
@@ -371,11 +437,11 @@ rin_nd_close(struct net_device *dev)
 	sl->xleft    = 0;
 	spin_unlock_bh(&sl->lock);
 
-	
+	printk("%s - line : %d\n", __FUNCTION__, __LINE__);
 	return 0;
 }
 
-
+/* Netdevice DOWN -> UP routine */
 
 static int rin_nd_open(struct net_device *dev)
 {
@@ -386,11 +452,11 @@ static int rin_nd_open(struct net_device *dev)
 
 	sl->flags &= (1 << SLF_INUSE);
 	netif_start_queue(dev);
-	
+	printk("%s - line : %d\n", __FUNCTION__, __LINE__);
 	return 0;
 }
 
-
+/* Netdevice change MTU request */
 
 static int rin_nd_change_mtu(struct net_device *dev, int new_mtu)
 {
@@ -404,7 +470,7 @@ static int rin_nd_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-
+/* Netdevice get statistics request */
 
 static struct net_device_stats *
 rin_nd_get_stats(struct net_device *dev)
@@ -426,13 +492,15 @@ rin_nd_get_stats(struct net_device *dev)
 	return (&stats);
 }
 
-
+/* Netdevice register callback */
 
 static int rin_nd_init(struct net_device *dev)
 {
 	struct rin_st *sl = netdev_priv(dev);
 
-
+	/*
+	 *	Finish setting up the DEVICE info.
+	 */
 
 	dev->mtu		= sl->mtu;
 	dev->type		= ARPHRD_TUNNEL;
@@ -501,7 +569,7 @@ static void rin_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 
 	skb = dev_alloc_skb(count);
 	if (skb == NULL) {
-		
+		printk(KERN_WARNING "%s: memory squeeze, dropping packet.\n", sl->dev->name);
         sl->rx_bytes += count;		
 		sl->rx_dropped++;
 		return;
@@ -516,7 +584,12 @@ static void rin_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	sl->rx_packets++;
     spin_unlock_bh(&sl->lock);		
 #ifdef RIN_DEINSALA_DEBUG
-    
+    printk(KERN_INFO "%s: rin_receive_buf: netif_rx(skb) received packet of %d bytes from TTY\n", sl->dev->name, count);
+    printk(KERN_INFO "%s: rin_receive_buf: tty_chars_in_buffer(sl->tty): %d\n", sl->dev->name, tty_chars_in_buffer(sl->tty));
+    printk(KERN_INFO "%s: rin_receive_buf: sl->xleft: %d\n", sl->dev->name, sl->xleft);
+    printk(KERN_INFO "%s: rin_receive_buf: sl->rcount: %d\n", sl->dev->name, sl->rcount);
+    printk(KERN_INFO "%s: rin_receive_buf: sl->mtu: %d\n", sl->dev->name, sl->mtu);
+    printk(KERN_INFO "%s: rin_receive_buf: sl->buffsize: %d\n", sl->dev->name, sl->buffsize);
 #endif
 }
 
@@ -686,20 +759,20 @@ static int rin_open(struct tty_struct *tty)
 	if(rindrv_count==0)
 	{
 		sl = rin_alloc(tty_devnum(tty));
-		
+		printk("%s - line : %d, sl->dev = %x\n", __FUNCTION__, __LINE__, sl->dev);
 	}
 	else if(rindrv_count>0)
 	{
 		if(realloc_count<rindrv_count)
 		{
 			sl = netdev_priv(rin_devs[realloc_count]);
-			
+			printk("%s - line : %d, realloc sl->dev = %x\n", __FUNCTION__, __LINE__, sl->dev);
 			realloc_count ++;
 		}
 	}
 	else
 	{
-		
+		printk("%s - line : %d, error rindrv_count = %d\n", __FUNCTION__, __LINE__, rindrv_count);
 		sl = NULL;
 	}
 	if (sl == NULL)
@@ -729,7 +802,7 @@ static int rin_open(struct tty_struct *tty)
 	{
 		rindrv_count = 0;
 		realloc_count = 0;
-		
+		printk("%s - line : %d, realloc done!!\n", __FUNCTION__, __LINE__);
 		
 	}
 	/* Done.  We have linked the TTY line to a channel. */
@@ -747,7 +820,7 @@ err_free_chan:
 
 err_exit:
 	rtnl_unlock();
-	
+	printk("%s - line : %d - error exit\n", __FUNCTION__, __LINE__);
 
 	/* Count references from TTY module */
 	return err;
@@ -793,7 +866,7 @@ static void rin_close(struct tty_struct *tty)
 		sl->line = 0;
 	
 	rindrv_count++;
-	
+	printk("%s - line : %d - rindrv_count = %d\n", __FUNCTION__, __LINE__, rindrv_count);
 }
 
 /* Perform I/O control on an active RIN channel. */
@@ -844,20 +917,20 @@ static int __init rin_init(void)
 	rin_devs = kzalloc(sizeof(struct net_device *)*rin_maxdev,
 								GFP_KERNEL);
 	if (!rin_devs) {
-		
+		printk(KERN_ERR "RIN: Can't allocate slip devices array.\n");
 		return -ENOMEM;
 	}
 
 	/* Fill in our line protocol discipline, and register it */
 	status = tty_register_ldisc(N_RIN, &rin_ldisc);
 	if (status != 0) {
-		
+		printk(KERN_ERR "RIN: can't register line discipline (err = %d)\n", status);
 		kfree(rin_devs);
 	}
         if (status == 0) {
 	       	rin_tx_wq = create_singlethread_workqueue("rintx");
         	if (!rin_tx_wq) {
-			
+			printk(KERN_ERR "RIN: failed to allocate workqueue");
 			tty_unregister_ldisc(N_RIN);
 			kfree(rin_devs);
 			status = -ENOMEM;
@@ -907,8 +980,8 @@ static void __exit rin_exit(void)
 
 		sl = netdev_priv(dev);
 		if (sl->tty) {
-			
-			 //      dev->name);
+			printk(KERN_ERR "%s: tty discipline still running\n",
+			       dev->name);
 			/* Intentionally leak the control block. */
 			dev->destructor = NULL;
 		}
@@ -921,7 +994,7 @@ static void __exit rin_exit(void)
 
 	i = tty_unregister_ldisc(N_RIN);
 	if (i != 0) {
-		
+		printk(KERN_ERR "RIN: can't unregister line discipline (err = %d)\n", i);
 	}
 	if (rin_tx_wq)	{
                	flush_workqueue(rin_tx_wq);

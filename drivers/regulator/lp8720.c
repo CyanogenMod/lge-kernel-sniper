@@ -174,7 +174,7 @@ static void lp8720_init(void)
 {
 	struct lp8720_platform_data *pdata = lp8720_client->dev.platform_data;
 
-	lp8720_write_reg(lp8720_client, LP8720_LDO1_SETTING, LP8720_NO_STARTUP | 0x1d); //3.0v - MMC0
+	lp8720_write_reg(lp8720_client, LP8720_LDO1_SETTING, LP8720_NO_STARTUP | 0x1F); //3.3v - MMC0
 	lp8720_write_reg(lp8720_client, LP8720_LDO2_SETTING, LP8720_NO_STARTUP | 0x1d); //3.0v - MOTOR
 	lp8720_write_reg(lp8720_client, LP8720_LDO3_SETTING, /*LP8720_STARTUP_DELAY_3TS*/LP8720_NO_STARTUP | 0x17); //2.7v
 	lp8720_write_reg(lp8720_client, LP8720_LDO4_SETTING, LP8720_NO_STARTUP | 0x11); //1.8v

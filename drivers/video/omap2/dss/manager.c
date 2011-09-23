@@ -456,11 +456,13 @@ struct manager_cache_data {
 static struct {
 	spinlock_t lock;
 
+// prime@sdcmicro.com
 #if defined(CONFIG_ARCH_OMAP3)
 	struct overlay_cache_data overlay_cache[3];
 #else
 	struct overlay_cache_data overlay_cache[4];
 #endif
+// prime@sdcmicro.com
 	struct manager_cache_data manager_cache[3];
 	struct writeback_cache_data writeback_cache;
 

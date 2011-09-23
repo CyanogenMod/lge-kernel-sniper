@@ -111,7 +111,9 @@
 #define CON_DRIVER_FLAG_INIT   2
 #define CON_DRIVER_FLAG_ATTR   4
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
 #define VT_BUF_VRAM_ONLY
+#endif
 
 struct con_driver {
 	const struct consw *con;

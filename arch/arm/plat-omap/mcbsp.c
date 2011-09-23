@@ -849,19 +849,13 @@ void omap_mcbsp_disable_fclk(unsigned int id)
 {
 #if !defined(CONFIG_PM_RUNTIME)
 	struct omap_mcbsp *mcbsp;
-// LGE_UPDATE_S	
-	int c;
-// LGE_UPDATE_E
+
 	if (!omap_mcbsp_check_valid_id(id)) {
 		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
 		return;
 	}
 	mcbsp = id_to_mcbsp_ptr(id);
 	
-// LGE_UPDATE_S
-	//c = mcbsp->fclk->usecount;
-	//while (c-- > 0)
-// LGE_UPDATE_E	
 		clk_disable(mcbsp->fclk);
 #endif
 }

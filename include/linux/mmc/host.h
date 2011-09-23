@@ -54,9 +54,11 @@ struct mmc_ios {
 	unsigned char	ddr;			/* dual data rate used */
 
 #define MMC_SDR_MODE		0
+// prime@sdcmicro.com Borrowed from 2.6.37 to eliminate duplicated definitions [START]
 //#define MMC_DDR_MODE		1
 #define MMC_1_2V_DDR_MODE	1
 #define MMC_1_8V_DDR_MODE	2
+// prime@sdcmicro.com Borrowed from 2.6.37 to eliminate duplicated definitions [END]
 };
 
 struct mmc_host_ops {

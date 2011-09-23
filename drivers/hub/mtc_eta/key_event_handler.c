@@ -24,7 +24,7 @@
 
 #include "lge_mtc_eta.h"
 
-//#define MTC_ETA_DEBUG
+#define MTC_ETA_DEBUG
 #ifdef MTC_ETA_DEBUG
 #define PDEBUG(fmt, args...) printk("mtc_eta_key: " fmt, ## args)
 #else
@@ -41,12 +41,15 @@ void mtc_eta_add_logging_event(struct mtc_eta_log *log);
 static int eta_key_list[] = {
 	KEY_VOLUMEUP,
 	KEY_VOLUMEDOWN,
-	KEY_MENU,
-	KEY_HOME,
-	KEY_BACK,
-	KEY_SEARCH,
-	KEY_KPJPCOMMA,
-	KEY_POWER,
+//20110416 yongman.kwon@lge.com [LS855] for logging touch key event [START]
+//these key is supported by touch sensor.
+//	KEY_MENU,
+//	KEY_HOME,
+//	KEY_BACK,
+//	KEY_SEARCH,
+//20110416 yongman.kwon@lge.com [LS855] for logging touch key event [END]
+	KEY_KPJPCOMMA,//hak.lee@lge.com
+	KEY_POWER,//hak.lee@lge.com
 };
 
 static int mtc_eta_event_log_connect(struct input_handler *handler, struct input_dev *dev, const struct input_device_id *id)
@@ -57,9 +60,11 @@ static int mtc_eta_event_log_connect(struct input_handler *handler, struct input
 
 	if (dev->name == NULL)
 		return 0;
+//hak.lee@lge.com
 	if ((strcmp(dev->name, "TWL4030_Keypad") != 0) &&
 			(strcmp(dev->name, "twl4030_pwrbutton") != 0))
 		return 0;
+//hak.lee@lge.com
 #if 0
 	for (i = 0; i < KEY_MAX; i++) {
 		if (test_bit(i, state->keybit) && test_bit(i, dev->keybit))
