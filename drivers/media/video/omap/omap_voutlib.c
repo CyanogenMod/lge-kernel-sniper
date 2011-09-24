@@ -30,17 +30,9 @@ MODULE_AUTHOR("Texas Instruments");
 MODULE_DESCRIPTION("OMAP Video library");
 MODULE_LICENSE("GPL");
 
-#define LG_FW_ISP_RESERVE /* 20110716 dongyu.gwak@lge.com reserve isp for camera */
-
 #ifdef CONFIG_OMAP3_ISP_RESIZER
 /* with isp resizer, resizing limitation in 34xx is 8x to 1/8x scaling. */
-#ifdef LG_FW_ISP_RESERVE /* 20110716 dongyu.gwak@lge.com reserve isp for camera */
-extern int isp_reserve;
-#define DOWNSCALE_RATIO_ISP 8
-#define DOWNSCALE_RATIO_DSS 4
-#else /*LG_FW_ISP_RESERVE*/
 #define DOWNSCALE_RATIO 8
-#endif /*LG_FW_ISP_RESERVE*/
 #else
 #define DOWNSCALE_RATIO 4
 #endif
@@ -124,14 +116,6 @@ int omap_vout_new_window(struct v4l2_rect *crop,
 {
 	int err;
 
-#ifdef LG_FW_ISP_RESERVE /* 20110716 dongyu.gwak@lge.com reserve isp for camera */
-	int  DOWNSCALE_RATIO;
-	if(!isp_reserve)
-		DOWNSCALE_RATIO = DOWNSCALE_RATIO_ISP;
-	else
-		DOWNSCALE_RATIO = DOWNSCALE_RATIO_DSS;
-#endif /*LG_FW_ISP_RESERVE*/
-	printk("omap_vout_new_window()\n");
 	err = omap_vout_try_window(fbuf, new_win);
 	if (err)
 		return err;
@@ -190,15 +174,6 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 	struct v4l2_rect try_crop;
 	unsigned long vresize, hresize;
 
-#ifdef LG_FW_ISP_RESERVE /* 20110716 dongyu.gwak@lge.com reserve isp for camera */
-	int  DOWNSCALE_RATIO;
-	if(!isp_reserve)
-		DOWNSCALE_RATIO = DOWNSCALE_RATIO_ISP;
-	else
-		DOWNSCALE_RATIO = DOWNSCALE_RATIO_DSS;
-	printk("omap_vout_new_crop()\n");
-#endif /*LG_FW_ISP_RESERVE*/
-
 	/* make a working copy of the new_crop rectangle */
 	try_crop = *new_crop;
 
@@ -244,23 +219,6 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 		vresize = 2048;
 	else if (cpu_is_omap34xx()) {
 #ifdef CONFIG_OMAP3_ISP_RESIZER
-#ifdef LG_FW_ISP_RESERVE /* 20110804 dongyu.gwak@lge.com isp reserve */ 
-		if (!isp_reserve){
-			if (vresize > 4096) {
-				*use_isp_rsz_for_downscale = 1;
-				printk(KERN_INFO "\n<%s> Using ISP resizer vresize "
-						"= %lu\n\n",
-						__func__, vresize);
-				if (vresize > 8096)
-					vresize = 8096;
-			}
-		}
-		else
-		{
-			if (vresize > 4096)
-				vresize = 4096;
-		}
-#else /* LG_FW_ISP_RESERVE */
 		if (vresize > 4096) {
 			*use_isp_rsz_for_downscale = 1;
 			printk(KERN_INFO "\n<%s> Using ISP resizer vresize "
@@ -269,7 +227,6 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 			if (vresize > 8096)
 				vresize = 8096;
 		}
-#endif /* LG_FW_ISP_RESERVE */
 #else
 		if (vresize > 4096)
 		vresize = 4096;
@@ -294,28 +251,6 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 		hresize = 2048;
 	} else if (cpu_is_omap34xx()) {
 #ifdef CONFIG_OMAP3_ISP_RESIZER
-#ifdef LG_FW_ISP_RESERVE /* 20110804 dongyu.gwak@lge.com isp reserve */ 
-		if (!isp_reserve){
-			/* DSS DMA resizer handles the 8x to 1/4x horz scaling
-			 * for 1/4x to 1/8x scaling ISP resizer is used
-			 * for width > 1024 and scaling 1/2x-1/8x ISP resizer is used
-			 */
-			if (hresize > 4096
-					||(hresize > 2048 && try_crop.width > 1024)) {
-				*use_isp_rsz_for_downscale = 1;
-				printk(KERN_INFO "\n<%s> Using ISP resizer "
-						"hresize = %lu, width = %u\n\n",
-						__func__, hresize, try_crop.width);
-				if (hresize > 8096)
-					hresize = 8096;
-			}
-		}
-		else
-		{
-			if (hresize > 4096)
-				hresize = 4096;
-		}
-#else /* LG_FW_ISP_RESERVE */ 
 		/* DSS DMA resizer handles the 8x to 1/4x horz scaling
 		 * for 1/4x to 1/8x scaling ISP resizer is used
 		 * for width > 1024 and scaling 1/2x-1/8x ISP resizer is used
@@ -329,7 +264,6 @@ int omap_vout_new_crop(struct v4l2_pix_format *pix,
 			if (hresize > 8096)
 				hresize = 8096;
 		}
-#endif /* LG_FW_ISP_RESERVE */
 #else
 		if (hresize > 4096)
 		hresize = 4096;
