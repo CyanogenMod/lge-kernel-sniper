@@ -500,10 +500,7 @@ fsg_hs_bulk_out_desc = {
 	/* bEndpointAddress copied from fs_bulk_out_desc during fsg_bind() */
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
 	.wMaxPacketSize =	cpu_to_le16(512),
-// LGE_UPDATE_S 20110226 [jaejoong.kimg@lge.com] matching for LG Android Net driver
-// Following LG Android Net Driver Spec, bInterval is 0x00 at bulk_endpoint_descriptor
-	//.bInterval =		1,	/* NAK every 1 uframe */
-// LGE_UPDATE_E 20110226 [jaejoong.kimg@lge.com] matching for LG Android Net driver
+	.bInterval =		1,	/* NAK every 1 uframe */
 };
 
 #ifndef FSG_NO_INTR_EP

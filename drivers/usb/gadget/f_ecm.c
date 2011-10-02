@@ -26,11 +26,6 @@
 #include <linux/device.h>
 #include <linux/etherdevice.h>
 
-#ifdef CONFIG_LGE_ANDROID_USB_CDC_ECM
-#include <linux/platform_device.h>
-#include <linux/usb/android_composite.h>
-#endif	/* CONFIG_LGE_ANDROID_USB_CDC_ECM */
-
 #include "u_ether.h"
 
 
@@ -83,10 +78,6 @@ struct f_ecm {
 	 */
 };
 
-#ifdef CONFIG_LGE_ANDROID_USB_CDC_ECM
-static struct usb_ether_platform_data *ecm_pdata;
-#endif /* CONFIG_LGE_ANDROID_USB_CDC_ECM */
-
 static inline struct f_ecm *func_to_ecm(struct usb_function *f)
 {
 	return container_of(f, struct f_ecm, port.func);
@@ -117,31 +108,11 @@ static inline unsigned ecm_bitrate(struct usb_gadget *g)
  */
 
 #define LOG2_STATUS_INTERVAL_MSEC	5	/* 1 << 5 == 32 msec */
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-#define ECM_STATUS_BYTECOUNT		64	/* 8 byte header + data */
-#else
 #define ECM_STATUS_BYTECOUNT		16	/* 8 byte header + data */
-#endif
 
 
 /* interface descriptor: */
 
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-#define USB_DT_IAD_SIZE     8
-struct usb_interface_assoc_descriptor ecm_control_association_intf = {
-	.bLength           = sizeof ecm_control_association_intf,
-	.bDescriptorType   = USB_DT_INTERFACE_ASSOCIATION,
-	.bFirstInterface   = 1,
-	.bInterfaceCount   = 2,
-	.bFunctionClass    = USB_CLASS_COMM,
-	.bFunctionSubClass = USB_CDC_SUBCLASS_ETHERNET,
-	.bFunctionProtocol = USB_CDC_PROTO_NONE,
-	.iFunction         = 0,
-};
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 static struct usb_interface_descriptor ecm_control_intf = {
 	.bLength =		sizeof ecm_control_intf,
 	.bDescriptorType =	USB_DT_INTERFACE,
@@ -223,12 +194,7 @@ static struct usb_endpoint_descriptor fs_ecm_notify_desc = {
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	cpu_to_le16(ECM_STATUS_BYTECOUNT),
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-	.bInterval =		4,
-#else
 	.bInterval =		1 << LOG2_STATUS_INTERVAL_MSEC,
-#endif
 };
 
 static struct usb_endpoint_descriptor fs_ecm_in_desc = {
@@ -237,11 +203,6 @@ static struct usb_endpoint_descriptor fs_ecm_in_desc = {
 
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-	.wMaxPacketSize =	cpu_to_le16(64),
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 };
 
 static struct usb_endpoint_descriptor fs_ecm_out_desc = {
@@ -250,33 +211,9 @@ static struct usb_endpoint_descriptor fs_ecm_out_desc = {
 
 	.bEndpointAddress =	USB_DIR_OUT,
 	.bmAttributes =		USB_ENDPOINT_XFER_BULK,
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-	.wMaxPacketSize =	cpu_to_le16(64),
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 };
 
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
 static struct usb_descriptor_header *ecm_fs_function[] = {
-	(struct usb_descriptor_header *) &ecm_control_association_intf,
-	/* CDC ECM control descriptors */
-	(struct usb_descriptor_header *) &ecm_control_intf,
-	(struct usb_descriptor_header *) &ecm_header_desc,
-	(struct usb_descriptor_header *) &ecm_union_desc,
-	(struct usb_descriptor_header *) &ecm_desc,
-	/* NOTE: status endpoint might need to be removed */
-	(struct usb_descriptor_header *) &fs_ecm_notify_desc,
-	/* data interface, altsettings 0 and 1 */
-	(struct usb_descriptor_header *) &ecm_data_nop_intf,
-	(struct usb_descriptor_header *) &ecm_data_intf,
-	(struct usb_descriptor_header *) &fs_ecm_out_desc,
-	(struct usb_descriptor_header *) &fs_ecm_in_desc,
-	NULL,
-};
-#else
-static struct usb_descriptor_header *ecm_fs_function[] __initdata = {
 	/* CDC ECM control descriptors */
 	(struct usb_descriptor_header *) &ecm_control_intf,
 	(struct usb_descriptor_header *) &ecm_header_desc,
@@ -291,8 +228,6 @@ static struct usb_descriptor_header *ecm_fs_function[] __initdata = {
 	(struct usb_descriptor_header *) &fs_ecm_out_desc,
 	NULL,
 };
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 
 /* high speed support: */
 
@@ -303,13 +238,7 @@ static struct usb_endpoint_descriptor hs_ecm_notify_desc = {
 	.bEndpointAddress =	USB_DIR_IN,
 	.bmAttributes =		USB_ENDPOINT_XFER_INT,
 	.wMaxPacketSize =	cpu_to_le16(ECM_STATUS_BYTECOUNT),
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-	.bInterval =		4,
-#else
 	.bInterval =		LOG2_STATUS_INTERVAL_MSEC + 4,
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 };
 static struct usb_endpoint_descriptor hs_ecm_in_desc = {
 	.bLength =		USB_DT_ENDPOINT_SIZE,
@@ -329,26 +258,7 @@ static struct usb_endpoint_descriptor hs_ecm_out_desc = {
 	.wMaxPacketSize =	cpu_to_le16(512),
 };
 
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
 static struct usb_descriptor_header *ecm_hs_function[] = {
-	(struct usb_descriptor_header *) &ecm_control_association_intf,
-	/* CDC ECM control descriptors */
-	(struct usb_descriptor_header *) &ecm_control_intf,
-	(struct usb_descriptor_header *) &ecm_header_desc,
-	(struct usb_descriptor_header *) &ecm_union_desc,
-	(struct usb_descriptor_header *) &ecm_desc,
-	/* NOTE: status endpoint might need to be removed */
-	(struct usb_descriptor_header *) &hs_ecm_notify_desc,
-	/* data interface, altsettings 0 and 1 */
-	(struct usb_descriptor_header *) &ecm_data_nop_intf,
-	(struct usb_descriptor_header *) &ecm_data_intf,
-	(struct usb_descriptor_header *) &hs_ecm_out_desc,
-	(struct usb_descriptor_header *) &hs_ecm_in_desc,
-	NULL,
-};
-#else
-static struct usb_descriptor_header *ecm_hs_function[] __initdata = {
 	/* CDC ECM control descriptors */
 	(struct usb_descriptor_header *) &ecm_control_intf,
 	(struct usb_descriptor_header *) &ecm_header_desc,
@@ -363,8 +273,6 @@ static struct usb_descriptor_header *ecm_hs_function[] __initdata = {
 	(struct usb_descriptor_header *) &hs_ecm_out_desc,
 	NULL,
 };
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 
 /* string descriptors: */
 
@@ -592,12 +500,8 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			/* Enable zlps by default for ECM conformance;
 			 * override for musb_hdrc (avoids txdma ovhead).
 			 */
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-            ecm->port.is_zlp_ok = false;
-#else
 			ecm->port.is_zlp_ok = !(gadget_is_musbhdrc(cdev->gadget)
 				);
-#endif
 			ecm->port.cdc_filter = DEFAULT_FILTER;
 			DBG(cdev, "activate ecm\n");
 			net = gether_connect(&ecm->port);
@@ -644,8 +548,6 @@ static void ecm_disable(struct usb_function *f)
 
 	if (ecm->notify->driver_data) {
 		usb_ep_disable(ecm->notify);
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660
-		usb_ep_fifo_flush(ecm->notify);
 		ecm->notify->driver_data = NULL;
 		ecm->notify_desc = NULL;
 	}
@@ -703,7 +605,6 @@ ecm_bind(struct usb_configuration *c, struct usb_function *f)
 	int			status;
 	struct usb_ep		*ep;
 
-	printk("daniel.kang ecm_bind\n");
 	/* allocate instance-specific interface IDs */
 	status = usb_interface_id(c, f);
 	if (status < 0)
@@ -711,11 +612,6 @@ ecm_bind(struct usb_configuration *c, struct usb_function *f)
 	ecm->ctrl_id = status;
 
 	ecm_control_intf.bInterfaceNumber = status;
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-	ecm_control_association_intf.bFirstInterface = status;
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 	ecm_union_desc.bMasterInterface0 = status;
 
 	status = usb_interface_id(c, f);
@@ -886,19 +782,6 @@ ecm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 		ecm_string_defs[0].id = status;
 		ecm_control_intf.iInterface = status;
 
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#ifdef CONFIG_USB_SUPPORT_LGE_ANDROID_ECM_FIX
-		// LGE_UPDATE_S 20110302 [jaejoong.kim@lge.com] exchange ecm Mac address string index
-		/* MAC address */
-		status = usb_string_id(c->cdev);
-		if (status < 0)
-			return status;
-		ecm_string_defs[1].id = 5; 	//status;
-		pr_info("%s: iMACAddress = %d\n", __func__, status);
-		ecm_desc.iMACAddress = 5;	//status;
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
-
 		/* data interface label */
 		status = usb_string_id(c->cdev);
 		if (status < 0)
@@ -906,16 +789,12 @@ ecm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 		ecm_string_defs[2].id = status;
 		ecm_data_intf.iInterface = status;
 
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [START]
-#if 0
 		/* MAC address */
 		status = usb_string_id(c->cdev);
 		if (status < 0)
 			return status;
 		ecm_string_defs[1].id = status;
 		ecm_desc.iMACAddress = status;
-#endif
-//20101204, jm1.lee@lge.com, matching for LG Android Net Driver from vs660 [END]
 	}
 
 	/* allocate and initialize one new instance */
@@ -932,7 +811,7 @@ ecm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 
 	ecm->port.cdc_filter = DEFAULT_FILTER;
 
-	ecm->port.func.name = "cdc_ecm";
+	ecm->port.func.name = "cdc_ethernet";
 	ecm->port.func.strings = ecm_strings;
 	/* descriptors are per-instance copies */
 	ecm->port.func.bind = ecm_bind;
@@ -949,56 +828,3 @@ ecm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 	}
 	return status;
 }
-
-// LGE_UPDATE_S 20110223 [jaejoong.kim@lge.com] usb tethering porting for B_DCM_GB
-#ifdef CONFIG_LGE_ANDROID_USB_CDC_ECM
-
-static int ecm_probe(struct platform_device *pdev)
-{
-	ecm_pdata = pdev->dev.platform_data;
-	return 0;
-}
-
-static struct platform_driver ecm_platform_driver = {
-	.driver = { .name = "cdc_ecm", },
-	.probe = ecm_probe,
-};
-
-int ecm_function_bind_config(struct usb_configuration * c)
-{
-	int ret;
-
-	if (!ecm_pdata) {
-		printk(KERN_ERR "ecm_pdata null in ecm_function_bind_config\n");
-		return -1;
-	}
-
-	printk(KERN_INFO
-		"ecm_function_bind_config MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-		ecm_pdata->ethaddr[0], ecm_pdata->ethaddr[1],
-		ecm_pdata->ethaddr[2], ecm_pdata->ethaddr[3],
-		ecm_pdata->ethaddr[4], ecm_pdata->ethaddr[5]);
-
-	ret = gether_setup(c->cdev->gadget, ecm_pdata->ethaddr);
-	if (ret == 0)
-		ret = ecm_bind_config(c, ecm_pdata->ethaddr);
-	return ret;
-}
-
-static struct android_usb_function ecm_function = {
-	.name = "cdc_ecm",
-	.bind_config = ecm_function_bind_config,
-};
-
-static int __init init(void)
-{
-	printk(KERN_INFO "f_ecm init\n");
-	platform_driver_register(&ecm_platform_driver);
-	android_register_function(&ecm_function);
-	return 0;
-}
-module_init(init);
-
-#endif /* CONFIG_LGE_ANDROID_USB_CDC_ECM */
-
-// LGE_UPDATE_E 20110223 [jaejoong.kim@lge.com] usb tethering porting for B_DCM_GB

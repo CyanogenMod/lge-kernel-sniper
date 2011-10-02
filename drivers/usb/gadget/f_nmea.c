@@ -133,19 +133,6 @@ static int gser_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	/* we know alt == 0, so this is an activation or a reset */
 
-#if 1
-	if (gser->port.in->driver_data) {
-		DBG(cdev, "reset generic ttyGS%d\n", gser->port_num);
-		gserial_disconnect(&gser->port);
-	} else {
-		DBG(cdev, "activate generic ttyGS%d\n", gser->port_num);
-	}
-	
-	gser->port.in_desc = ep_choose(cdev->gadget,
-			gser->hs.in, gser->fs.in);
-	gser->port.out_desc = ep_choose(cdev->gadget,
-			gser->hs.out, gser->fs.out);
-#else
 	if (gser->port.in->driver_data) {
 		DBG(cdev, "reset generic ttyGS%d\n", gser->port_num);
 		gserial_disconnect(&gser->port);
@@ -156,8 +143,6 @@ static int gser_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		gser->port.out_desc = ep_choose(cdev->gadget,
 				gser->hs.out, gser->fs.out);
 	}
-#endif
-
 	gserial_connect(&gser->port, gser->port_num);
 	return 0;
 }
@@ -303,39 +288,9 @@ int __init nmea_bind_config(struct usb_configuration *c, u8 port_num)
 	gser->port.func.set_alt = gser_set_alt;
 	gser->port.func.disable = gser_disable;
 
-	gser->port.func.disabled = 0;
-
 	status = usb_add_function(c, &gser->port.func);
 	if (status)
 		kfree(gser);
 	return status;
 }
 
-#ifdef CONFIG_LGE_ANDROID_USB_NMEA
-
-int nmea_function_bind_config(struct usb_configuration *c)
-{
-	int ret = nmea_bind_config(c, 2);
-
-#ifdef CONFIG_LGE_ANDROID_USB
-	if (ret == 0)
-		gserial_setup(c->cdev->gadget, 3);
-#endif 
-// LGE_UPDATE_E 20110131 ttyGS0,1,2 setup
-	return ret;
-}
-
-static struct android_usb_function acm_function = {
-	.name = "nmea", //  "gser",
-	.bind_config = nmea_function_bind_config,
-};
-
-static int __init init(void)
-{
-	printk(KERN_INFO "f_nmea init\n");
-	android_register_function(&acm_function);
-	return 0;
-}
-module_init(init);
-
-#endif /* CONFIG_LGE_ANDROID_USB_NMEA */

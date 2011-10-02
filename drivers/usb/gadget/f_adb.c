@@ -278,6 +278,8 @@ static ssize_t adb_read(struct file *fp, char __user *buf,
 	int r = count, xfer;
 	int ret;
 
+	DBG(cdev, "adb_read(%d)\n", count);
+
 	if (count > BULK_BUFFER_SIZE)
 		return -EINVAL;
 
@@ -311,7 +313,7 @@ requeue_req:
 		dev->error = 1;
 		goto done;
 	} else {
-
+		DBG(cdev, "rx %p queue\n", req);
 	}
 
 	/* wait for a request to complete */
@@ -326,7 +328,7 @@ requeue_req:
 		if (req->actual == 0)
 			goto requeue_req;
 
-
+		DBG(cdev, "rx %p %d\n", req, req->actual);
 		xfer = (req->actual < count) ? req->actual : count;
 		if (copy_to_user(buf, req->buf, xfer))
 			r = -EFAULT;
@@ -335,7 +337,7 @@ requeue_req:
 
 done:
 	_unlock(&dev->read_excl);
-
+	DBG(cdev, "adb_read returning %d\n", r);
 	return r;
 }
 
@@ -347,6 +349,8 @@ static ssize_t adb_write(struct file *fp, const char __user *buf,
 	struct usb_request *req = 0;
 	int r = count, xfer;
 	int ret;
+
+	DBG(cdev, "adb_write(%d)\n", count);
 
 	if (_lock(&dev->write_excl))
 		return -EBUSY;
@@ -399,7 +403,7 @@ static ssize_t adb_write(struct file *fp, const char __user *buf,
 		req_put(dev, &dev->tx_idle, req);
 
 	_unlock(&dev->write_excl);
-
+	DBG(cdev, "adb_write returning %d\n", r);
 	return r;
 }
 

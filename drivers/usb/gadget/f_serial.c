@@ -57,8 +57,8 @@ static struct usb_interface_descriptor gser_interface_desc __initdata = {
 	/* .bInterfaceNumber = DYNAMIC */
 	.bNumEndpoints =	2,
 	.bInterfaceClass =	USB_CLASS_VENDOR_SPEC,
-	.bInterfaceSubClass =	USB_CLASS_VENDOR_SPEC,	//0,
-	.bInterfaceProtocol =	USB_CLASS_VENDOR_SPEC,	//0,
+	.bInterfaceSubClass =	0,
+	.bInterfaceProtocol =	0,
 	/* .iInterface = DYNAMIC */
 };
 
@@ -134,19 +134,6 @@ static int gser_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	/* we know alt == 0, so this is an activation or a reset */
 
-#if 1
-	if (gser->port.in->driver_data) {
-		DBG(cdev, "reset generic ttyGS%d\n", gser->port_num);
-		gserial_disconnect(&gser->port);
-	} else {
-		DBG(cdev, "activate generic ttyGS%d\n", gser->port_num);
-	}
-	
-	gser->port.in_desc = ep_choose(cdev->gadget,
-			gser->hs.in, gser->fs.in);
-	gser->port.out_desc = ep_choose(cdev->gadget,
-			gser->hs.out, gser->fs.out);
-#else
 	if (gser->port.in->driver_data) {
 		DBG(cdev, "reset generic ttyGS%d\n", gser->port_num);
 		gserial_disconnect(&gser->port);
@@ -157,8 +144,6 @@ static int gser_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		gser->port.out_desc = ep_choose(cdev->gadget,
 				gser->hs.out, gser->fs.out);
 	}
-#endif	// #if 1
-
 	gserial_connect(&gser->port, gser->port_num);
 	return 0;
 }
@@ -258,6 +243,9 @@ gser_unbind(struct usb_configuration *c, struct usb_function *f)
 	if (gadget_is_dualspeed(c->cdev->gadget))
 		usb_free_descriptors(f->hs_descriptors);
 	usb_free_descriptors(f->descriptors);
+	if (f->name) {
+		kfree(f->name);
+	}
 	kfree(func_to_gser(f));
 }
 
@@ -282,9 +270,7 @@ int __init gser_bind_config(struct usb_configuration *c, u8 port_num)
 	 * distinguish instances ...
 	 */
 
-
 	printk("gser_bind_config, port_num :%d", port_num);
-	
 	/* maybe allocate device-global string ID */
 	if (gser_string_defs[0].id == 0) {
 		status = usb_string_id(c->cdev);
@@ -300,42 +286,23 @@ int __init gser_bind_config(struct usb_configuration *c, u8 port_num)
 
 	gser->port_num = port_num;
 
-	gser->port.func.name = "gser";
+	gser->port.func.name = kzalloc(7, GFP_KERNEL);
+	if (gser->port.func.name) {
+		//snprintf((char*)gser->port.func.name, 7, "gser%d", gser->port_num);
+		snprintf((char*)gser->port.func.name, 5, "gser");
+	} else {
+		kfree(gser);
+		return -ENOMEM;
+	}
 	gser->port.func.strings = gser_strings;
 	gser->port.func.bind = gser_bind;
 	gser->port.func.unbind = gser_unbind;
 	gser->port.func.set_alt = gser_set_alt;
 	gser->port.func.disable = gser_disable;
 
-	gser->port.func.disabled = 0;
-
 	status = usb_add_function(c, &gser->port.func);
 	if (status)
 		kfree(gser);
 	return status;
 }
-
-#ifdef CONFIG_LGE_ANDROID_USB_DIAG
-int gser_function_bind_config(struct usb_configuration *c)
-{
-	int ret = gser_bind_config(c, 1);
-	return ret;
-}
-
-static struct android_usb_function acm_function = {
-	.name = "gser",
-	.bind_config = gser_function_bind_config,
-};
-
-static int __init init(void)
-{
-	printk(KERN_INFO "f_serial init\n");
-	android_register_function(&acm_function);
-	return 0;
-}
-module_init(init);
-
-#endif /* CONFIG_USB_ANDROID_ACM */
-
-
 

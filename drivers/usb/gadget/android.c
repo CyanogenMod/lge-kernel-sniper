@@ -54,8 +54,8 @@ MODULE_VERSION("1.0");
 static const char longname[] = "Gadget Android";
 
 /* Default vendor and product IDs, overridden by platform data */
-#define VENDOR_ID		0x1004	//0x0bb4
-#define PRODUCT_ID		0x618E	//0x0c03
+#define VENDOR_ID		0x18D1
+#define PRODUCT_ID		0x0001
 
 struct android_dev {
 	struct usb_composite_dev *cdev;
@@ -100,11 +100,7 @@ static struct usb_device_descriptor device_desc = {
 	.bLength              = sizeof(device_desc),
 	.bDescriptorType      = USB_DT_DEVICE,
 	.bcdUSB               = __constant_cpu_to_le16(0x0200),
-	.bDeviceClass         = USB_CLASS_MISC, 	//USB_CLASS_PER_INTERFACE,
-#ifdef CONFIG_MACH_LGE_OMAP3
-	.bDeviceSubClass      = 0x02,
-	.bDeviceProtocol      = 0x01,
-#endif /* CONFIG_MACH_LGE_OMAP3 */
+	.bDeviceClass         = USB_CLASS_PER_INTERFACE,
 	.idVendor             = __constant_cpu_to_le16(VENDOR_ID),
 	.idProduct            = __constant_cpu_to_le16(PRODUCT_ID),
 	.bcdDevice            = __constant_cpu_to_le16(0xffff),
@@ -162,7 +158,7 @@ static struct usb_configuration android_config_driver = {
 	.bind		= android_bind_config,
 	.setup		= android_setup_config,
 	.bConfigurationValue = 1,
-	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_WAKEUP,
+	.bmAttributes	= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
 	.bMaxPower	= 0xFA, /* 500ma */
 };
 
@@ -192,9 +188,6 @@ static int product_has_function(struct android_usb_product *p,
 	int i;
 
 	for (i = 0; i < count; i++) {
-		printk("product_has_function,i:%d, cnt:%d, p : %s, functions : %s, f->disabled:%d \n",
-			i, count,  *functions, name, f->disabled);
-
 		if (!strcmp(name, *functions++))
 			return 1;
 	}
@@ -204,9 +197,9 @@ static int product_has_function(struct android_usb_product *p,
 static int product_matches_functions(struct android_usb_product *p)
 {
 	struct usb_function		*f;
-	list_for_each_entry(f, &android_config_driver.functions, list) 
-	{
-		if (product_has_function(p, f) == !!f->disabled)
+	list_for_each_entry(f, &android_config_driver.functions, list) {
+		if (product_has_function(p, f) == !!f->disabled 
+			&& strcmp(f->name,"gser") && strcmp(f->name,"nmea"))
 			return 0;
 	}
 	return 1;
@@ -342,6 +335,9 @@ void android_enable_function(struct usb_function *f, int enable)
 			 */
 			list_for_each_entry(func, &android_config_driver.functions, list) {
 				if (!strcmp(func->name, "usb_mass_storage")
+					|| !strcmp(func->name, "acm")
+					|| !strcmp(func->name, "gser")
+					|| !strcmp(func->name, "nmea")
 					|| !strcmp(func->name, "mtp")) {
 					usb_function_set_enabled(func, !enable);
 				}

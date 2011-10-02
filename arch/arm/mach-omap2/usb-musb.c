@@ -36,6 +36,17 @@
 #include <plat/omap_hwmod.h>
 #include <plat/omap-pm.h>
 
+#define CONTROL_DEV_CONF                0x300
+#define PHY_PD				(1 << 0)
+
+#ifdef CONFIG_ARCH_OMAP4
+#define DIE_ID_REG_BASE         (L4_44XX_PHYS + 0x2000)
+#define DIE_ID_REG_OFFSET               0x200
+#else
+#define DIE_ID_REG_BASE         (L4_WK_34XX_PHYS + 0xA000)
+#define DIE_ID_REG_OFFSET               0x218
+#endif /* CONFIG_ARCH_OMAP4 */
+
 #ifdef CONFIG_USB_MUSB_SOC
 
 static const char name[] = "musb_hdrc";
@@ -50,35 +61,14 @@ static struct musb_hdrc_config musb_config = {
 	.ram_bits	= 12,
 };
 
-#define CONTROL_DEV_CONF		0x300
-#	define PHY_PD			(1 << 0)
-
-#ifdef CONFIG_ARCH_OMAP4
-#define DIE_ID_REG_BASE		(L4_44XX_PHYS + 0x2000)
-#define DIE_ID_REG_OFFSET		0x200
-#else
-#define DIE_ID_REG_BASE		(L4_WK_34XX_PHYS + 0xA000)
-#define DIE_ID_REG_OFFSET		0x218
-#endif /* CONFIG_ARCH_OMAP4 */
-
-#define MAX_USB_SERIAL_NUM		17	//jaejoong.kim 33
-#ifdef CONFIG_LGE_ANDROID_USB //!defined( CONFIG_LGE_ANDROID_USB )
-#define LGE_USB_VENDOR_ID		0x1004
-#define LGE_USB_PRODUCT_ID		0x618E
-#else	// for Linux_PC	and it will work only ADB mode
-#define LGE_USB_VENDOR_ID		0x0bb4
-#define LGE_USB_PRODUCT_ID		0x0c03
-#endif /*CONFIG_LGE_ANDROID_USB*/
-
-#define LGE_USB_VENDOR_NAME 		"LG Electronics. Inc"
-#define LGE_B_USB_DEVICE_NAME		"LGP970"
 #ifdef CONFIG_ANDROID
-
-#define OMAP_UMS_PRODUCT_ID		0xD100
-#define OMAP_ADB_PRODUCT_ID		0x0c03 //jaejoong.kim 0x0c03
-#define OMAP_UMS_ADB_PRODUCT_ID		0xD102
+#define MAX_USB_SERIAL_NUM		17
+#define OMAP_VENDOR_ID			0x1004 //0x0451
+#define OMAP_UMS_PRODUCT_ID		0x6000 //0xD100
+#define OMAP_ADB_PRODUCT_ID		0xD101
+#define OMAP_UMS_ADB_PRODUCT_ID		0x618E //0xD102
 #define OMAP_RNDIS_PRODUCT_ID		0xD103
-#define OMAP_RNDIS_ADB_PRODUCT_ID	0xD104
+#define OMAP_RNDIS_ADB_PRODUCT_ID	0x61D9 //0xD104
 #define OMAP_ACM_PRODUCT_ID		0xD105
 #define OMAP_ACM_ADB_PRODUCT_ID		0xD106
 #define OMAP_ACM_UMS_ADB_PRODUCT_ID	0xD107
@@ -86,11 +76,10 @@ static struct musb_hdrc_config musb_config = {
 #define OMAP_MTP_ADB_PRODUCT_ID 	0xD109
 #define OMAP_MTP_UMS_ADB_PRODUCT_ID	0xD10A
 
-//jjun.lee
-
 static char device_serial[MAX_USB_SERIAL_NUM];
 
 static char *usb_functions_ums[] = {
+	"acm",
 	"usb_mass_storage",
 };
 
@@ -99,6 +88,7 @@ static char *usb_functions_adb[] = {
 };
 
 static char *usb_functions_ums_adb[] = {
+	"acm",
 	"usb_mass_storage",
 	"adb",
 };
@@ -141,23 +131,12 @@ static char *usb_functions_mtp_ums_adb[] = {
 	"adb",
 };
 
-static char *usb_functions_lge_acm_diag_nmea_ums_adb[] = {
-	"acm",
-	"gser",	
-	"nmea",
-	"usb_mass_storage",
-	"adb",
-};
-
 static char *usb_functions_all[] = {
-#ifdef CONFIG_USB_ANDROID_ACM // LGE_CHANGE
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	"rndis",
+#endif
+#ifdef CONFIG_USB_ANDROID_ACM
 	"acm",
-#endif /* CONFIG_USB_ANDROID_ACM */
-#ifdef CONFIG_LGE_ANDROID_USB_DIAG
-	"gser",
-#endif /* CONFIG_LGE_ANDROID_USB_DIAG  */
-#ifdef CONFIG_LGE_ANDROID_USB_NMEA
-	"nmea",
 #endif
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 	"usb_mass_storage",
@@ -165,22 +144,12 @@ static char *usb_functions_all[] = {
 #ifdef CONFIG_USB_ANDROID_ADB
 	"adb",
 #endif
-#ifdef CONFIG_USB_ANDROID_RNDIS // LGE_CHANGE
-	"rndis",
-#endif
 #ifdef CONFIG_USB_ANDROID_MTP
 	"mtp",
 #endif
 };
 
 static struct android_usb_product usb_products[] = {
-	{
-#ifdef CONFIG_MACH_LGE_HUB 
-		.product_id     = LGE_USB_PRODUCT_ID,
-		.num_functions  = ARRAY_SIZE(usb_functions_all),
-		.functions      = usb_functions_all,
-	},
-#else	
 	{
 		.product_id     = OMAP_UMS_PRODUCT_ID,
 		.num_functions  = ARRAY_SIZE(usb_functions_ums),
@@ -236,21 +205,14 @@ static struct android_usb_product usb_products[] = {
 		.num_functions  = ARRAY_SIZE(usb_functions_mtp_ums_adb),
 		.functions      = usb_functions_mtp_ums_adb,
         },
-#endif	/* CONFIG_MACH_LGE_HUB */
 };
 
 /* standard android USB platform data */
 static struct android_usb_platform_data andusb_plat = {
-	.vendor_id		= LGE_USB_VENDOR_ID,	// OMAP_VENDOR_ID,
-
-	.product_id		= LGE_USB_PRODUCT_ID,	// OMAP_PRODUCT_ID,
-
-	.manufacturer_name	= LGE_USB_VENDOR_NAME, 	//"Texas Instruments Inc.",
-#ifdef CONFIG_MACH_LGE_HUB
-	.product_name		= "LGE LGP970 USB Device",
-#else
-	.product_name		= "OMAP-3/4",
-#endif /* CONFIG_MACH_LGE_HUB */
+	.vendor_id		= OMAP_VENDOR_ID,
+	.product_id		= OMAP_UMS_PRODUCT_ID,
+	.manufacturer_name	= "LG Electronics. Inc",
+	.product_name		= "P970",
 	.serial_number		= device_serial,
 	.num_products		= ARRAY_SIZE(usb_products),
 	.products		= usb_products,
@@ -268,14 +230,9 @@ static struct platform_device androidusb_device = {
 
 #ifdef CONFIG_USB_ANDROID_MASS_STORAGE
 static struct usb_mass_storage_platform_data usbms_plat = {
-	/*
-	 In struct of fsg_config, is following.
-		vendor 	: (8 chars or less)
-		product : (16 chars or less)
-	 */
-	.vendor		= "LGE", //LGE_USB_VENDOR_NAME, 	//jaejoong.kim "Texas Instruments Inc.",
-	.product	= "LGP970",
-	.release	= 0xFFFF,
+	.vendor		= "LGE",
+	.product	= "P970",
+	.release	= 1,
 	.nluns		= 1,
 };
 
@@ -291,7 +248,7 @@ static struct platform_device usb_mass_storage_device = {
 #ifdef CONFIG_USB_ANDROID_RNDIS
 static struct usb_ether_platform_data rndis_pdata = {
 	/* ethaddr is filled by board_serialno_setup */
-	.vendorID	= LGE_USB_VENDOR_ID,
+	.vendorID	= OMAP_VENDOR_ID,
 	.vendorDescr	= "Texas Instruments Inc.",
 	};
 
@@ -308,7 +265,6 @@ static void usb_gadget_init(void)
 {
 	unsigned int val[4] = { 0 };
 	unsigned int reg;
-	int ret_check = 0;
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	int i;
 	char *src;
@@ -326,12 +282,9 @@ static void usb_gadget_init(void)
 		val[2] = omap_readl(reg + 0x8);
 		val[3] = omap_readl(reg + 0xC);
 	}
+
 	snprintf(device_serial, MAX_USB_SERIAL_NUM, "%08X%08X%08X%08X",
 					val[3], val[2], val[1], val[0]);
-//	ret_check = snprintf(device_serial, MAX_USB_SERIAL_NUM, "0123456789ABCDEF");
-	if(0 > ret_check)
-		printk("usb_gadget_init(): fail to snprintf()!!\n");
-// LGE_UPDATE_S 20110125 jaejoong.kim usb porting B-Project GB
 
 #ifdef CONFIG_USB_ANDROID_RNDIS
 	/* create a fake MAC address from our serial number.
@@ -522,8 +475,7 @@ void musb_context_save_restore(enum musb_state state)
 	}
 
 	if (drv) {
-//#ifdef CONFIG_PM_RUNTIME
-#if 0
+#ifdef CONFIG_PM_RUNTIME
 		struct musb_hdrc_platform_data *pdata = dev->platform_data;
 		const struct dev_pm_ops *pm = drv->pm;
 
@@ -555,7 +507,7 @@ void musb_context_save_restore(enum musb_state state)
 					clk_disable(clk48m);
 				}
 				/* Enable ENABLEFORCE bit*/
-				__raw_writel(0x0, base + 0x414);
+				__raw_writel(0x1, base + 0x414);
 				pdata->device_idle(pdev);
 				break;
 
