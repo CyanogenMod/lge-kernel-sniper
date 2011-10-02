@@ -2815,22 +2815,19 @@ int ds_detect_task_type(void){
 						}
 						else
 #endif
-#if 1	// com.android.lgecamera. [application].
+#if 1	// com.android.camera. [application].
 						if(
 							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'r' && 
 							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'o' && 
 							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'i' && 
 							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd' && 
 							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'l' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'g' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'c' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'a'
+							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'c' && 
+							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'a' &&
+							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'm' &&
+							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'e' &&
+							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'r' &&
+							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'a'
 						)
 						{
 							new_type = DS_SRT_DAEMON_TASK;
