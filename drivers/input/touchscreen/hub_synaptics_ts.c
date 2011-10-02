@@ -50,8 +50,8 @@
 #define FEATURE_LGE_TOUCH_MOVING_IMPROVE
 #define FEATURE_LGE_TOUCH_JITTERING_IMPROVE
 #endif //end of seven
-#define FEATURE_LGE_TOUCH_GHOST_FINGER_IMPROVE
-#define FEATURE_LGE_TOUCH_GRIP_SUPPRESSION 
+//#define FEATURE_LGE_TOUCH_GHOST_FINGER_IMPROVE
+//#define FEATURE_LGE_TOUCH_GRIP_SUPPRESSION 
 
 #define FEATURE_LGE_TOUCH_REAL_TIME_WORK_QUEUE	
 #define FEATURE_LGE_TOUCH_ESD_DETECT					
@@ -657,8 +657,8 @@ do{
 					pr_debug("[TOUCH] Girp Region Pressed. IGNORE!!!\n" );
 				}
 				else
-				{
 				#endif 
+				{
 
 					if ((((ts_reg_data.fingers_data[i][3] & 0xf0) >> 4) - (ts_reg_data.fingers_data[i][3] & 0x0f)) > 0)
 						curr_ts_data.width[i] = (ts_reg_data.fingers_data[i][3] & 0xf0) >> 4;
@@ -906,8 +906,10 @@ do{
 						input_mt_sync(ts->input_dev);
 
 						
+#ifdef FEATURE_LGE_TOUCH_GHOST_FINGER_IMPROVE
 						if(curr_ts_data.X_position[1] || curr_ts_data.Y_position[1])
 							ghost_count=0; 
+#endif
 						
 						
 						pr_debug("[TOUCH-27] (X, Y) = (%d, %d), z = %d, w = %d\n", curr_ts_data.X_position[i], curr_ts_data.Y_position[i], curr_ts_data.pressure[i], curr_ts_data.width[i]);
@@ -1597,7 +1599,7 @@ static int synaptics_ts_probe(
 	set_bit(KEY_SEARCH, ts->input_dev->keybit);
 	set_bit(KEY_REJECT, ts->input_dev->keybit);
 
-	max_x = SYNAPTICS_PANEL_MAX_X;
+	max_x = SYNAPTICS_PANEL_MAX_X+1;
 	max_y = SYNAPTICS_PANEL_LCD_MAX_Y;
 	max_pressure = 0xFF;
 	max_width = 0x0F;
