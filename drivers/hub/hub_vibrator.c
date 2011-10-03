@@ -78,6 +78,7 @@ struct timed_vibrator_data {
 };
 
 static struct work_struct  vibrator_timeout;
+static struct work_struct  vibrator_start;
 
 static void hub_vibrator_gpio_enable (int enable)
 {
@@ -185,6 +186,11 @@ static int hub_vibrator_force_set(int nForce)
 }
 
 
+static void vibrator_enable_work(struct work_struct *wq)
+{
+    hub_vibrator_force_set(127);
+}
+
 static void vibrator_timeout_work(struct work_struct *wq)
 {
     hub_vibrator_force_set(0);
@@ -218,9 +224,6 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	
 	DEBUG_MSG("[!] %s() - value : %d.\n", __func__, value);
 
-	if (atomic_read(&vibe_timer_state))
-		return;
-
 	if (atomic_inc_return(&vibrator_work) != 1) {
 		atomic_dec(&vibrator_work);
 		return;
@@ -232,7 +235,7 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	if (value > 0) {
 		if (value > data->max_timeout)
 			value = data->max_timeout;
-		hub_vibrator_force_set(127); /* set Max Gain. */
+		schedule_work(&vibrator_start);
 		hrtimer_start(&data->timer, ktime_set(value / 1000, (value % 1000) * 1000000), HRTIMER_MODE_REL);
 	} else {
                 schedule_work(&vibrator_timeout);
@@ -283,6 +286,7 @@ static int vibrator_probe(struct platform_device *dev)
 	//hub_vibrator_intialize();
 
         INIT_WORK(&vibrator_timeout, vibrator_timeout_work);
+        INIT_WORK(&vibrator_start, vibrator_enable_work);
 
 	hrtimer_init(&hub_vibrator_data.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	hub_vibrator_data.timer.function = vibrator_timer_func;
