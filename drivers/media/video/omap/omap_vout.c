@@ -39,7 +39,12 @@
 #include <linux/irq.h>
 #include <linux/videodev2.h>
 #include <linux/slab.h>
-
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-16, */ 
+#if 1 /* TI Patch 14591 by Tushar */
+#include <linux/delay.h>
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-16 */
+#include <linux/wait.h> /* 20110721 dongyu.gwak@lge.com http://review.omapzoom.org/#change,13170 */
 #ifndef CONFIG_ARCH_OMAP4
 #include <media/videobuf-dma-sg.h>
 #else
@@ -90,6 +95,8 @@ enum dma_channel_state {
 	DMA_CHAN_ALLOTED,
 };
 
+#define LG_FW_ISP_RESERVE /* 20110716 dongyu.gwak@lge.com reserve isp for camera */
+
 #define QQVGA_WIDTH		160
 #define QQVGA_HEIGHT		120
 
@@ -107,8 +114,8 @@ enum dma_channel_state {
 
 /* 2048 x 2048 is max res supported by OMAP display controller */
 #define MAX_PIXELS_PER_LINE     2048
-
-#define VRFB_TX_TIMEOUT         200   // 1000 - Tushar - Temporarily modified for recording freeze issue caused by audio capture DMA error
+/* 20110721 dongyu.gwak@lge.com http://review.omapzoom.org/#change,13170 */
+#define VRFB_TX_TIMEOUT         1000 //- Tushar - Temporarily modified for recording freeze issue caused by audio capture DMA error
 #define VRFB_NUM_BUFS		OMAP_VOUT_MAX_BUFFERS
 
 /* Max buffer size tobe allocated during init */
@@ -121,6 +128,13 @@ enum dma_channel_state {
 (cpu_is_omap3630() ? 200000 : 166000) : 0)
 
 #ifdef CONFIG_OMAP3_ISP_RESIZER
+
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-16, */ 
+#if 1 /* TI Patch 14591 by Tushar */
+extern void tick_nohz_disable(int nohz);
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-16 */
+
 struct isp_node pipe;
 static int vrfb_configured;
 int use_isp_resizer_decoder = 0;
@@ -325,11 +339,23 @@ void omap_vout_isp_rsz_dma_tx_callback(void *arg)
 }
 
 static bool need_isp_rsz(struct omap_vout_device *vout) {
+#if 0 //LGE_CHANGE_S [jaedo.jin@lge.com] 2011-7-04, Tushar - OMAPS00243118 - [
 	if (vout->pix.height * vout->pix.width == VID_MAX_WIDTH * 720)
 		return true;
+#else 
+	 if ((vout->pix.height * vout->pix.width == VID_MAX_WIDTH * 720) || 
+		 (vout->pix.height * vout->pix.width > 864 * 480) || 
+		 (vout->pix.height > 864) ||
+		 (vout->pix.width > 864))
+	  return true;
+#endif //LGE_CHANGE_E [jaedo.jin@lge.com] 2011-7-04, Tushar - OMAPS00243118 - ]
 
 	return false;
 }
+
+#ifdef LG_FW_ISP_RESERVE /* 20110716 dongyu.gwak@lge.com reserve isp for camera */
+extern int isp_reserve;
+#endif /*LG_FW_ISP_RESERVE*/
 
 /* This function configures and initializes the ISP resizer*/
 static int init_isp_rsz(struct omap_vout_device *vout)
@@ -355,13 +381,22 @@ static int init_isp_rsz(struct omap_vout_device *vout)
 #else // Tushar - Customization for LGE h/w
 
 	if (vout->use_isp_rsz_for_downscale){
-		if (((abs(vout->win.w.width - 800) <= 4) && (abs(vout->win.w.height - 480) <= 4)) || 
+
+/* LGE_CHANGE [jaedo.jin@lge.com] 2011-7-27, Tushar OMAPS00245856  */ 
+/* modify following condition in a generic way to identify camera preview uecase,
+rest all can be considered as playback usecase and ISP resizer can be used based on 
+current resolution condition (>WVGA) along with camera preview mode flag.*/
+#ifdef LG_FW_ISP_RESERVE /* 20110716 dongyu.gwak@lge.com reserve isp for camera */
+		if(!isp_reserve)
+#else							
+		if ((((abs(vout->win.w.width - 800) <= 4) && (abs(vout->win.w.height - 480) <= 4)) || 
 					((abs(vout->win.w.width - 800) <= 4) && (abs(vout->win.w.height - 450) <= 4)
 //LGE_CHANGE_S [hj.eum@lge.com]  2011_05_09, for fixing video rotation issue (OMAPS00238355)
 					|| ((abs(vout->win.w.width - 480) <= 4) && (abs(vout->win.w.height - 270) <= 4))  // Tushar - [] - OMAPS00238355 - Portrait playback issue
 //LGE_CHANGE_E [hj.eum@lge.com]  2011_05_09, for fixing video rotation issue (OMAPS00238355)
-					)
-						){
+					)))
+#endif /*LG_FW_ISP_RESERVE*/
+		{
 					use_isp_resizer_decoder = 1;
 		}else{
 		
@@ -646,10 +681,7 @@ static void calc_overlay_window_params(struct omap_vout_device *vout,
 		info->out_height = temp;
 #ifndef CONFIG_ARCH_OMAP4
 
-//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
-//#if 1  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
-#ifdef ORG_GB_ROTATION  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
-//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#ifdef ORG_GB_ROTATION  // Tushar - omaps00241525 - //#if 1  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
 		info->pos_y = win->w.left;
 		info->pos_x = win->w.top;
 #else
@@ -674,10 +706,7 @@ static void calc_overlay_window_params(struct omap_vout_device *vout,
 		info->out_height = temp;
 #ifndef CONFIG_ARCH_OMAP4
 
-//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
-//#if 1  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
-#ifdef ORG_GB_ROTATION  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
-//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+#ifdef ORG_GB_ROTATION  // Tushar - omaps00241525 - //#if 1  // Tushar - [ Required in case video is positioned at (0,0) and video size is less than LCD size e.g. 640x480@(0,0) display on 480x800 LCD panel at 90 degree
 		info->pos_y = win->w.left;
 		info->pos_x = win->w.top;
 #else
@@ -1921,6 +1950,10 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 	/* src_port required only for OMAP1 */
 	omap_set_dma_src_params(tx->dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
 			dmabuf->bus_addr, src_element_index, src_frame_index);
+	
+	/* enable src data packing */
+	omap_set_dma_src_data_pack(tx->dma_ch, 1);  // Tushar - OMAPS00245785 - []
+
 	/*set dma source burst mode for VRFB */
 	omap_set_dma_src_burst_mode(tx->dma_ch, OMAP_DMA_DATA_BURST_16);
 
@@ -1942,7 +1975,10 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 
 	/*set dma dest burst mode for VRFB */
 	omap_set_dma_dest_burst_mode(tx->dma_ch, OMAP_DMA_DATA_BURST_16);
-	omap_dma_set_global_params(DMA_DEFAULT_ARB_RATE, 0x20, 0);
+
+	omap_set_dma_dest_data_pack(tx->dma_ch, 1);  // Tushar - OMAPS00245785 - []
+
+	omap_dma_set_global_params(DMA_DEFAULT_ARB_RATE, 0x20, 1);  // OMAPS00242883 - [] - For youtube lockup issue
 
 #ifdef CONFIG_PM
 	if (!cpu_is_omap44xx() && pdata->set_min_bus_tput) {
@@ -1957,9 +1993,13 @@ static int omap_vout_buffer_prepare(struct videobuf_queue *q,
 		}
 	}
 #endif
+	//Added to avoid the DMA timeout error /* 20110725 dongyu.gwak@lge.com TI patch */ 
+	//while downloading from the market using 3G, and recording with camera
+//	omap_dma_set_prio_lch(tx->dma_ch, 0, DMA_CH_PRIO_HIGH); //OMAPS00242883 - lockup issue
 
 	omap_start_dma(tx->dma_ch);
-	interruptible_sleep_on_timeout(&tx->wait, msecs_to_jiffies(VRFB_TX_TIMEOUT)); // , VRFB_TX_TIMEOUT); - Tushar - Temporarily modified for recording freeze issue caused by audio capture DMA error
+//	interruptible_sleep_on_timeout(&tx->wait, msecs_to_jiffies(VRFB_TX_TIMEOUT)); // , VRFB_TX_TIMEOUT); - Tushar - Temporarily modified for recording freeze issue caused by audio capture DMA error
+	wait_event_interruptible_timeout(tx->wait, tx->tx_status != 0, VRFB_TX_TIMEOUT); /* 20110721 dongyu.gwak@lge.com http://review.omapzoom.org/#change,13170 */  
 
 	if (tx->tx_status == 0) {
 		printk(KERN_ERR "%s: interruptible_sleep_on_timeout time(%d) out, stopping DMA\n", __func__, VRFB_TX_TIMEOUT);
@@ -3291,6 +3331,17 @@ static int vidioc_streamon(struct file *file, void *fh, enum v4l2_buf_type i)
 				((vout->vid_dev)->v4l2_dev).dev ,
 					OCP_INITIATOR_AGENT, 166 * 1000 * 4);
 		}
+
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-16, */ 
+#if 1 /* TI Patch 14591 by Tushar */
+		if(!cpu_is_omap44xx()) {
+			tick_nohz_disable(1);
+			/* Wait for 2 vsyncs before start processing buffers */
+			 mdelay(32);
+		}
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-16 */
+
 	}
 #endif
 
@@ -3395,11 +3446,19 @@ static int vidioc_streamoff(struct file *file, void *fh, enum v4l2_buf_type i)
 		pdata->set_min_bus_tput(
 			((vout->vid_dev)->v4l2_dev).dev,
 				OCP_INITIATOR_AGENT, 0);
+
+/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-16, */ 
+#if 1 /* TI Patch 14591 by Tushar */
+	tick_nohz_disable(0);
+#endif
+/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-16 */
+
 #endif
 
 finish:
 	INIT_LIST_HEAD(&vout->dma_queue);
 	ret = videobuf_streamoff(&vout->vbq);
+	
 	return ret;
 }
 

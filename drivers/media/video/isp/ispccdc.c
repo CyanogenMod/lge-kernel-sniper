@@ -875,6 +875,8 @@ static int ispccdc_config_datapath(struct isp_ccdc_device *isp_ccdc,
 	case CCDC_YUV_RSZ:
 		syn_mode |= ISPCCDC_SYN_MODE_SDR2RSZ;
 		syn_mode &= ~ISPCCDC_SYN_MODE_WEN;
+		ispccdc_enable_vp(isp_ccdc, 0);
+		ispccdc_enable_lsc(isp_ccdc, 0);
 		break;
 
 	case CCDC_YUV_MEM_RSZ:
