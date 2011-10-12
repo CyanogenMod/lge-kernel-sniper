@@ -1395,9 +1395,6 @@ wl_control_wl_start(struct net_device *dev)
 //	MUTEX_LOCK(iw->pub);
 
 	if (g_onoff == G_WLAN_SET_OFF) {
-// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [START] : kernel patch from Platform power consume TDR
-//bill.jung@lge.com - Don't restart. 
-#if 0
 		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_ON);
 #if defined(BCMLXSDMMC)
 		sdioh_start(NULL, 0);
@@ -1410,8 +1407,6 @@ wl_control_wl_start(struct net_device *dev)
 #endif
 
 		dhd_dev_init_ioctl(dev);
-#endif
-// LGE_WIFI_FEATURE : byungsu.jeon@lge.com : 110407 : merge [END] : kernel patch from Platform power consume TDR
 		g_onoff = G_WLAN_SET_ON;
 	}
 	WL_ERROR(("Exited %s \n", __FUNCTION__));

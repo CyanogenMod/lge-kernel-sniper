@@ -5869,8 +5869,9 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 #endif /* !defined(IGNORE_ETH0_DOWN) */
 			/* save country settinng if was pre-setup with priv ioctl */
 			dhd_os_proto_block(dhdp);
+/*
 			dhd_wl_ioctl_cmd(bus->dhd, WLC_GET_COUNTRY,
-				bus->dhd->country_code, sizeof(bus->dhd->country_code), FALSE, 0);
+				bus->dhd->country_code, sizeof(bus->dhd->country_code), FALSE, 0);*/
 			dhd_os_proto_unblock(dhdp);
 			/* Expect app to have torn down any connection before calling */
 			/* Stop the bus, disable F2 */
