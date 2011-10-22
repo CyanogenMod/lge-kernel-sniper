@@ -1847,7 +1847,7 @@ static int twl4030_bci_battery_get_property(struct power_supply *psy,
 	}
 			break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		val->intval = di->voltage_uV;
+		val->intval = di->voltage_uV * 1000;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
 		val->intval = di->current_uA;
