@@ -393,6 +393,42 @@ static struct v4l2_int_device rt8515_int_device = {
 	},
 };
 
+#include <linux/leds.h>
+
+static struct led_classdev fl_lcdev;
+static int prev_brightness = 0;
+
+static void fl_lcdev_brightness_set(struct led_classdev *led_cdev,
+                        int brightness)
+{
+	u8 s2c_data;
+	unsigned long dummy; // used for flash_off, needed by the timer function on a first place
+	unsigned long flags;
+
+	if (prev_brightness == brightness)
+		return;
+
+	prev_brightness = brightness;
+
+	if (brightness > 0 && brightness <=100) {
+		s2c_data = turn_percent_to_s2c(brightness);
+		spin_lock_irqsave(&rt8515_private.lock, flags);
+		rt8515_dev.pdata->torch_on(s2c_data);
+		spin_unlock_irqrestore(&rt8515_private.lock, flags);
+	} else {
+		rt8515_dev.pdata->flash_off(dummy);
+	}
+	return;
+}
+
+static int flashlight_probe(struct platform_device *pdev)
+{
+	fl_lcdev.name = pdev->name;
+	fl_lcdev.brightness_set = fl_lcdev_brightness_set;
+	fl_lcdev.brightness = 0;
+	return led_classdev_register(&pdev->dev, &fl_lcdev);
+}
+
 static int rt8515_probe(struct platform_device *pdev)
 {
 	struct rt8515_platform_data *pdata = pdev->dev.platform_data;
@@ -410,6 +446,8 @@ static int rt8515_probe(struct platform_device *pdev)
 		return -ENOENT;
 	}
 
+	flashlight_probe(pdev);
+
 	printk(KERN_ERR "rt8515_probe success\n");
 	return pdata->init();
 }
@@ -420,6 +458,8 @@ static int rt8515_remove(struct platform_device *pdev)
 	int ret = 0;
 
 	ret = del_timer(&flash_timer);
+
+	led_classdev_unregister(&fl_lcdev);
 	if (ret)
 		printk(KERN_ERR "flash_timer is still in use!\n");
 
