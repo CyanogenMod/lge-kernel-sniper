@@ -157,9 +157,13 @@ void omap_idle_notifier_end(void)
 }
 
 #endif
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [END]
 
 struct device *omap2_get_mpuss_device(void)
 {
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	if(ds_status.flag_correct_cpu_op_update_path == 0) 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!mpu_dev);
 	return mpu_dev;
 }
@@ -167,6 +171,9 @@ EXPORT_SYMBOL(omap2_get_mpuss_device);
 
 struct device *omap2_get_iva_device(void)
 {
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	if(ds_status.flag_correct_cpu_op_update_path == 0) 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!iva_dev);
 	return iva_dev;
 }
@@ -174,7 +181,9 @@ EXPORT_SYMBOL(omap2_get_iva_device);
 
 struct device *omap2_get_l3_device(void)
 {
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	if(ds_status.flag_correct_cpu_op_update_path == 0) 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!l3_dev);
 	return l3_dev;
 }
@@ -182,6 +191,9 @@ EXPORT_SYMBOL(omap2_get_l3_device);
 
 struct device *omap4_get_dsp_device(void)
 {
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
+	if(ds_status.flag_correct_cpu_op_update_path == 0) 
+	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!dsp_dev);
 	return dsp_dev;
 }
