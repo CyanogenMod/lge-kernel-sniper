@@ -51,7 +51,7 @@ EXTRA_CFLAGS = \
 	-DDHD_GPL \
 	-DBCMLXSDMMC \
 	-DBCMPLATFORM_BUS \
-	-Wall -Wstrict-prototypes -Werror \
+	-Wall -Wstrict-prototypes \
 	-I$(SRCROOT) \
 	-I$(SRCROOT)/include \
 	-I$(SRCROOT)/shared \
