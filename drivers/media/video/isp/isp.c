@@ -819,6 +819,7 @@ int isp_configure_interface(struct device *dev,
 	ispccdc_set_raw_offset(&isp->isp_ccdc, config->raw_fmt_in);
 
 	isp->mclk = config->cam_mclk;
+	isp_enable_mclk(dev);
 
 	isp_adjust_bandwidth(dev);
 
