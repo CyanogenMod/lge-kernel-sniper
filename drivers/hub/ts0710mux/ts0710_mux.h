@@ -28,6 +28,45 @@
 * shared between MUX and applications.
 */
 
+/* MUX DLCI(Data Link Connection Identifier) Configuration */
+/*
+*  DLCI     Service
+*   0    Control Channel
+*   1    Voice Call & Network-related
+*   2    SMS MO
+*   3    SMS MT
+*   4    Phonebook & related
+*   5    MISC
+*   6    CSD/FAX
+*   7    GPRS1
+*   8    GPRS2
+*   9    Logger CMD
+*   10   Logger Data
+*   11   Test CMD
+*   12   AGPS
+*   13   Net Monitor
+*/
+
+/* Mapping between DLCI and MUX device files */
+/*
+*   File Name   Minor  DLCI  AT Command/Data
+*   /dev/mux0     0     1     AT Command
+*   /dev/mux1     1     2     AT Command
+*   /dev/mux2     2     3     AT Command
+*   /dev/mux3     3     4     AT Command
+*   /dev/mux4     4     5     AT Command
+*   /dev/mux5     5     6     AT Command
+*   /dev/mux6     6     7     AT Command
+*   /dev/mux7     7     8     AT Command
+*   /dev/mux8     8     6     Data
+*   /dev/mux9     9     7     Data
+*   /dev/mux10    10    8     Data
+*   /dev/mux11    11    9     Data
+*   /dev/mux12    12    10    Data
+*   /dev/mux13    13    11    Data
+*   /dev/mux14    14    12    Data
+*   /dev/mux15    15    13    Data
+*/
 
 #define MUX_CMD_FILE_VOICE_CALL   "/dev/mux0"
 #define MUX_CMD_FILE_SMS_MO       "/dev/mux1"
@@ -51,20 +90,20 @@
 #define NUM_MUX_DATA_FILES 8
 #define NUM_MUX_FILES ( NUM_MUX_CMD_FILES  +  NUM_MUX_DATA_FILES )
 
-
+/* Special ioctl() upon a MUX device file for hanging up a call */
 #define TS0710MUX_IO_MSC_HANGUP 0x54F0
 
-
+/* Special ioctl() upon a MUX device file for MUX loopback test */
 #define TS0710MUX_IO_TEST_CMD 0x54F1
 
+/* Special Error code might be return from write() to a MUX device file  */
+#define EDISCONNECTED 900	/* Logical data link is disconnected */
 
-#define EDISCONNECTED 900	
-
-
-#define EREJECTED 901		
+/* Special Error code might be return from open() to a MUX device file  */
+#define EREJECTED 901		/* Logical data link connection request is rejected */
 
 #ifdef LGE_KERNEL_MUX
-#define TS0710MUX_MAJOR 0  
+#define TS0710MUX_MAJOR 0  /* Use dynamic allocation*/
 #else
 #define TS0710MUX_MAJOR 250 VBB 
 #endif
@@ -74,7 +113,7 @@
 
 
 
-#define TS0710MUX_TIME_OUT 250	
+#define TS0710MUX_TIME_OUT 250	/* 2500ms, for BP UART hardware flow control AP UART  */
 
 #define TS0710MUX_IO_DLCI_FC_ON 0x54F2
 #define TS0710MUX_IO_DLCI_FC_OFF 0x54F3
@@ -87,9 +126,9 @@
 #define TS0710MUX_SEND_BUF_SIZE (DEF_TS0710_MTU + TS0710MUX_SEND_BUF_OFFSET + 34)
 #define TS0710MUX_RECV_BUF_SIZE TS0710MUX_SEND_BUF_SIZE
 
-#define ACK_SPACE 66		
+#define ACK_SPACE 66		/* 6 * 11(ACK frame size)  */
 
-#define TS0710MUX_SERIAL_BUF_SIZE (DEF_TS0710_MTU + TS0710_MAX_HDR_SIZE + ACK_SPACE)	
+#define TS0710MUX_SERIAL_BUF_SIZE (DEF_TS0710_MTU + TS0710_MAX_HDR_SIZE + ACK_SPACE)	/* For BP UART problem: ACK_SPACE  */
 
 #define TS0710MUX_MAX_TOTAL_FRAME_SIZE (DEF_TS0710_MTU + TS0710_MAX_HDR_SIZE + FLAG_SIZE)
 #define TS0710MUX_MAX_CHARS_IN_BUF 65535
@@ -100,17 +139,17 @@
 #define CMDTAG 0x55
 #define DATATAG 0xAA
 
-#define ACK 0x4F		
+#define ACK 0x4F		/*For BP UART problem */
 
 
-#define SLIDE_BP_SEQ_OFFSET 1	
+#define SLIDE_BP_SEQ_OFFSET 1	/*offset from start flag */
 #ifdef LGE_KERNEL_MUX
 #define SEQ_FIELD_SIZE 0
 #else
 #define SEQ_FIELD_SIZE 1
 #endif
 
-#define ADDRESS_FIELD_OFFSET (1 + SEQ_FIELD_SIZE)	
+#define ADDRESS_FIELD_OFFSET (1 + SEQ_FIELD_SIZE)	/*offset from start flag */
 
 #ifndef UNUSED_PARAM
 #define UNUSED_PARAM(v) (void)(v)

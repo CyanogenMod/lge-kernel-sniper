@@ -123,4 +123,19 @@ struct twl4030_madc_user_parms {
 
 int twl4030_madc_conversion(struct twl4030_madc_request *conv);
 
+#ifdef CONFIG_LGE_OMAP3_EXT_PWR
+
+#define NO_INIT_CABLE		0
+#define UNKNOWN_CABLE		1
+#define TA_CABLE			2
+#define LT_CABLE			3
+#define USB_CABLE			4
+#define FORGED_TA_CABLE		5
+#define ABNORMAL_USB_100MA	6
+#define ABNORMAL_USB_400MA	7
+#define NO_CABLE			8
+
+extern int get_ext_pwr_type(void);
+#endif 
+
 #endif

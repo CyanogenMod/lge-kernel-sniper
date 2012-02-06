@@ -43,8 +43,7 @@
 #define OMAP3_UART1_BASE	OMAP2_UART1_BASE
 #define OMAP3_UART2_BASE	OMAP2_UART2_BASE
 #define OMAP3_UART3_BASE	0x49020000
-//2011_01_13 by seunghyun.yi@lge.com for UART4
-#define OMAP_UART4_BASE		0x49042000
+#define OMAP3_UART4_BASE	0x49042000	/* Only on 36xx */
 
 /* OMAP4 serial ports */
 #define OMAP4_UART1_BASE	OMAP2_UART1_BASE
@@ -105,6 +104,12 @@ extern void omap_uart_prepare_suspend(void);
 extern void omap_uart_prepare_idle(int num);
 extern void omap_uart_resume_idle(int num);
 extern void omap_uart_enable_irqs(int enable);
+//LGSI Saravanan TI Patch 14353
+#ifdef CONFIG_PM
+extern int omap_uart_per_errata(void);
+extern int omap_uart_check_per_uarts_used(void);
 #endif
+//LGSI Saravanan TI Patch 14353
 
+#endif
 #endif

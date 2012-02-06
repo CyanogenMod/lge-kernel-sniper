@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU General Public License along with
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+// prime@sdcmicro.com Reworked for 2.6.35 [START]
 
 /*#define DEBUG*/
 
@@ -30,8 +31,6 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
-#include <linux/wakelock.h>
-
 
 #include <plat/display.h>
 
@@ -98,7 +97,8 @@ static void read_status_reg(enum omap_dsi_index ix, u8* msg)
 #define DCS_CTRL_DISPLAY		0x53
 #define DCS_WRITE_CABC			0x55
 #define DCS_READ_CABC			0x56
-#define DCS_GET_ID1			0xf8	
+#define DCS_GET_ID1			0xf8	/*sunggyun.yu@lge.com for B-prj*/
+
 /* #define HUB_USE_ESD_CHECK */
 #define HUB_ESD_CHECK_PERIOD	msecs_to_jiffies(5000)
 
@@ -109,10 +109,6 @@ static int _hub_enable_te(struct omap_dss_device *dssdev, bool enable);
 #ifdef HUB_USE_ESD_CHECK
 static void hub_esd_work(struct work_struct *work);
 #endif
-
-/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-08-10, */ 
-static struct wake_lock hub_resume_wake_lock;
-/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-08-10 */
 
 /*LGE_CHANGE_S <sunggyun.yu@lge.com> */
   /*LG_CHANGE_S lee.hyunji@lge.com 20110223 LCD blinked in the middle of boot up a phone.*/
@@ -130,7 +126,6 @@ static int __init nolcd_setup(char *unused)
 {
 
 	lcd_off_boot = 1;
-	printk(KERN_INFO "lcd_off_boot %d\n", lcd_off_boot);
 	return 1;
 }
 __setup("nolcd", nolcd_setup);
@@ -138,8 +133,8 @@ __setup("nolcd", nolcd_setup);
 
 static int no_lcd_flag = 0; // 20100901 taehwan.kim@lge.com Add detection for factory array test 
 
-#if 0
 enum {
+	MIPI_SETTING,
 	CMD_GATESET_8_1,
 	CMD_GATESET_8_2,
 	CMD_SET_PARTIAL_AREA,
@@ -218,6 +213,7 @@ u8 lcd_command_for_mipi[][22] = {
 	[STAR08                     ] = {0x15,0x02,0xBD,0x11,},               
 	[STAR09                     ] = {0x15,0x02,0xBC,0xFF,},               
 #endif
+	[MIPI_SETTING				] = {0x39,0x13,0xBC,0x12,0x8A,0x02,0x04,0xFF,0xFF,0xFF,0x10,0xFF,0xFF,0x00,0xA6,0x14,0x0A,0x19,0x00,0x00,0xFF,},	  
 	[CMD_GATESET_8_1            ] = {0x23,0x02,0xCF,0x30,},                                                                           
 	[CMD_GATESET_8_2            ] = {0x23,0x02,0xCF,0x30,},                                                                           
 	[CMD_SET_PARTIAL_AREA       ] = {0x39,0x05,0x30,0x00,0x00,0x03,0x1F,},                                                            
@@ -233,8 +229,8 @@ u8 lcd_command_for_mipi[][22] = {
 	[CMD_RBIAS2                 ] = {0x23,0x02,0xB6,0x03,},                                                                           
 	[CMD_SET_DDVDHP             ] = {0x29,0x11,0xB7,0x1A,0x33,0x03,0x03,0x03,0x00,0x00,0x01,0x02,0x00,0x00,0x00,0x00,0x01,0x01,0x01,},
 	[CMD_SET_DDVDHM             ] = {0x29,0x0E,0xB8,0x1C,0x53,0x03,0x03,0x00,0x01,0x02,0x00,0x00,0x04,0x00,0x01,0x01,},               
-	[CMD_SET_VGH                ] = {0x29,0x0B,0xB9,0x0C,0x01,0x01,0x00,0x00,0x00,0x02,0x00,0x02,0x01,},                              
-	[CMD_SET_VGL                ] = {0x29,0x0B,0xBA,0x0D,0x01,0x01,0x00,0x00,0x00,0x02,0x00,0x02,0x01,},                              
+	[CMD_SET_VGH                ] = {0x29,0x0B,0xB9,0x0A,0x01,0x01,0x00,0x00,0x00,0x02,0x00,0x02,0x01,},                              
+	[CMD_SET_VGL                ] = {0x29,0x0B,0xBA,0x0F,0x01,0x01,0x00,0x00,0x00,0x02,0x00,0x02,0x01,},                                                                         
 	[CMD_SET_VCL                ] = {0x29,0x08,0xBB,0x00,0x00,0x00,0x00,0x01,0x02,0x01,},                                             
 	[CMD_NUMBER_OF_LINES        ] = {0x23,0x02,0xC1,0x01,},                                                                           
 	[CMD_NUMBER_OF_FP_LINES     ] = {0x23,0x02,0xC2,0x08,},                                                                           
@@ -283,72 +279,6 @@ u8 lcd_command_for_mipi[][22] = {
 	[NUM_CMD]                    = {0,},
 	[CMD_SET_TEAR_SCANLINE      ] = {0x39,0x03,0x44,0x00,0x00,},
 };
-#else
-enum {
-//	CMD_GATESET_8_1,
-	MIPI_SETTING,
-	CMD_SET_ADDRESS_MODE,
-	CMD_SETVGMPM,
-	CMD_SET_DDVDHP,
-	CMD_SET_DDVDHM,
-	CMD_SET_VGH,
-	CMD_SET_VGL,
-	CMD_NUMBER_OF_LINES,
-	CMD_1H_PERIOD,
-	CMD_SOURCE_PRECHARGE,
-	CMD_SOURCE_PRECHARGE_TIMING,
-	CMD_GATESET_3,
-	CMD_DOTINV,
-	CMD_PONSEQA,
-	CMD_PONSEQC,
-	CMD_BACKLIGHTCONTROL,
-	CMD_HIGH_SPEED_RAM,
-	CMD_GAMMA_SETTING_R_POS,
-	CMD_GAMMA_SETTING_R_NEG,
-	CMD_GAMMA_SETTING_G_POS,
-	CMD_GAMMA_SETTING_G_NEG,
-	CMD_GAMMA_SETTING_B_POS,
-	CMD_GAMMA_SETTING_B_NEG,
-	NUM_CMD,
-	CMD_SET_TEAR_SCANLINE,
-};
-
-u8 lcd_command_for_mipi[][22] = {
-//	[CMD_GATESET_8_1            ] = {0x23,0x02,0xCF,0x30,},         
-        [MIPI_SETTING               ] = {0x39,0x13,0xBC,0x12,0x8A,0x02,0x04,0xFF,0xFF,0xFF,0x10,0xFF,0xFF,0x00,0xA6,0x14,0x0A,0x19,0x00,0x00,0xFF,},      
-	[CMD_SET_ADDRESS_MODE       ] = {0x15,0x02,0x36,0x0A,},                                                                           
-	[CMD_SETVGMPM               ] = {0x23,0x02,0xB4,0xAA,},                                                                                                                                                    
-	[CMD_SET_DDVDHP             ] = {0x29,0x11,0xB7,0x1A,0x33,0x03,0x03,0x03,0x00,0x00,0x01,0x02,0x00,0x00,0x00,0x00,0x01,0x01,0x01,},
-	[CMD_SET_DDVDHM             ] = {0x29,0x0E,0xB8,0x1C,0x53,0x03,0x03,0x00,0x01,0x02,0x00,0x00,0x04,0x00,0x01,0x01,},               
-	[CMD_SET_VGH                ] = {0x29,0x0B,0xB9,0x0A,0x01,0x01,0x00,0x00,0x00,0x02,0x00,0x02,0x01,},                              
-	[CMD_SET_VGL                ] = {0x29,0x0B,0xBA,0x0F,0x01,0x01,0x00,0x00,0x00,0x02,0x00,0x02,0x01,},                                                                         
-	[CMD_NUMBER_OF_LINES        ] = {0x23,0x02,0xC1,0x01,},                                                                                                                                                  
-	[CMD_1H_PERIOD              ] = {0x23,0x02,0xC4,0x4C,},                                                                           
-	[CMD_SOURCE_PRECHARGE       ] = {0x23,0x02,0xC5,0x07,},                                                                           
-	[CMD_SOURCE_PRECHARGE_TIMING] = {0x29,0x03,0xC6,0xC4,0x04,},                                                                                                                                                
-	[CMD_GATESET_3              ] = {0x29,0x03,0xCA,0x04,0x04,},                                                                                                                                                
-	[CMD_DOTINV                 ] = {0x23,0x02,0xD6,0x01,},                                                                                                                                                   
-	[CMD_PONSEQA                ] = {0x29,0x0A,0xD8,0x01,0x05,0x06,0x0D,0x18,0x09,0x22,0x23,0x00,},                                                                                                      
-	[CMD_PONSEQC                ] = {0x29,0x06,0xDE,0x09,0x0F,0x21,0x12,0x04,},                                                                                                                                
-	[CMD_BACKLIGHTCONTROL       ] = {0x23,0x02,0x53,0x40,},                                                                          
-	[CMD_HIGH_SPEED_RAM         ] = {0x23,0x02,0xEA,0x01,},                                                                           
-  //[CMD_GAMMA_SETTING_R_POS    ] = {0x29,0x09,0xEB,0x01,0x33,0x14,0x10,0xB8,0x88,0x88,0x0F,}, // 2011/01/14 Rev. 0.4
-	[CMD_GAMMA_SETTING_R_POS    ] = {0x29,0x09,0xEB,0x00,0x33,0x12,0x10,0x98,0x88,0x87,0x0B,},                                        
-  //[CMD_GAMMA_SETTING_R_NEG    ] = {0x29,0x09,0xEC,0x01,0x33,0x14,0x10,0xB8,0x88,0x88,0x0F,}, // 2011/01/14 Rev. 0.4
-	[CMD_GAMMA_SETTING_R_NEG    ] = {0x29,0x09,0xEC,0x00,0x33,0x12,0x10,0x98,0x88,0x87,0x0B,},                                        
-  //[CMD_GAMMA_SETTING_G_POS    ] = {0x29,0x09,0xED,0x01,0x33,0x14,0x10,0xB8,0x88,0x88,0x0F,},                                        
-	[CMD_GAMMA_SETTING_G_POS    ] = {0x29,0x09,0xED,0x00,0x33,0x12,0x10,0x98,0x88,0x87,0x0B,},                                        
-  //[CMD_GAMMA_SETTING_G_NEG    ] = {0x29,0x09,0xEE,0x01,0x33,0x14,0x10,0xB8,0x88,0x88,0x0F,},                                        
-	[CMD_GAMMA_SETTING_G_NEG    ] = {0x29,0x09,0xEE,0x00,0x33,0x12,0x10,0x98,0x88,0x87,0x0B,},                                        
-  //[CMD_GAMMA_SETTING_B_POS    ] = {0x29,0x09,0xEF,0x01,0x33,0x14,0x10,0xB8,0x88,0x88,0x0F,},                                        
-	[CMD_GAMMA_SETTING_B_POS    ] = {0x29,0x09,0xEF,0x00,0x33,0x12,0x10,0x98,0x88,0x87,0x0B,},                                        
-  //[CMD_GAMMA_SETTING_B_NEG    ] = {0x29,0x09,0xF0,0x01,0x33,0x14,0x10,0xB8,0x88,0x88,0x0F,},                                        
-	[CMD_GAMMA_SETTING_B_NEG    ] = {0x29,0x09,0xF0,0x00,0x33,0x12,0x10,0x98,0x88,0x87,0x0B,},                                        
-	[NUM_CMD]                    = {0,},
-	[CMD_SET_TEAR_SCANLINE      ] = {0x39,0x03,0x44,0x00,0x00,},
-};
-#endif
-
 
 #define LCD_CMD(a)	(lcd_command_for_mipi[(a)][0])
 #define LCD_DAT(a)	(&lcd_command_for_mipi[(a)][2])
@@ -1026,10 +956,6 @@ static int hub_probe(struct omap_dss_device *dssdev)
 #endif
 /*LGE_CHANGE_E <sunggyun.yu@lge.com> */
 
-/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-08-10, */ 
-	wake_lock_init(&hub_resume_wake_lock, WAKE_LOCK_SUSPEND, "hub_resume");
-/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-08-10 */
-
 	return 0;
 
 err_sysfs:
@@ -1081,10 +1007,6 @@ static void hub_remove(struct omap_dss_device *dssdev)
 
 	/* reset, to be sure that the panel is in a valid state */
 	hub_hw_reset(dssdev);
-
-/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-08-10, */ 
-	wake_lock_destroy(&hub_resume_wake_lock);
-/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-08-10 */
 
 	kfree(td);
 }
@@ -1177,9 +1099,8 @@ err:
 
 	//lcd_off_boot =1; // rsy
 
-	if( lcd_off_boot == 0 ) {
+	if( lcd_off_boot == 0){
 		hub_hw_reset(dssdev);
-
 		omapdss_dsi_display_disable(dssdev);
 	}
 err0:
@@ -1346,23 +1267,11 @@ static int hub_resume(struct omap_dss_device *dssdev)
 
 	dev_dbg(&dssdev->dev, "resume\n");
 
-/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-08-10, */ 
-	wake_lock_timeout(&hub_resume_wake_lock, HZ);
-/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-08-10 */
-
 	mutex_lock(&td->lock);
 
 	bldev->props.power = FB_BLANK_UNBLANK;
 	hub_bl_update_status(bldev);
-/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-08-03, */ 
-#if 0 /* Even if disabled state, try to turn on lcd */
 	if (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) {
-#else 
-	if ( (dssdev->state != OMAP_DSS_DISPLAY_SUSPENDED) 
-			&& (dssdev->state != OMAP_DSS_DISPLAY_DISABLED) ) {
-		printk("%s : Error .. dss state %d\n", __func__, dssdev->state);
-#endif 
-/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-08-03 */
 		r = -EINVAL;
 		goto err;
 	}

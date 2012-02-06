@@ -2729,13 +2729,13 @@ static const s8 *get_scaling_coef(int orig_size, int out_size,
 		two_m < 58 ? fir5_m26 :
 		fir5_m32;
 }
-
+//[Saravanan LGSI]TI Patch 13749
 static void _dispc_set_vdma_attrs(enum omap_plane plane, bool enable)
 {
 	REG_FLD_MOD(dispc_reg_att[plane], enable ? 1 : 0, 20, 20);
 } //Deepak fix for OMAPS00238807
 
-
+//[Saravanan LGSI]TI Patch 13749
 static void _dispc_set_scaling(enum omap_plane plane,
 		u16 orig_width, u16 orig_height,
 		u16 out_width, u16 out_height,
@@ -2896,6 +2896,9 @@ static void _dispc_set_rotation_attrs(enum omap_plane plane, u8 rotation,
 	if (color_mode == OMAP_DSS_COLOR_YUV2 ||
 			color_mode == OMAP_DSS_COLOR_UYVY) {
 		int vidrot = 0;
+//LGE_CHANGE_S [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
+//#define ORG_GB_ROTATION // Tushar            
+//LGE_CHANGE_E [hj.eum@lge.com]  2011_04_22, for improve ISP to get 30fps (OMAPS00236923)
 #ifdef ORG_GB_ROTATION // Tushar
 		switch (rotation) {
 		case OMAP_DSS_ROT_0:
@@ -3575,6 +3578,9 @@ int dispc_scaling_decision(u16 width, u16 height,
 loop:
 		/* err if exhausted search region */
 		if (x == max_x_decim && y == max_y_decim) {
+   			DSSERR("dbglog : channel=%d in_w=%d, in_h=%d, out_w=%d, out_h=%d", 
+				channel, in_width, in_height,out_width, out_height);
+
 			DSSERR("failed to set up scaling, "
 					"required fclk rate = %lu Hz, "
 					"current fclk rate = %lu Hz\n",
@@ -3621,7 +3627,7 @@ static int _dispc_setup_plane(enum omap_plane plane,
 	u16 frame_height = height;
 	unsigned int field_offset = 0;
 
-	bool vdma; //Deepak fix for OMAPS00238807
+	bool vdma = false; //Deepak fix for OMAPS00238807
 
 	if (paddr == 0)
 		return -EINVAL;
@@ -3725,9 +3731,11 @@ static int _dispc_setup_plane(enum omap_plane plane,
 		}
 	}
 	 //Deepak fix for OMAPS00238807
+//[Saravanan LGSI]TI Patch 13749
 #if 0 // 2011-07-12, Tushar, TI engineer, recommend to delete below code( below is temp code at DCM )
 	if(width == 720 && height == 1280 && out_width == 360 && out_height == 640)
 #endif
+//[Saravanan LGSI]TI Patch 13749
 		vdma = dispc_is_vdma_req(rotation, color_mode);
 
 	if (vdma)	//Deepak fix for OMAPS00238807

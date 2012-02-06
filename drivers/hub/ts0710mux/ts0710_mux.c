@@ -70,7 +70,9 @@
 #include <asm/bitops.h>
 #include <asm/mach-types.h>
 
-
+//LGE_TELECA_JAVA_RIL_RECOVERY_264  -START
+//20110329, ramesh.chandrasekaran@teleca.com, RIL RECOVERY
+//Description: Enable the Ril Recovery tag. Undef this, to disable ril recovery
 #ifndef LGE_ENABLE_RIL_RECOVERY_MODE    
 #define LGE_ENABLE_RIL_RECOVERY_MODE    
 #endif
@@ -78,9 +80,11 @@
 #include <linux/delay.h>
 #include <mach/gpio.h>
 #define RECOVERY_MODE
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 #define IFX_MODEM_RESET_N 26
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 #endif
-
+//LGE_TELECA_JAVA_RIL_RECOVERY_264  -END
 #ifdef LGE_KERNEL_MUX
 #include <linux/spinlock.h>
 #include <linux/semaphore.h>
@@ -95,11 +99,27 @@
 
 #include "ts0710.h"
 #include "ts0710_mux.h"
-
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Initial declarations for data thrput measurement
+#ifdef DEBUG_THRPUT
+#include <linux/timer.h>
+//DBG_THRPUT_DLCID - Modify this to measure the throughput on appropriate DLCID
+#define DBG_THRPUT_DLCID 21 //Measure Data Channel trhoughput
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+static struct timer_list thrput_timer;
+unsigned long muxwtotb[32], muxrtotb[32];
+unsigned long totalmuxr, totalmuxw;
+static volatile int myflag=0;
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+//LGE_GB_TELECA_MUX_WRITE_RETRY_387  -START
+//20110321, ravi.holal@teleca.com
+//Description: mux write retry handling
 #define MUX_WRITE_MAX_RETRY 10
-
-
+//LGE_GB_TELECA_MUX_WRITE_RETRY_387  -END
 
 #define LOCK_T          spinlock_t
 #define CREATELOCK(_l)  spin_lock_init(&(_l))
@@ -110,8 +130,9 @@
 #define ATOMIC(_l,_f)   spin_lock_irqsave(&(_l),(_f))
 #define UNATOMIC(_l,_f) spin_unlock_irqrestore(&(_l),(_f))
 static int NR_MUXS;
-
-static struct tty_struct *ipc_tty = NULL;	
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+static struct tty_struct *ipc_tty;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 
 typedef struct {
 	u8 cmdtty;
@@ -145,7 +166,7 @@ struct mux_data {
 	unsigned char chunk[MAX_PACKET_SIZE];
 };
 #endif
-
+/* Bit number in flags of mux_send_struct */
 
 struct mux_recv_packet_tag {
 	u8 *data;
@@ -194,8 +215,10 @@ static volatile struct file * mux_filp[TS0710MAX_CHANNELS];
 static ts0710_con ts0710_connection;
 
 #ifdef LGE_KERNEL_MUX
-static DECLARE_MUTEX(spi_write_sema);
+static DECLARE_MUTEX(spi_write_sema); /* use semaphore to synchronize different threads*/
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 static struct semaphore spi_write_data_sema[33];	
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 struct spi_data_recived_struct {
     struct tty_struct *tty; 
     const u8 *data; 
@@ -203,134 +226,111 @@ struct spi_data_recived_struct {
     int size;
     int updated;
 };
-
-
-#define MAX_WAITING_FRAMES 400  
-static DECLARE_WAIT_QUEUE_HEAD(wq);
-static volatile short int frames_to_send_count[TS0710MAX_CHANNELS];
-
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_MUX_PERF_634  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: For Optimizing mux performance
+#define MAX_WAITING_FRAMES 1000 //100
+//LGE_GB_TELECA_MUX_PERF_634  -END
 struct spi_data_send_struct;
 struct spi_data_send_struct {
     struct spi_data_send_struct *next;
-    u8  dlci;	
+
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
     u8 *data;
     int size;
 };
 
 static LOCK_T frame_nodes_lock = SPIN_LOCK_UNLOCKED;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Locks to safeguard the data throughput data
+#ifdef DEBUG_THRPUT
+static LOCK_T thrput_lock = SPIN_LOCK_UNLOCKED;
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 static unsigned long lock_flag ;
 static struct spi_data_send_struct frame_node[MAX_WAITING_FRAMES];
 static struct spi_data_send_struct *frame_to_send[TS0710MAX_PRIORITY_NUMBER];          
 static struct spi_data_recived_struct spi_data_recieved;
-static struct task_struct *task = NULL;	
-static struct task_struct *write_task = NULL;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+static struct task_struct *task;
+static struct task_struct *write_task;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 static u8 default_priority_table[] = {
- 0,                      
- 7, 7, 7, 7, 7, 7, 7,    
-15,15,15,15,15,15,15,15, 
-23,23,23,23,23,23,23,23, 
-31,31,31,31,31,31,31,31, 
-39,39,39,39,39,39,39,39, 
-47,47,47,47,47,47,47,47, 
-55,55,55,55,55,55,55,55, 
-61,61,61,61,61,61,       
-63,63                    
+ 0,                      /* multiplexer control channel */
+ 7, 7, 7, 7, 7, 7, 7,    /* 1-7 DLC   */
+15,15,15,15,15,15,15,15, /* 8-15 DLC  */
+23,23,23,23,23,23,23,23, 	 /* 16-23 DLC */	
+31,31,31,31,31,31,31,31, /* 24-31 DLC */
+39,39,39,39,39,39,39,39, /* 32-39 DLC */
+47,47,47,47,47,47,47,47, /* 40-47 DLC */
+55,55,55,55,55,55,55,55, /* 48-55 DLC */
+61,61,61,61,61,61,       /* 56-61 DLC */
+63,63                    /* 62-63 DLC */
 };
-
-
-static u8 max_waiting_frames_count[] = {
- 20,                       
- 3, 3, 3, 3, 3, 3, 3,      
- 3, 3, 3, 3, 3, 3, 3, 3,   
- 3, 3, 3, 3, 3, 47, 3, 47, 
- 3, 47, 3, 47, 3, 3, 3, 3, 
- 3, 3, 3, 3, 3, 3, 3, 3,   
- 3, 3, 3, 3, 3, 3, 3, 3,   
- 3, 3, 3, 3, 3, 3, 3, 3,   
- 3, 3, 3, 3, 3, 3,         
- 3, 3                      
-};
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//removed
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 
 
 static int max_frame_usage = 0;
 static void nodes_init(void)
 {
     int i;
-
-    LOCK(frame_nodes_lock);
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_CR_405	-START
+//20110322, ravi.holal@teleca.com
+//Description: lockup during utube streaming 
+    spin_lock_irqsave(&frame_nodes_lock, lock_flag);
+//LGE_GB_TELECA_CR_405	-END
 
     
     for (i=0; i<MAX_WAITING_FRAMES;i++){
         frame_node[i].next = NULL;
-        frame_node[i].dlci = 0;		
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
         frame_node[i].data = NULL;
         frame_node[i].size = 0;
     }
     for (i=0; i<TS0710MAX_PRIORITY_NUMBER;i++){
         frame_to_send[i]=NULL;
     }
-
-    for (i = 0; i < TS0710MAX_CHANNELS; i++) {
-        frames_to_send_count[i] = 0;
-    }
-
-    UNLOCK(frame_nodes_lock);
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_CR_405	-START
+//20110322, ravi.holal@teleca.com
+//Description: lockup during utube streaming 
+//LGE_GB_TELECA_CR_405	-END
+    spin_unlock_irqrestore(&frame_nodes_lock, lock_flag);
 }
 
 static int node_put_to_send(u8 dlci, u8 *data, int size)
 {
     int i;
-    int retval = -ENOMEM;		
-    int tmp_int = -1;		
+    int retval = 0; 
     int free_node = MAX_WAITING_FRAMES+1;
     struct spi_data_send_struct *new_frame;
-    u8 * buf;			
+//    u8 * buf;
     u8 priority;
 	int frame_count = 0;
 
-
-#ifdef TS0710LOG
-    unsigned int smp_id = smp_processor_id();
-#endif
-    int dont_wait = (in_interrupt() || ((mux_filp[dlci] != NULL) && (mux_filp[dlci]->f_flags & O_NONBLOCK)));
-
-
-
-
-    if(dont_wait){
-        if ((frames_to_send_count[dlci] >= max_waiting_frames_count[dlci])){
-            
-            return retval;
-        }
-    }
-    else{
-        while (0 != tmp_int){
-            tmp_int = wait_event_interruptible(wq, (frames_to_send_count[dlci] < max_waiting_frames_count[dlci]));
-            
-        }
-    }
-
-    
-
-
     priority = ts0710_connection.dlci[dlci].priority;    
-    buf = kmalloc(size, GFP_ATOMIC);
-    if (buf){
-         memcpy(buf, data, size);
-	}
-    else{
-
-         return -ENOMEM;
-    }
-        
-
-
-    LOCK(frame_nodes_lock);
-       
-
+//    buf = kmalloc(size, GFP_ATOMIC);
+//    if (buf)
+//         memcpy(buf, data, size);
+//    else
+//    {
+//         printk("\nTS0710:node_put_to_send:buf null, return ENOMEM\r\n");
+//         return -ENOMEM;
+//    }
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_CR_405	-START
+//20110322, ravi.holal@teleca.com
+//Description: lockup during utube streaming   
+    spin_lock_irqsave(&frame_nodes_lock, lock_flag);
+//LGE_GB_TELECA_CR_405	-END
 
 
   
@@ -339,15 +339,14 @@ static int node_put_to_send(u8 dlci, u8 *data, int size)
             free_node = i;
             if(free_node > max_frame_usage){
                 max_frame_usage = free_node;
-	
+                //printk("\nTS0710:node_put_to_send:max_frame_usage=%d\n",max_frame_usage);
             }
             break;    
         }
     }
     if(free_node < MAX_WAITING_FRAMES){
         frame_node[free_node].next = NULL;
-            frame_node[free_node].dlci = dlci;	
-            frame_node[free_node].data = buf;		
+        frame_node[free_node].data = data;
         frame_node[free_node].size = size;
         retval = size;
         if(frame_to_send[priority] == NULL){
@@ -357,46 +356,42 @@ static int node_put_to_send(u8 dlci, u8 *data, int size)
             new_frame = frame_to_send[priority];
             while (new_frame->next != NULL){
                 new_frame = new_frame->next;
-
-
-
-
+                frame_count++;
+                if(frame_count>MAX_WAITING_FRAMES) {
+                  printk("\n Never hit this case : frame_count(%d) > MAX_WAITING_FRAMES[%d]\r\n", frame_count, MAX_WAITING_FRAMES);
+                  break;
             }
+        }
             new_frame->next = &frame_node[free_node];
-        }
-            ++frames_to_send_count[dlci];		
     }
-
-   
-        UNLOCK(frame_nodes_lock);
-
-        if (retval < 0) {
-            
-            kfree(buf);
         }
-        else {
-            
-            up(&spi_write_sema);
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Add the bytes to the array index corres. to DLC
+#ifdef DEBUG_THRPUT
+    if(retval > 0){
+
+		  myflag = 1;
+          muxwtotb[dlci] += size;
+ 		  totalmuxw += size;
+		  myflag = 0;
         }
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+    spin_unlock_irqrestore(&frame_nodes_lock, lock_flag);
 
-
-#if 0
     if(free_node >= MAX_WAITING_FRAMES){
-       	
+       	TS0710_DEBUG("\nTS0710 free_node[%d] < MAX_WAITING_FRAMES\r\n", free_node);
         kfree(data);
         retval = -ENOMEM; 
     }
 
-
-    UNLOCK(frame_nodes_lock);
-
     if(retval > 0 ){
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
         up(&spi_write_sema);
     }
-#endif
- 
-
-
     return retval;
 } 
 
@@ -466,7 +461,9 @@ static void ts0710_upon_disconnect(void)
 	ts0710_reset_con();
 }
 
+/* Sending packet functions */
 
+/* See TS 07.10's Section 5.2.1.6 */
 static u_int8_t fcs_table[0x100];
 static void fcs_init(void)
 {
@@ -484,7 +481,7 @@ static void fcs_init(void)
 	}
 }
 
-
+/* Computes the FCS checksum for a chunk of data.  */
 static u_int8_t mux_fcs_compute(const u8 payload[], int len)
 {
 	u8 gen_reg;
@@ -496,33 +493,33 @@ static u_int8_t mux_fcs_compute(const u8 payload[], int len)
 	return ~gen_reg;
 }
 
-#ifndef LGE_KERNEL_MUX
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+/* Returns 1 if the given chunk of data has a correct FCS appended.  */
 static int mux_fcs_check(const u8 payload[], int len)
 {
 	return mux_fcs_compute(payload, len + 1) == 0xcf;
 }
-#endif
 
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+/* See TS 07.10's Section 5.2.1 */
 static int mux_send_frame(u8 dlci, int initiator,
 		enum mux_frametype frametype, const u8 data[], int len)
 {
-	u8 framebuf[2048];		
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+
 	int pos = 0;
 	int pf, crc_len, res;
 	int cr = initiator & 0x1;
-#if 0
   u_int8_t fcs;
   u8 *framebuf = kmalloc(2048, GFP_ATOMIC);
 
   if (!framebuf) {
-
+    printk(KERN_ERR "mux_send_frame:: Alloc Failed \n");
     return -1;
   }
-#endif
 
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+	/* FIXME: bitmask? */
 	switch (frametype) {
 		case MUX_UIH:
 		case ACK:
@@ -538,30 +535,41 @@ static int mux_send_frame(u8 dlci, int initiator,
 			crc_len = 0;
 	}
 
-
+	/* if (dlc->muxer->option == mux_option_basic) */
 		framebuf[pos++] = MUX_BASIC_FLAG_SEQ;
+	/* else
+		framebuf[pos++] = MUX_ADVANCED_FLAG_SEQ; */
 	
+	/* Address field.  */
 	framebuf[pos++] = MUX_EA | (cr << 1) | (dlci << 2);
 
-	
+	/* Control field.  */
 	framebuf[pos++] = frametype | (pf << 4);
 
-	
+	/* Length indicator.  */
+	/* if (dlc->muxer->option == mux_option_basic) { */
 		if (len & ~0x7f) {
 			framebuf[pos ++] = 0 | ((len & 0x7f) << 1);
 			framebuf[pos ++] = len >> 7;
 		} else
 			framebuf[pos ++] = 1 | (len << 1);
+	/* } */
 	
-
-	
+	/* Information field.  */
 	if (len)
 		memcpy(&framebuf[pos], data, len);
 	pos += len;
-	framebuf[pos++] = mux_fcs_compute(framebuf + 1, pos - 1 - crc_len);
 
+    fcs = mux_fcs_compute(framebuf + 1, (pos - 1 - crc_len));
+     framebuf[pos++] = fcs;
 
+	/*if (dlc->muxer->option == mux_option_advanced)
+		pos = mux_frame_escape(framebuf + 1, pos - 1) + 1;
+
+	if (dlc->muxer->option == mux_option_basic) */
 		framebuf[pos ++] = MUX_BASIC_FLAG_SEQ;
+	/* else
+		framebuf[pos ++] = MUX_ADVANCED_FLAG_SEQ; */
 #ifdef LGE_KERNEL_MUX
     res = node_put_to_send( dlci, framebuf, pos);
     if(res == -ENOMEM){
@@ -569,21 +577,21 @@ static int mux_send_frame(u8 dlci, int initiator,
     }
 #else    
 	res = ipc_tty->ops->write(ipc_tty, framebuf, pos);
-//     kfree(framebuf);		
+     kfree(framebuf);
 #endif
 
 	if (res != pos) {
-		
-        if (res < 0)		
-            return res;
-        else				
+		TS0710_PRINTK("mux_send_frame error %d\n", res);
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+	//	panic("mux send fram error !!"); // EBS TEST
 		return -1;
 	}
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 #ifdef LGE_KERNEL_MUX
-	
+	/* Function should return number of sent information bytes. 
+	Therefore need to decrease ret variable */
 	if (len & ~0x7f) {
-		
+		/* Length indicator have two octet size. */
 		res -= 7;
 	} else {
 		res -= 6;
@@ -593,14 +601,14 @@ static int mux_send_frame(u8 dlci, int initiator,
 	return res;
 }
 
-
+/* Creates a UA packet and puts it at the beginning of the pkt pointer */
 
 static void send_ua(ts0710_con * ts0710, u8 dlci)
 {
 	mux_send_frame(dlci, !ts0710->initiator, MUX_UA, 0, 0);
 }
 
-
+/* Creates a DM packet and puts it at the beginning of the pkt pointer */
 
 static void send_dm(ts0710_con * ts0710, u8 dlci)
 {
@@ -612,21 +620,23 @@ static void send_sabm(ts0710_con * ts0710, u8 dlci)
 	mux_send_frame(dlci, ts0710->initiator, MUX_SABM, 0, 0);
 }
 
-#ifndef LGE_KERNEL_MUX
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 static void send_disc(ts0710_con * ts0710, u8 dlci)
 {
 	mux_send_frame(dlci, !ts0710->initiator, MUX_DISC, 0, 0);
 }
-#endif
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 
+/* Multiplexer command packets functions */
 
+/* Turns on the ts0710 flow control */
 
 static void ts0710_fcon_msg(ts0710_con * ts0710, u8 cr)
 {
 	mux_send_uih(ts0710, cr, FCON, 0, 0);
 }
 
-
+/* Turns off the ts0710 flow control */
 
 static void ts0710_fcoff_msg(ts0710_con * ts0710, u8 cr)
 {
@@ -634,7 +644,8 @@ static void ts0710_fcoff_msg(ts0710_con * ts0710, u8 cr)
 }
 
 
-
+/* Sends an PN-messages and sets the not negotiable parameters to their
+   default values in ts0710 */
 
 static void send_pn_msg(ts0710_con * ts0710, u8 prior, u32 frame_size,
 		       u8 credit_flow, u8 credits, u8 dlci, u8 cr)
@@ -659,7 +670,7 @@ static void send_pn_msg(ts0710_con * ts0710, u8 prior, u32 frame_size,
 	mux_send_uih(ts0710, cr, PN, data, 8);
 }
 
-
+/* Send a Not supported command - command, which needs 3 bytes */
 
 static void send_nsc_msg(ts0710_con * ts0710, mcc_type cmd, u8 cr)
 {
@@ -668,18 +679,11 @@ static void send_nsc_msg(ts0710_con * ts0710, mcc_type cmd, u8 cr)
 
 static void mux_send_uih(ts0710_con * ts0710, u8 cr, u8 type, u8 *data, int len)
 {
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
      u8 *send = kmalloc(len + 2, GFP_ATOMIC);
 
-     mcc_short_frame_head *head;		
-
-     if(send==NULL){
-       
-       return;
-     }
-
-     head = (mcc_short_frame_head *)send;		
-
-//	mcc_short_frame_head *head = (mcc_short_frame_head *)send;
+	mcc_short_frame_head *head = (mcc_short_frame_head *)send;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 	head->type.ea = 1;
 	head->type.cr = cr;
 	head->type.type = type;
@@ -700,12 +704,20 @@ static int mux_send_uih_data(ts0710_con * ts0710, u8 dlci, u8 *data, int len)
 #ifdef LGE_KERNEL_MUX
     u8 *send = NULL;
 	if (len){
-        send = kmalloc(len + 1, GFP_ATOMIC);
-        if(send != NULL){
-            memcpy(send, data, len);
-            ret = mux_send_frame(dlci, ts0710->initiator, MUX_UIH, send, len);
-            kfree(send);
+
+//LGE_GB_TELECA_MUX_PERF_634  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Optimizing unnecessary memory allocations
+
+        //send = kmalloc(len + 1, GFP_ATOMIC); 
+        if(data != NULL){
+            //memcpy(send, data, len);
+            //ret = mux_send_frame(dlci, ts0710->initiator, MUX_UIH, send, len); 
+			ret = mux_send_frame(dlci, ts0710->initiator, MUX_UIH, data, len); 
+            //kfree(send); 
         }
+//LGE_GB_TELECA_MUX_PERF_634  -END
+
     }
 #else
 	u8 *send = kmalloc(len + 2, GFP_ATOMIC);
@@ -754,19 +766,21 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 	switch (mcc_short_pkt->h.type.type) {
 
 	case FCON:		/*Flow control on command */
-		
+		TS0710_PRINTK("MUX Received Flow control(all channels) on command\n");
 		if (mcc_short_pkt->h.type.cr == MCC_CMD) {
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 			for (j = 0; j < TS0710_MAX_CHN; j++) {
 				ts0710->dlci[j].state = CONNECTED;
 				up(&spi_write_data_sema[j]);
-				(void)down_trylock(&spi_write_data_sema[j]);
+				down_trylock(&spi_write_data_sema[j]);
 			}
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 			ts0710_fcon_msg(ts0710, MCC_RSP);
 		}
 		break;
 
 	case FCOFF:		/*Flow control off command */
-		
+		TS0710_PRINTK("MUX Received Flow control(all channels) off command\n");
 		if (mcc_short_pkt->h.type.cr == MCC_CMD) {
 			for (j = 0; j < TS0710_MAX_CHN; j++) {
 				ts0710->dlci[j].state = FLOW_STOPPED;
@@ -782,33 +796,32 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 
 			dlci = (mcc_short_pkt->value[0]) >> 2;
 			v24_sigs = mcc_short_pkt->value[1];
-
-#ifndef LGE_KERNEL_MUX
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 			if ((ts0710->dlci[dlci].state != CONNECTED)
 			    && (ts0710->dlci[dlci].state != FLOW_STOPPED)) {
 				send_dm(ts0710, dlci);
 				break;
 			}
-#endif
 
 			if (mcc_short_pkt->h.type.cr == MCC_CMD) {
-				
+				TS0710_DEBUG("Received Modem status command\n");
 				if ((v24_sigs & 2) && (ts0710->dlci[dlci].state == CONNECTED)) {
-
+					TS0710_LOG ("MUX Received Flow off on dlci %d\n", dlci);
 					ts0710->dlci[dlci].state = FLOW_STOPPED;
 				} else if (MUX_STOPPED(ts0710,dlci)) {
 					ts0710->dlci[dlci].state = CONNECTED;
-
+					TS0710_LOG ("MUX Received Flow on on dlci %d\n", dlci);
 					up(&spi_write_data_sema[dlci]);
-                    (void)down_trylock(&spi_write_data_sema[dlci]);
+					down_trylock(&spi_write_data_sema[dlci]);
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 				}
 
 				ts0710_msc_msg(ts0710, v24_sigs, MCC_RSP, dlci);
 			} else {
-				
+				TS0710_DEBUG("Received Modem status response\n");
 
 				if (v24_sigs & 2) {
-					
+					TS0710_DEBUG("Flow stop accepted\n");
 				}
 			}
 			break;
@@ -823,19 +836,19 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 			pn_pkt = (pn_msg *) data;
 			dlci = pn_pkt->dlci;
 			frame_size = GET_PN_MSG_FRAME_SIZE(pn_pkt);
-			
+			TS0710_DEBUG("Received DLC parameter negotiation, PN\n");
 
 			if (pn_pkt->mcc_s_head.type.cr == MCC_CMD) {
-				
-				
+				TS0710_DEBUG("received PN command with:\n");
+				TS0710_DEBUG("Frame size:%d\n", frame_size);
 
 				frame_size = min(frame_size, ts0710->dlci[dlci].mtu);
 				send_pn_msg(ts0710, pn_pkt->prior, frame_size, 0, 0, dlci, MCC_RSP);
 				ts0710->dlci[dlci].mtu = frame_size;
-				
+				TS0710_DEBUG("process_mcc : mtu set to %d\n", ts0710->dlci[dlci].mtu);
 			} else {
-				
-				
+				TS0710_DEBUG("received PN response with:\n");
+				TS0710_DEBUG("Frame size:%d\n", frame_size);
 
 				frame_size = min(frame_size, ts0710->dlci[dlci].mtu);
 				ts0710->dlci[dlci].mtu = frame_size;
@@ -849,12 +862,12 @@ void process_mcc(u8 * data, u32 len, ts0710_con * ts0710, int longpkt)
 			break;
 		}
 
-	case NSC:		
-		
+	case NSC:		/*Non supported command resonse */
+		TS0710_LOG("MUX Received Non supported command response\n");
 		break;
 
-	default:		
-		
+	default:		/*Non supported command received */
+		TS0710_LOG("MUX Received a non supported command\n");
 		send_nsc_msg(ts0710, mcc_short_pkt->h.type, MCC_RSP);
 		break;
 	}
@@ -898,14 +911,15 @@ static void ts0710_flow_on(u8 dlci, ts0710_con * ts0710)
 
 	ts0710->dlci[dlci].flow_control = 0;
 }
-
-#ifndef LGE_KERNEL_MUX
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//removed ifndef //CONFIG_LGE_KERNEL_MUX
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 static void ts0710_flow_off(struct tty_struct *tty, u8 dlci,
 		ts0710_con * ts0710)
 {
 	int i;
 
-	
+	TS0710_PRINTK("flow off\n");
 
 	if (test_and_set_bit(TTY_THROTTLED, &tty->flags))
 		return;
@@ -925,12 +939,14 @@ static void ts0710_flow_off(struct tty_struct *tty, u8 dlci,
 		if (ts0710_msc_msg(ts0710, EA | FC | RTC | RTR | DV, MCC_CMD, dlci) < 0) 
 			continue;
 
-		
+		TS0710_LOG("\nMUX send Flow off on dlci %d\n", dlci);
 		ts0710->dlci[dlci].flow_control = 1;
 		break;
 	}
 }
-#endif
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//removed ifndef //CONFIG_LGE_KERNEL_MUX
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 
 void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int len)
 {
@@ -941,19 +957,19 @@ void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int le
 
 	switch (CLR_PF(short_pkt->h.control)) {
 	case SABM:
-		
-		
+		TS0710_DEBUG("SABM-packet received\n");
+		TS0710_DEBUG("server channel == 0\n");
 		ts0710->dlci[0].state = CONNECTED;
 
-		
+		TS0710_DEBUG("sending back UA - control channel\n");
 		send_ua(ts0710, 0);
 		wake_up_interruptible(&ts0710->dlci[0].open_wait);
 
 		break;
 	case UA:
+		TS0710_DEBUG("UA packet received\n");
 		
-
-		
+		TS0710_DEBUG("server channel == 0\n");
 
 		if (ts0710->dlci[0].state == CONNECTING) {
 			ts0710->dlci[0].state = CONNECTED;
@@ -962,13 +978,13 @@ void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int le
 		} else if (ts0710->dlci[0].state == DISCONNECTING) {
 			ts0710_upon_disconnect();
 		} else {
-			
+			TS0710_DEBUG(" Something wrong receiving UA packet\n");
 		}
 
 		break;
 	case DM:
-		
-		
+		TS0710_DEBUG("DM packet received\n");
+		TS0710_DEBUG("server channel == 0\n");
 
 		if (ts0710->dlci[0].state == CONNECTING) {
 			be_connecting = 1;
@@ -982,49 +998,49 @@ void ts0710_recv_data_server(ts0710_con * ts0710, short_frame *short_pkt, int le
 
 		break;
 	case DISC:
+		TS0710_DEBUG("DISC packet received\n");
 		
-
-		
+		TS0710_DEBUG("server channel == 0\n");
 
 		send_ua(ts0710, 0);
-		
+		TS0710_DEBUG("DISC, sending back UA\n");
 
 		ts0710_upon_disconnect();
 
 		break;
 
 	case UIH:
-		
+		TS0710_DEBUG("UIH packet received\n");
 
 		if (GET_PF(short_pkt->h.control)) {
-			
-				
+			TS0710_LOG("MUX Error %s: UIH packet with P/F set, discard it!\n",
+				__FUNCTION__);
 			break;
 		}
 
 		/* FIXME: connected and flow */
 
 		if ((short_pkt->h.length.ea) == 0) {
-			
+			TS0710_DEBUG("Long UIH packet received\n");
 			long_pkt = (long_frame *) short_pkt;
 			uih_len = GET_LONG_LENGTH(long_pkt->h.length);
 			uih_data_start = long_pkt->h.data;
-			
+			TS0710_DEBUG("long packet length %d\n", uih_len);
 
 		} else {
-			
+			TS0710_DEBUG("Short UIH pkt received\n");
 			uih_len = short_pkt->h.length.len;
 			uih_data_start = short_pkt->data;
 
 		}
-		
+		TS0710_DEBUG("UIH on serv_channel 0\n");
 		process_mcc((u8 *)short_pkt, len, ts0710,
 				!(short_pkt->h.length.ea));
 
 		break;
 
 	default:
-		
+		TS0710_DEBUG("illegal packet\n");
 		break;
 	}
 
@@ -1048,30 +1064,33 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 
 	if ((ts0710->dlci[dlci].state != CONNECTED)
 			&& (ts0710->dlci[dlci].state != FLOW_STOPPED)) {
-		
-
+		TS0710_LOG("MUX Error %s: DLCI %d not connected, discard it!\n",
+				__FUNCTION__, dlci);
 		send_dm(ts0710, dlci);
 		return;
 	}
 
 	if ((short_pkt->h.length.ea) == 0) {
-		
+		TS0710_DEBUG("Long UIH packet received\n");
 		long_pkt = (long_frame *) data;
 		uih_len = GET_LONG_LENGTH(long_pkt->h.length);
 		uih_data_start = long_pkt->h.data;
-		
+		TS0710_DEBUG("long packet length %d\n", uih_len);
 
 	} else {
-		
+		TS0710_DEBUG("Short UIH pkt received\n");
 		uih_len = short_pkt->h.length.len;
 		uih_data_start = short_pkt->data;
 
 	}
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 
-	
-
+	TS0710_DEBUG("UIH on channel %d\n", dlci);
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 	if (uih_len > ts0710->dlci[dlci].mtu) {
-		
+		TS0710_PRINTK
+			("MUX Error:  DLCI:%d, uih_len:%d is bigger than mtu:%d, discard data!\n",
+			 dlci, uih_len, ts0710->dlci[dlci].mtu);
 		return;
 	}
 #ifndef LGE_KERNEL_MUX
@@ -1082,25 +1101,32 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 	if (!uih_len)
 		return;
 
+	printk("TS07.10:uih tag %x on dlci %d\n",tag,dlci);
 #endif
 
 	tty_idx = dlci;
 	tty = mux_table[tty_idx];
 	if ((!mux_tty[tty_idx]) || (!tty)) {
-	    
+		TS0710_PRINTK
+			("MUX: No application waiting for, discard it! /dev/mux%d\n",
+			 tty_idx);
 		return;
 
 	}
 
 	if ((!mux_recv_info_flags[tty_idx])
 			|| (!mux_recv_info[tty_idx])) {
-		
+		TS0710_PRINTK
+			("MUX Error: No mux_recv_info, discard it! /dev/mux%d\n",
+			 tty_idx);
 		return;
 	}
 
 	recv_info = mux_recv_info[tty_idx];
 	if (recv_info->total > 8192) {
-		
+		TS0710_PRINTK
+			("MUX : discard data for tty_idx:%d, recv_info->total > 8192 \n",
+			 tty_idx);
 		return;
 	}
 
@@ -1120,16 +1146,9 @@ void process_uih(ts0710_con * ts0710, char *data, int len, u8 dlci) {
 #else
 	tty->ldisc.ops->receive_buf(tty, uih_data_start, NULL, uih_len);
 #endif
-
-
-        if((dlci == 12) && (flow_control))
-	{
-		return;
-	}
-
 	if (flow_control)
+		tty_throttle(tty);	//20101127-3, syblue.lee@lge.com, Teleca's patch for mux flow control
 //		ts0710_flow_off(tty, dlci, ts0710);
-		tty_throttle(tty);	
 }
 
 void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
@@ -1140,12 +1159,25 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 	short_pkt = (short_frame *) data;
 
 	dlci = short_pkt->h.addr.server_chn << 1 | short_pkt->h.addr.d;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Add the bytes to the array index corres. to DLC
+#ifdef DEBUG_THRPUT
+	LOCK(thrput_lock);
+	myflag = 1;
+	muxrtotb[dlci] += len;
+	myflag = 0;
+	UNLOCK(thrput_lock);
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 	if (!dlci)
 		return ts0710_recv_data_server(ts0710, short_pkt, len);
 
 	switch (CLR_PF(short_pkt->h.control)) {
 	case SABM:
-		
+		TS0710_PRINTK("Incomming connect on channel %d\n", dlci);
 
 		send_ua(ts0710, dlci);
 
@@ -1154,7 +1186,7 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 		break;
 	case UA:
-		
+		TS0710_DEBUG("Incomming UA on channel %d\n", dlci);
 
 		if (ts0710->dlci[dlci].state == CONNECTING) {
 			ts0710->dlci[dlci].state = CONNECTED;
@@ -1171,7 +1203,7 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 		break;
 	case DM:
-		
+		TS0710_DEBUG("Incomming DM on channel %d\n", dlci);
 
 		if (ts0710->dlci[dlci].state == CONNECTING)
 			ts0710->dlci[dlci].state = REJECTED;
@@ -1185,15 +1217,15 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 
 		break;
 	case DISC:
-        
+        TS0710_PRINTK("Incomming DISC on channel %d\n", dlci); // LG#8656; Bug#694 
 		send_ua(ts0710, dlci);
 
 		ts0710->dlci[dlci].state = DISCONNECTED;
 
-		if(waitqueue_active(&ts0710->dlci[dlci].open_wait)) 
+		if(waitqueue_active(&ts0710->dlci[dlci].open_wait)) // LG#8656; Bug#694
 			wake_up_interruptible(&ts0710->dlci[dlci].open_wait);
 
-		if(waitqueue_active(&ts0710->dlci[dlci].close_wait)) 
+		if(waitqueue_active(&ts0710->dlci[dlci].close_wait)) // LG#8656; Bug#694
 			wake_up_interruptible(&ts0710->dlci[dlci].close_wait);
 
 		ts0710_reset_dlci(dlci);
@@ -1201,33 +1233,34 @@ void ts0710_recv_data(ts0710_con * ts0710, char *data, int len)
 		break;
 	case UIH:
 		#if 0
-
+/* VBB20100907 start */
 		if(dlci == 4)
 		{
 		    if (len == 1405)
 				count_1405++;
+            printk("TS07.10:Recieved UIH Frame for DLC4 size %d, count_1405 = %d \n", len, count_1405);
 
 		}
-
+/* VBB20100907 end */
 		#endif
 		process_uih(ts0710, data, len, dlci);
 
 		break;
 	default:
-		
+		TS0710_PRINTK("illegal packet\n");
+        printk("\n TS0710:ts0710_recv_data:illegal packet for DLCi %d, hdr=%x \n",dlci,CLR_PF(short_pkt->h.control));
 		break;
 	}
 }
 
-#ifndef LGE_KERNEL_MUX
-
+/* Close ts0710 channel */
 static void ts0710_close_channel(u8 dlci)
 {
 	ts0710_con *ts0710 = &ts0710_connection;
 	int try;
 	unsigned long t;
 
-	
+	TS0710_DEBUG("ts0710_disc_command on channel %d\n", dlci);
 
 	if ((ts0710->dlci[dlci].state == DISCONNECTED)
 	    || (ts0710->dlci[dlci].state == REJECTED)) {
@@ -1248,18 +1281,18 @@ static void ts0710_close_channel(u8 dlci)
 		if (ts0710->dlci[dlci].state == DISCONNECTED) {
 			break;
 		} else if (signal_pending(current)) {
-			
+			TS0710_PRINTK ("MUX DLCI %d Send DISC got signal!\n", dlci);
 			break;
 		} else if ((jiffies - t) >= TS0710MUX_TIME_OUT) {
-			
+			TS0710_PRINTK ("MUX DLCI %d Send DISC timeout!\n", dlci);
 			continue;
 		}
 	}
 
 	if (ts0710->dlci[dlci].state != DISCONNECTED) {
-		if (dlci == 0) {	
+		if (dlci == 0) {	/* Control Channel */
 			ts0710_upon_disconnect();
-		} else {	
+		} else {	/* Other Channel */
 			ts0710->dlci[dlci].state = DISCONNECTED;
 			wake_up_interruptible(&ts0710->dlci[dlci].
 					      close_wait);
@@ -1267,7 +1300,6 @@ static void ts0710_close_channel(u8 dlci)
 		}
 	}
 }
-#endif
 
 int ts0710_open_channel(u8 dlci)
 {
@@ -1277,12 +1309,13 @@ int ts0710_open_channel(u8 dlci)
 	unsigned long t;
 
 	retval = -ENODEV;
-	if (dlci == 0) {	
+	if (dlci == 0) {	/* control channel */
 		if (ts0710->dlci[0].state & (CONNECTED | FLOW_STOPPED)) {
 			return 0;
 		} else if (ts0710->dlci[0].state == CONNECTING) {
-			
-			
+			/* Reentry */
+			TS0710_PRINTK("MUX DLCI: 0, reentry to open DLCI 0, pid: %d, %s !\n",
+				current->pid, current->comm);
 			try = 11;
 			while (try--) {
 				t = jiffies;
@@ -1301,11 +1334,13 @@ int ts0710_open_channel(u8 dlci)
 					   DISCONNECTED) {
 					break;
 				} else if (signal_pending(current)) {
-					
+					TS0710_PRINTK ("MUX DLCI:%d Wait for connecting got signal!\n", dlci);
 					retval = -EAGAIN;
 					break;
 				} else if ((jiffies - t) >= TS0710MUX_TIME_OUT) {
-					
+					TS0710_PRINTK
+					    ("MUX DLCI:%d Wait for connecting timeout!\n",
+					     dlci);
 					continue;
 				} else if (ts0710->dlci[0].state == CONNECTING) {
 					continue;
@@ -1317,7 +1352,7 @@ int ts0710_open_channel(u8 dlci)
 			}
 		} else if ((ts0710->dlci[0].state != DISCONNECTED)
 			   && (ts0710->dlci[0].state != REJECTED)) {
-			
+			TS0710_PRINTK("MUX DLCI:%d state is invalid!\n", dlci);
 			return retval;
 		} else {
 			ts0710->initiator = 1;
@@ -1334,13 +1369,17 @@ int ts0710_open_channel(u8 dlci)
 						FLOW_STOPPED)) {
 				retval = 0;
 			} else if (ts0710->dlci[0].state == REJECTED) {
-				
+				TS0710_PRINTK
+					("MUX DLCI:%d Send SABM got rejected!\n",
+					 dlci);
 				retval = -EREJECTED;
 			} else if (signal_pending(current)) {
-				
+				TS0710_PRINTK ("MUX DLCI:%d Send SABM got signal!\n", dlci);
 				retval = -EAGAIN;
 			} else if ((jiffies - t) >= TS0710MUX_TIME_OUT) {
-				
+				TS0710_PRINTK
+					("MUX DLCI:%d Send SABM timeout!\n",
+					 dlci);
 				retval = -ENODEV;
 			}
 
@@ -1381,7 +1420,7 @@ int ts0710_open_channel(u8 dlci)
 			}
 		} else if ((ts0710->dlci[dlci].state != DISCONNECTED)
 			   && (ts0710->dlci[dlci].state != REJECTED)) {
-			
+			TS0710_PRINTK("MUX DLCI:%d state is invalid!\n", dlci);
 			return retval;
 		} else {
 #ifdef LGE_KERNEL_MUX
@@ -1398,7 +1437,9 @@ int ts0710_open_channel(u8 dlci)
 						       open_wait,
 						       TS0710MUX_TIME_OUT);
 			if (signal_pending(current)) {
-				
+				TS0710_PRINTK
+				    ("MUX DLCI:%d Send pn_msg got signal!\n",
+				     dlci);
 				retval = -EAGAIN;
 			}
 #endif
@@ -1418,8 +1459,14 @@ int ts0710_open_channel(u8 dlci)
 					retval = 0;
 				} else if (ts0710->dlci[dlci].state ==
 					   REJECTED) {
+					TS0710_PRINTK
+					    ("MUX DLCI:%d Send SABM got rejected!\n",
+					     dlci);
 					retval = -EREJECTED;
 				} else if (signal_pending(current)) {
+					TS0710_PRINTK
+					    ("MUX DLCI:%d Send SABM got signal!\n",
+					     dlci);
 					retval = -EAGAIN;
 				} 
 			}
@@ -1434,7 +1481,9 @@ int ts0710_open_channel(u8 dlci)
 	return retval;
 }
 
-
+/****************************
+ * TTY driver routines
+*****************************/
 
 static void mux_close(struct tty_struct *tty, struct file *filp)
 {
@@ -1453,22 +1502,27 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 	dlci = line;
 	if (mux_tty[line] == 0)
 #ifdef LGE_KERNEL_MUX
-
-        
-
-    	if(dlci==12)
     	{	
-            
+/*Workaround Infineon modem - DLS opened once will never be closed*/
+        TS0710_PRINTK("%s - skip to close channel[%d]\n", __FUNCTION__, dlci);  
+//20100915-1, syblue.lee@lge.com, Fix VT can't recevie data from CP [START]
+    	if(dlci==12)
+    	{	//When VT close DLC 12 with flow off status, must send flow ON status to CP
+            //TS0710_PRINTK("%s - sending flow ON status to CP\n", __FUNCTION__);  
     		ts0710_flow_on(dlci, &ts0710_connection);
     	}
-
-//        return;		
+//20100915, syblue.lee@lge.com, Fix VT can't recevie data from CP [END]
+//Teleca: Since the channel is closed already so release the resources, wake locks read_wait/write_wait
+        //return;   
+    }
 #else        
-        
+    {
+        TS0710_PRINTK("%s - close channel[%d]\n", __FUNCTION__, dlci);  
     	ts0710_close_channel(dlci);
+    }
 #endif    
 
-//    mux_filp[line] = NULL;	
+    mux_filp[line] = NULL;
 
 	if (mux_tty[line] != 0)
 		return;
@@ -1478,7 +1532,7 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 		mux_send_info_flags[line] = 0;
 		kfree(mux_send_info[line]);
 		mux_send_info[line] = 0;
-		
+		TS0710_DEBUG("Free mux_send_info for /dev/mux%d\n", line);
 	}
 
 	if ((mux_recv_info_flags[line])
@@ -1487,17 +1541,10 @@ static void mux_close(struct tty_struct *tty, struct file *filp)
 		mux_recv_info_flags[line] = 0;
 		free_mux_recv_struct(mux_recv_info[line]);
 		mux_recv_info[line] = 0;
-		
+		TS0710_DEBUG("Free mux_recv_info for /dev/mux%d\n", line);
 	}
-        tty_unthrottle(tty);	
+        tty_unthrottle(tty);	//20101127-3, syblue.lee@lge.com, Teleca's patch for mux flow control
 //	ts0710_flow_on(dlci, ts0710);
-
-#if 1 
-        if(mux_table[line] != NULL) {
-            tty_kref_put(mux_table[line]);
-            mux_table[line] = NULL;
-        }
-#endif
 
 	wake_up_interruptible(&tty->read_wait);
 	wake_up_interruptible(&tty->write_wait);
@@ -1516,7 +1563,8 @@ static void mux_throttle(struct tty_struct *tty)
 		return;
 
 
-	
+	TS0710_DEBUG("Enter into %s, minor number is: %d\n", __FUNCTION__,
+		     line);
 
 	dlci = line;
 	if ((ts0710->dlci[0].state != CONNECTED)
@@ -1536,7 +1584,7 @@ static void mux_throttle(struct tty_struct *tty)
 		    (ts0710, EA | FC | RTC | RTR | DV, MCC_CMD, dlci) < 0) {
 			continue;
 		} else {
-			
+			TS0710_LOG("MUX Send Flow off on dlci %d\n", dlci);
 			ts0710->dlci[dlci].flow_control = 1;
 			break;
 		}
@@ -1558,18 +1606,19 @@ static void mux_unthrottle(struct tty_struct *tty)
 		return;
 	}
 
-	
+	TS0710_DEBUG("Enter into %s, minor number is: %d\n", __FUNCTION__,
+		     line);
 
 	recv_info = mux_recv_info[line];
 	dlci = line;
-
-//	if (recv_info->total) {
-//		recv_info->post_unthrottle = 1;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+	if (recv_info->total) {
+		recv_info->post_unthrottle = 1;
 		/* schedule_work(&post_recv_tqueue); */
-//	} else {
+	} else {
 		ts0710_flow_on(dlci, ts0710);
-//	}
-
+	}
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 }
 
 static int mux_chars_in_buffer(struct tty_struct *tty)
@@ -1609,7 +1658,7 @@ out:
 	return retval;
 }
 
-
+//#define LGE_DUMP_MUX_BIFFUER
 #ifdef LGE_DUMP_MUX_BIFFUER
 #define COL_SIZE 50
 static void dump_mux_buffer(const unsigned char *txt, const unsigned char *buf, int count)
@@ -1635,11 +1684,11 @@ static void dump_mux_buffer(const unsigned char *txt, const unsigned char *buf, 
             j++;
         }
         *cur_str = 0;
-                    
+        printk("%s:count:%d [%s]\n", txt, count, dump_buf_str);                        
     }
     else
     {
-               
+        printk("%s: buffer is NULL\n", txt);                 
     }
 }
 #else
@@ -1667,89 +1716,50 @@ static int mux_write(struct tty_struct *tty,
 
 	dlci = tty->index;
 	#if 0
-
+/* VBB20100907 start */
     if(dlci == 4)
     {
         if (count == 52)
 			count_52++;
-
+        printk("TS07.10: DLC4 write %d bytes, count_52 = %d \n", count, count_52);
     }
-
+/* VBB20100907 end */
 	#endif
-	
+	/*
+	 * FIXME: split big packets into small one
+	 * FIXME: support DATATAG
+	 * */
 #ifdef LGE_KERNEL_MUX
-
-     while (count) {
-         if (ts0710->dlci[dlci].state == FLOW_STOPPED) {
-            
-
-             if (in_interrupt()) {
-                 
-                 return -EIO;
-             }
-
-             if ((mux_filp[dlci] != NULL) && (mux_filp[dlci]->f_flags & O_NONBLOCK)) {
-                 
-                 return -EWOULDBLOCK;
-             }
-
-             if (down_interruptible(&spi_write_data_sema[dlci])) {
-                 
-                 return -ERESTARTSYS;
-             }
-         }
-
-         frame_size = min(count, ts0710->dlci[dlci].mtu);
-         frame_written = mux_send_uih_data(ts0710, dlci, (u8 *)(buf + written), frame_size);
-
-         if (frame_written < 0) {
-             
-
-             if (in_interrupt()) {
-                 
-                 return -EIO;
-             }
-
-             if ((mux_filp[dlci] != NULL) && (mux_filp[dlci]->f_flags & O_NONBLOCK)) {
-                 
-                 return -EWOULDBLOCK;
-             }
-
-         
-             return frame_written;
-         }
-
-         written += frame_written;
-         count -= frame_written;
-     }
-
-
-#if 0
+/* To remove Motorola's modem specific*/
   if(ts0710->dlci[dlci].state == FLOW_STOPPED)
   {
-    	
+    	TS0710_DEBUG("TS0710 Write:Flow OFF state = %d \n",ts0710->dlci[dlci].state);
 
 		if(mux_filp[dlci]->f_flags & O_NONBLOCK)
 		{
-      		
+      		TS0710_DEBUG("TS0710 Write: returning  EWOULDBLOCK for flow stopped channel\n");
       		return -EWOULDBLOCK;
    	    }
   	    else 
 	    {
       		while (down_interruptible(&spi_write_data_sema[dlci])!=0)
 			{};
-    	}
+             }
 
   }
-
-
-	while(count)
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+/* spliting big packets into small one */
+//LGE_GB_TELECA_MUX_PERF_634  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Don't allow negative values
+	while(count > 0)
+//LGE_GB_TELECA_DATA_THRPUT_634  -END
+                 
 	{
 		frame_size = min(count, ts0710->dlci[dlci].mtu);
-
 		frame_written = mux_send_uih_data(ts0710, dlci, (u8 *)(buf + written), frame_size);
 
-          if(frame_written == -ENOMEM) 
+          if(frame_written == -ENOMEM) //-12 == ENOMEM // EBS 
 		  {
 	            if(mux_filp[dlci]->f_flags & O_NONBLOCK)
 				{
@@ -1760,13 +1770,13 @@ static int mux_write(struct tty_struct *tty,
 	              down(&spi_write_data_sema[dlci]);
 	            }
 	            else
-	              
+	              TS0710_DEBUG("\nTS0710:mux_write(), NOMEM, returning 0, should be stopped by mtx \n");
            }
 
 	        if(frame_written < 0)
 			{
-
-				
+	      	    printk("\nTS0710:mux_write(): returning -1 \n"); //for ebs test
+				/* send frame error */
 				return -1;
 			}
 			else
@@ -1775,10 +1785,8 @@ static int mux_write(struct tty_struct *tty,
 				count -= frame_written;
 			}
 
-			
+			//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 	};
-#endif
-
 #else
 	written = mux_send_uih_data(ts0710, dlci, (u8 *)buf, count) - 7;
 #endif    
@@ -1801,13 +1809,13 @@ static int mux_write_room(struct tty_struct *tty)
 
 	dlci = line;
 	if (ts0710->dlci[0].state == FLOW_STOPPED) {
-		
+		TS0710_DEBUG("Flow stopped on all channels, returning ZERO\n");
 		goto out;
 	} else if (ts0710->dlci[dlci].state == FLOW_STOPPED) {
-		
+		TS0710_DEBUG("Flow stopped, returning ZERO\n");
 		goto out;
 	} else if (ts0710->dlci[dlci].state != CONNECTED) {
-		
+		TS0710_DEBUG("DLCI %d not connected\n", dlci);
 		goto out;
 	}
 
@@ -1824,7 +1832,7 @@ static int mux_write_room(struct tty_struct *tty)
 	retval = ts0710->dlci[dlci].mtu - 1;
 
 out:
-
+// printk("\nTS0710:write_room retval %d \n",retval);
 	return retval;
 }
 
@@ -1837,7 +1845,7 @@ static void mux_flush_buffer(struct tty_struct *tty)
 		return;
 
 
-	
+	TS0710_PRINTK("MUX %s: line is:%d\n", __FUNCTION__, line);
 
 	if ((mux_send_info_flags[line])
 	    && (mux_send_info[line])
@@ -1871,36 +1879,25 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 	retval = -ENODEV;
 
 	line = tty->index;
-
-     if(mux_filp[line] != NULL)
-         
      mux_filp[line] = filp;
 
-	 
-     if (!(ipc_tty && line)) {
-		
+	if (!(ipc_tty && line))
      	return -ENODEV;
-	 }
-
-#if 1 
-    if(mux_tty[line] == 0) {
-        mux_table[line] = tty_kref_get(tty);
-    }
-#endif
-
 
     mux_tty[line]++;
 	dlci = line;
+	mux_table[line] = tty;
 
+	/* Open server channel 0 first */
 	if ((retval = ts0710_open_channel(0)) != 0) {
-		
+		TS0710_PRINTK("MUX: Can't connect server channel 0!\n");
 		ts0710_init();
 
 		mux_tty[line]--;
 		goto out;
 	}
 
-	
+	/* Allocate memory first. As soon as connection has been established, MUX may receive */
 	if (mux_send_info_flags[line] == 0) {
 		send_info =
 		    (mux_send_struct *) kmalloc(sizeof(mux_send_struct),
@@ -1916,7 +1913,7 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 		send_info->filled = 0;
 		mux_send_info[line] = send_info;
 		mux_send_info_flags[line] = 1;
-		
+		TS0710_DEBUG("Allocate mux_send_info for /dev/pts%d", line);
 	}
 
 	if (mux_recv_info_flags[line] == 0) {
@@ -1927,7 +1924,7 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 			mux_send_info_flags[line] = 0;
 			kfree(mux_send_info[line]);
 			mux_send_info[line] = 0;
-			
+			TS0710_DEBUG("Free mux_send_info for /dev/pts%d", line);
 			retval = -ENOMEM;
 
 			mux_tty[line]--;
@@ -1940,25 +1937,25 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 		recv_info->post_unthrottle = 0;
 		mux_recv_info[line] = recv_info;
 		mux_recv_info_flags[line] = 1;
-		
+		TS0710_DEBUG("Allocate mux_recv_info for /dev/mux%d", line);
 	}
 
-
+	/* Now establish DLCI connection */
 	if (mux_tty[dlci] > 0) {
 		if ((retval = ts0710_open_channel(dlci)) != 0) {
-			
-				      
+			TS0710_PRINTK("MUX: Can't connected channel %d!\n",
+				      dlci);
 			ts0710_reset_dlci(dlci);
 
 			mux_send_info_flags[line] = 0;
 			kfree(mux_send_info[line]);
 			mux_send_info[line] = 0;
-			
+			TS0710_DEBUG("Free mux_send_info for /dev/mux%d", line);
 
 			mux_recv_info_flags[line] = 0;
 			free_mux_recv_struct(mux_recv_info[line]);
 			mux_recv_info[line] = 0;
-			
+			TS0710_DEBUG("Free mux_recv_info for /dev/mux%d", line);
 
 			mux_tty[line]--;
 			goto out;
@@ -1968,32 +1965,21 @@ static int mux_open(struct tty_struct *tty, struct file *filp)
 
 	retval = 0;
 out:
-
-#if 1 
-    if(mux_tty[line] == 0) {
-        tty_kref_put(mux_table[line]);
-        mux_table[line] = NULL;
-    }
-#endif 
-
      return retval;
-
-
 }
 
+/* mux dispatcher, call from serial.c receiver_chars() */
 void mux_dispatcher(struct tty_struct *tty)
 {
 	UNUSED_PARAM(tty);
 
-
+	/* schedule_work(&receive_tqueue); */
 }
 
-#ifndef LGE_KERNEL_MUX
 static void send_ack(ts0710_con * ts0710, u8 seq_num)
 {
 	mux_send_frame(CTRL_CHAN, ts0710->initiator, ACK, &seq_num, 1);
 }
-#endif
 
 static void ts_ldisc_rx_post(struct tty_struct *tty, const u8 *data, char *flags, int count)
 {
@@ -2012,13 +1998,13 @@ static void ts_ldisc_rx_post(struct tty_struct *tty, const u8 *data, char *flags
 		framelen = TS0710_MAX_HDR_SIZE + GET_LONG_LENGTH(long_pkt->h.length) + 2 + SEQ_FIELD_SIZE;
 	}
 #ifdef LGE_KERNEL_MUX
-
+/* To remove Motorola's modem specific*/
     ts0710_recv_data(&ts0710_connection,
 				(char*)(data + 1),
 				framelen - 2);
 #else
-    
-    
+    TS0710_PRINTK("MUX: ts_ldisc_rx_post: expect_seq = %x \n", expect_seq );
+    TS0710_PRINTK("MUX: ts_ldisc_rx_post: *(data + SLIDE_BP_SEQ_OFFSET) = %x \n", *(data + SLIDE_BP_SEQ_OFFSET) );
 	if (expect_seq == *(data + SLIDE_BP_SEQ_OFFSET)) {
 		expect_seq++;
 		if (expect_seq >= 4)
@@ -2030,7 +2016,7 @@ static void ts_ldisc_rx_post(struct tty_struct *tty, const u8 *data, char *flags
 				(char*)(data + ADDRESS_FIELD_OFFSET),
 				framelen - 2 - SEQ_FIELD_SIZE);
 	} else {
-		
+		TS0710_PRINTK("miss seq. possibly lost sync!\n");
 	}
 #endif
 
@@ -2043,6 +2029,19 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
     int i;
     short_frame *short_pkt;
     long_frame *long_pkt;
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Add the total received bytes
+#ifdef DEBUG_THRPUT
+	LOCK(thrput_lock);
+	myflag = 1;
+	totalmuxr += size;
+	myflag = 0;
+	UNLOCK(thrput_lock);
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
     for(i=0; i < size; i++)
 	{
         switch (st->state)
@@ -2055,17 +2054,17 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
 	            }
 	            else
 				{
-					
+					// LGE_UPDATE_S eungbo.shim@lge.com -- Kernel mux received bad data.
 						if(i == 0 || i == 1|| i == 2|| i == 3)
-
-					
+		              		printk("\n[LGE-MUX] :ts_ldisc_rx:bad_data,%x  Size = %d\n",data[i], size);
+					// LGE_UPDATE_E eungbo.shim@lge.com -- Kernel mux received bad data.
 
 						break;
           	     }
         case INSIDE_FRAME_HEADER:
 	            if(st->copy_index < TS0710_MAX_HDR_SIZE)
 				{
-	                if((st->copy_index == 1) && (data[i] == (u8)TS0710_BASIC_FLAG)) 
+	                if((st->copy_index == 1) && (data[i] == (u8)TS0710_BASIC_FLAG)) /* this is fix of out of sync with seq F9 F9*/
 	                    st->copy_index = 0;
 
 					st->chunk[st->copy_index++]=data[i];
@@ -2084,7 +2083,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
                     st->framelen = TS0710_MAX_HDR_SIZE + GET_LONG_LENGTH(long_pkt->h.length) + 2 + SEQ_FIELD_SIZE;
                 }
                 if(st->framelen > MAX_FRAME_SIZE){
-
+                    printk("\nTS0710:ts_ldisc_rx:Too big frame to copy %d!\n",st->framelen);
                     st->state = OUT_OF_FRAME ;
                     break;
                 }
@@ -2100,7 +2099,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
             }
             break;
         default:
-
+            printk("\nTS0710:ts_ldisc_rx:unknown state!!!!!!!\n");
             return;
         }
     }
@@ -2130,7 +2129,7 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
 						flags,
 						packet_size
 					);
-				else { 
+				else { /* use existing chunk */
 					memcpy(st->chunk + st->chunk_size, packet_start, packet_size);
 					ts_ldisc_rx_post(tty, st->chunk, flags,
 						st->chunk_size + packet_size);
@@ -2141,213 +2140,186 @@ void ts_ldisc_rx(struct tty_struct *tty, const u8 *data, char *flags, int size)
 		}
 		data++;
 	}
-	if (st->state == INSIDE_PACKET) 
+	if (st->state == INSIDE_PACKET) /* create/update chunk */
 	{
-		size_t new_chunk_size = data - packet_start; 
+		size_t new_chunk_size = data - packet_start; /* buffer points right after data end */
 		memcpy(st->chunk + st->chunk_size, packet_start, new_chunk_size);
 		st->chunk_size += new_chunk_size;
 	}
 #endif
 }
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Callback function which will be fired every 1 second
+//to print the data throughput
+#ifdef DEBUG_THRPUT
+void thrput_callback(void *param)
+{
+	int thrput_ret=1;
+	static int sec =0;
+	sec++;
+	if (!myflag){
+		printk("[TX-TOT] %u | [TX-%d] %u | [RX-%d] %u | [RX-TOT] %u Bytes/ %d Sec\r\n", totalmuxw, DBG_THRPUT_DLCID,
+			muxwtotb[DBG_THRPUT_DLCID], DBG_THRPUT_DLCID, muxrtotb[DBG_THRPUT_DLCID], totalmuxr, sec);
+		totalmuxr = 0;
+		totalmuxw = 0;
+		muxrtotb[DBG_THRPUT_DLCID] = 0;
+		muxwtotb[DBG_THRPUT_DLCID] = 0;
+		sec =0;
+	}
+	thrput_ret = mod_timer( &thrput_timer, jiffies + msecs_to_jiffies(1000) );
+    if (thrput_ret) printk("Error in mod_timer (Callback)\r\n");
+}
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 #ifdef LGE_KERNEL_MUX
-
-
+//LGE_GB_TELECA_MUX_FIX_543  -START
+//20110418, ramesh.chandrasekaran@teleca.com
+//Description: Logic variable to check tty spi driver is not null, before accesing it 
 volatile int time_to_stop;
-
-
+//LGE_GB_TELECA_MUX_FIX_543  -END
 static int ts_ldisc_tx_looper(void *param)
 {
     int i,res;
-    u8  dlci;		
-
+//LGE_GB_TELECA_MUX_WRITE_RETRY_387  -START
+//20110321, ravi.holal@teleca.com
+//Description: mux write retry handling
     int writeCount = 0;
     u8 *write_ptr = NULL;
-
+//LGE_GB_TELECA_MUX_WRITE_RETRY_387  -END
     u8 *data_ptr;
     int data_size;
-
-    int is_frames;
-    struct spi_data_send_struct *next_ptr;
-    struct spi_data_send_struct *prev_ptr;
-
-
-#ifdef TS0710LOG
-    unsigned int smp_id = smp_processor_id();
-#endif
-
-    while(!kthread_should_stop() && (ipc_tty != NULL)){		
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+    void * next_ptr; 
+//LGE_GB_TELECA_MUX_FIX_543  -START
+//20110414, ramesh.chandrasekaran@teleca.com
+//Description: check the ipc_tty(tty spi driver) is not null, before writing
+// to spi. 
+//20110418
+//Description: Logic variable to check tty spi
+//spi driver is not null, before accesing it 
+    while(!time_to_stop && (ipc_tty != NULL)){
+//LGE_GB_TELECA_MUX_FIX_543  -END
+ //LGE_GB_TELECA_CR_405	-START
+//20110322, ravi.holal@teleca.com
+//Description: lockup during utube streaming                               
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+//@@   spin_lock_irqsave(&frame_nodes_lock,flag);  // for avoiding to catch spinlock of interrupt handler, by eunae.kim
+//@@   spin_lock(&frame_nodes_lock);
+//        WAIT_UNLOCK(frame_nodes_lock);
         LOCK(frame_nodes_lock);
-        
+//LGE_GB_TELECA_CR_405	-END
         data_size = 0;
         data_ptr  = NULL;
-        is_frames = 0;		
         for(i = 0; i < TS0710MAX_PRIORITY_NUMBER ; i++){
             if(frame_to_send[i] != NULL){
-
-                dlci = frame_to_send[i]->dlci;
-                is_frames = 1;
-
-                if (ts0710_connection.dlci[dlci].state == FLOW_STOPPED) {
-                    prev_ptr = frame_to_send[i];
-                    next_ptr = prev_ptr->next;
-
-                    while (next_ptr != NULL) {
-                        dlci = next_ptr->dlci;
-
-                        if (ts0710_connection.dlci[dlci].state != FLOW_STOPPED) {
-                            prev_ptr->next = next_ptr->next;
-                            next_ptr->next = frame_to_send[i];
-                            frame_to_send[i] = next_ptr;
-                            break;
-                        }
-                        prev_ptr = next_ptr;
-                        next_ptr = next_ptr->next;
-                    }
-
-                    if (next_ptr == NULL) {
-                        continue;
-                    }
-                }
-
                 data_ptr = frame_to_send[i]->data;
                 data_size = frame_to_send[i]->size;
                 next_ptr = frame_to_send[i]->next;
                 frame_to_send[i]->size = 0;
-                frame_to_send[i]->dlci = 0;		
                 frame_to_send[i]->data = NULL;
                 frame_to_send[i]->next = NULL;
                 frame_to_send[i]= next_ptr;
-
-
-                --frames_to_send_count[dlci];
-
-
-
                 break;
             }
         }
-
+//LGE_GB_TELECA_CR_405	-START
+//20110322, ravi.holal@teleca.com
+//Description: lockup during utube streaming
+//@@     spin_unlock(&frame_nodes_lock);
+//@@     spin_unlock_irqrestore(&frame_nodes_lock,flag); // for avoiding to catch spinlock of interrupt handler, by eunae.kim
         UNLOCK(frame_nodes_lock);
+//LGE_GB_TELECA_CR_405	-END
 
-
-		
-
-        if (i < TS0710MAX_PRIORITY_NUMBER) {
-            wake_up_interruptible(&wq);
-
-            if ((data_size > 0) && (data_ptr != NULL)) {
-                if (ipc_tty != NULL) {
-                    res = ipc_tty->ops->write(ipc_tty, data_ptr, data_size);
-
-
-                    
-                } else {
-                    
-                }
-
-                if (res != data_size) {
-
-                }
-                kfree(data_ptr);
-            }
-        }
-        else if (is_frames) {
-
-            up(&spi_write_sema);
-        }
-
-
-        down_timeout(&spi_write_sema, TS0710MUX_TIME_OUT);
-
-    }
-    while(!kthread_should_stop()){
-        msleep(1);
-    }
-
-#if 0
-
-        write_ptr = data_ptr;    
- 
+//LGE_GB_TELECA_MUX_WRITE_RETRY_387  -START
+//20110321, ravi.holal@teleca.com
+//Description: mux write retry handling
+        write_ptr = data_ptr;    // don't change data_ptr. used to free memory
+//LGE_GB_TELECA_MUX_FIX_543  -START
+//20110414, ramesh.chandrasekaran@teleca.com
+//Description: check the ipc_tty(tty spi driver) is not null, before writing
+// to spi. 
         while((data_size > 0) && (write_ptr != NULL) && (ipc_tty != NULL)){
-
+//LGE_GB_TELECA_MUX_FIX_543 - END
             res = ipc_tty->ops->write(ipc_tty, write_ptr, data_size);
-            if (max_frame_usage > 0)
-                {  
-                    --max_frame_usage;
-
-                }
             if (res < 0 ) {
-                
-                
+                //SPI WRITE ERROR, NO DATA WRITTEN
+                printk("\nTS0710:ts_ldisc_tx_looper: ERROR Writing on SPI: data_size=%d, res=%d\n",data_size,res);
                 writeCount++;
                 if(writeCount >= MUX_WRITE_MAX_RETRY){
-                    
+                    printk("ts_ldisc_tx_looper: FATAL Writing on SPI: Max Retry count (%d) exceeded. Dropping the Packet\n",writeCount);
                     break;
                 }
             } else if (res >= 0 && res <  data_size){
-            
-             
+            //SPI WRITE ERROR, NOT ALL DATA WRITTEN 
+                printk("\nTS0710:ts_ldisc_tx_looper: ERROR Writing on SPI: data_size=%d, res=%d\n",data_size,res);
                 write_ptr += res;
                 data_size -= res;
                 writeCount++;
                 if(writeCount >= MUX_WRITE_MAX_RETRY){
-                   
+                    printk("ts_ldisc_tx_looper: FATAL Writing on SPI: Max Retry count (%d) exceeded. Dropping the Packet\n",writeCount);
                     break;
                 }
             } else {
-                
-                data_size -= res;  
+                //SPI WRITE OK 
+                data_size -= res;  //or break;    
             }
         }
 
+//LGE_GB_TELECA_MUX_WRITE_RETRY_387  -END
 
 
         kfree(data_ptr);    
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
         down(&spi_write_sema);
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
     }
-#endif
-
-
+//LGE_GB_TELECA_MUX_FIX_543  -START
+//20110418, ramesh.chandrasekaran@teleca.com
+//Description: To handle kthread_stop
+	while(!kthread_should_stop()){
+        msleep(1);
+    }
+//LGE_GB_TELECA_MUX_FIX_543  -END
     return 0;
 }
 
 #endif
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 static int ts_ldisc_open(struct tty_struct *tty)
 {
 	struct mux_data *disc_data;
      int i;
-
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: For Data thrput
+#ifdef DEBUG_THRPUT
+     int thrput_ret=1;
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 	tty->receive_room = 65536;
 
 	disc_data = kzalloc(sizeof(struct mux_data), GFP_KERNEL);
-
-     if(disc_data==NULL){
-       
-       return -ENOMEM;
-     }
 
 	disc_data->state = OUT_OF_FRAME;
 	disc_data->chunk_size = 0;
 
 	tty->disc_data = disc_data;
 
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
     for (i=0; i<32; i++){
         spi_write_data_sema[i].lock = __SPIN_LOCK_UNLOCKED(spi_write_data_sema[i].lock);
         spi_write_data_sema[i].count = 0;
         spi_write_data_sema[i].wait_list.next = &(spi_write_data_sema[i].wait_list);
         spi_write_data_sema[i].wait_list.prev = &(spi_write_data_sema[i].wait_list);
     }
-
-		
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+	ipc_tty = tty;
 #ifdef LGE_KERNEL_MUX
-
-    if (write_task == NULL)
-    {
-        CREATELOCK(frame_nodes_lock);
-    }
+    spin_lock_init(&frame_nodes_lock) ; //ebs 
     nodes_init();
     ts0710_reset_dlci_priority();
     spi_data_recieved.tty = NULL;
@@ -2355,95 +2327,88 @@ static int ts_ldisc_open(struct tty_struct *tty)
     spi_data_recieved.flags = NULL;
     spi_data_recieved.size = 0;
     spi_data_recieved.updated = 0;
-
+//LGE_GB_TELECA_MUX_FIX_543  -START
+//20110418, ramesh.chandrasekaran@teleca.com
+//Description: Logic variable to handle invalid spi access
     time_to_stop = 0;
-
-
-    
+//LGE_GB_TELECA_MUX_FIX_543  -END
+    // LGE_UPDATE_S // 20100826 syblue.lee@lge.com, initialize task handle [START]
     task = NULL;
-    
+    // LGE_UPDATE_E // 20100826 syblue.lee@lge.com, initialize task handle [START]
     write_task = NULL;
     write_task = kthread_run(ts_ldisc_tx_looper,NULL,"%s","ts_ldisc_tx_looper");
-    if(write_task == NULL)TS0710_DEBUG("ts_ldisc_open WRITE_THREAD is not started!!!\n");
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Initialze the data thrput timer
+#ifdef DEBUG_THRPUT
+	spin_lock_init(&thrput_lock) ;
+	printk("Starting MUX Throughput Timer\r\n");
+  	setup_timer( &thrput_timer, thrput_callback, 0);
+	printk( "Starting timer to fire every 1Sec (%ld)\r\n", jiffies );
+    thrput_ret = mod_timer( &thrput_timer, jiffies + msecs_to_jiffies(1000) );
+    if (thrput_ret) printk("Error in mod_timer\r\n");
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+    if(write_task == NULL)
+        TS0710_DEBUG("ts_ldisc_open WRITE_THREAD is not started!!!\n");
 #endif    
-	
-    ipc_tty = tty;	
+	TS0710_PRINTK("ts_ldisc_open executed\n");
 
 	return 0;
 }
-
+//LGE_TELECA_JAVA_RIL_RECOVERY_264  -START
+//20110329, ramesh.chandrasekaran@teleca.com, RIL RECOVERY
+//Description: ts_ldisc_close executes CP restart using gpio
 #ifdef LGE_ENABLE_RIL_RECOVERY_MODE    
-
+/* LGE_ENABLE_RIL_RECOVERY_MODE [start] */
+//[ebs] LGE_UPDATE_S eungbo.shim@lge.com -- for ADD LGE RIL Recorvery Mode & CP<IFX> RESET 20110126
 static void ts_ldisc_close(struct tty_struct *tty)
 {
 	ipc_tty = 0;
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_DATA_THRPUT_633  -START
+//20110428, ramesh.chandrasekaran@teleca.com
+//Description: Cleanup the data throughput timer
+#ifdef DEBUG_THRPUT
+	int thrput_ret=1;
+    thrput_ret = del_timer(&thrput_timer);
+    if (thrput_ret) printk("Unable to delete throughput timer.Timer is still in use...\n");
+#endif
+//LGE_GB_TELECA_DATA_THRPUT_633  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 #ifdef LGE_KERNEL_MUX
     if(task != NULL)
     {
         kthread_stop(task);
-        
+        TS0710_DEBUG("ts_ldisc_close READ_THREAD is stopped\n");    
     }
     if(write_task != NULL)
     {
-
-
-        time_to_stop = 1;
-
-
-       
+        // LGE_UPDATE_S // 20100826 syblue.lee@lge.com, if write semaphore holds on the thread, release it [START]
         up(&spi_write_sema);
-     
+        // LGE_UPDATE_E // 20100826 syblue.lee@lge.com, if write semaphore holds on the thread, release it [START]
         kthread_stop(write_task);
-         
+        TS0710_DEBUG("ts_ldisc_close WRITE_THREAD is stopped\n");    
     }
-
-    ipc_tty = 0;
-
-
 #if defined(RECOVERY_MODE) // for ebs test
 	{
 		ts0710_con *ts0710 = &ts0710_connection;
-		u8 i, j;
+		u8 j;
 
-
-        LOCK(frame_nodes_lock);
-        for (i=0; i<TS0710MAX_PRIORITY_NUMBER;i++){
-            while(frame_to_send[i] != NULL) {
-                if(frame_to_send[i]->data) {
-                    kfree(frame_to_send[i]->data);
-                    frame_to_send[i]->data = NULL;
-             }
-             frame_to_send[i]->size = 0;
-             frame_to_send[i]= frame_to_send[i]->next;
-        }
-    }
-        UNLOCK(frame_nodes_lock);
-	
-
-
-		
-	
-		
-		
-		
-		
-
-		if(tty->disc_data)
-		{
-			
-			kfree(tty->disc_data);
-			tty->disc_data = NULL;
-		}
-
-		
-
-
+		//TS0710_PRINTK("%s - start recovery mode!!\n", __FUNCTION__);
+		printk(KERN_ERR "*******************************\n");
+		printk(KERN_ERR "*Start RIL Recorvery Mode     *\n");
+		printk(KERN_ERR "*[e-mail] eungbo.shim@lge.com *\n");
+		printk(KERN_ERR "\n* Restart IFX Modem               *\n");
+		printk(KERN_ERR "******************************* \n");
 
 		if (gpio_request(IFX_MODEM_RESET_N, "ifx reset") < 0)
 		{
-		 
+		    printk(KERN_ERR "[LGE-EBS] Can't get IFX_RESET GPIO\n");
 		}
+
 		gpio_direction_output(IFX_MODEM_RESET_N, 1);
 
 		gpio_set_value(IFX_MODEM_RESET_N,1);
@@ -2451,20 +2416,19 @@ static void ts_ldisc_close(struct tty_struct *tty)
 		gpio_set_value(IFX_MODEM_RESET_N,0);
 		mdelay(200);
 		gpio_set_value(IFX_MODEM_RESET_N,1);
-//		max_frame_usage = 0;    // Data Throughput , EBS, jisil
-		ts0710_upon_disconnect();
 		
+		ts0710_upon_disconnect();
+		//TS0710_PRINTK("%s - wait 5 seconds until cp rebooting!!\n", __FUNCTION__);
 		tty_ldisc_flush(tty);
 		mdelay(1000);
-		
+		TS0710_PRINTK("%s - end recovery mode!!\n", __FUNCTION__);
 	}
-#endif 
-#endif 
-
+#endif //RECOVERY_MODE
+#endif //LGE_KERNEL_MUX 
+//[ebs] LGE_UPDATE_E eungbo.shim@lge.com -- for ADD LGE RIL Recorvery Mode & CP<IFX> RESET 20110126
 }
 #else
-
-
+//LGE_TELECA_JAVA_RIL_RECOVERY_264  -END
 static void ts_ldisc_close(struct tty_struct *tty)
 {
 	ipc_tty = 0;
@@ -2472,76 +2436,46 @@ static void ts_ldisc_close(struct tty_struct *tty)
 #ifdef LGE_KERNEL_MUX
     if(task != NULL){
         kthread_stop(task);
-        
+        TS0710_DEBUG("ts_ldisc_close READ_THREAD is stopped\n");    
     }
     if(write_task != NULL){
-
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_MUX_FIX_543  -START
+//20110418, ramesh.chandrasekaran@teleca.com
+//Description: Logic variable to handle invalid spi access
 
         time_to_stop = 1;
-
-
-        
+		TS0710_PRINTK("ts_ldisc_close WRITE_THREAD is stopping\n");  
+//LGE_GB_TELECA_MUX_FIX_543  -END
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+        // LGE_UPDATE_S // 20100826 syblue.lee@lge.com, if write semaphore holds on the thread, release it [START]
         up(&spi_write_sema);
-   
+        // LGE_UPDATE_E // 20100826 syblue.lee@lge.com, if write semaphore holds on the thread, release it [START]
         kthread_stop(write_task);
-        
-    }
-
-// LGE_TELECA_CR_1631_INCORRECT_CLEAN START
-    ipc_tty = 0;
-// LGE_TELECA_CR_1631_INCORRECT_CLEAN END
-
-// Data UDP up link throughput - [START]
-#if 1 //LGE_RIL_RECOVERY
-	{
-		ts0710_con *ts0710 = &ts0710_connection;
-		u8 i;
-
-// LGE_TELECA_CR_1631_INCORRECT_CLEAN START
+        TS0710_DEBUG("ts_ldisc_close WRITE_THREAD is stopped\n");    
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+//LGE_GB_TELECA_MUX_FIX_543  -START
+//20110418, ramesh.chandrasekaran@teleca.com
+//Description: Free the Write Queue when closing
+		write_task = NULL;
         LOCK(frame_nodes_lock);
-        for (i=0; i<TS0710MAX_PRIORITY_NUMBER;i++){
-            while(frame_to_send[i] != NULL) {
-                if(frame_to_send[i]->data) {
+        for(i = 0; i < MAX_WAITING_FRAMES; i++) {
+            if(frame_to_send[i] != NULL) {
                     kfree(frame_to_send[i]->data);
                     frame_to_send[i]->data = NULL;
              }
-             frame_to_send[i]->size = 0;
-             frame_to_send[i]= frame_to_send[i]->next;
-        }
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
     }
         UNLOCK(frame_nodes_lock);
-// LGE_TELECA_CR_1631_INCORRECT_CLEAN END
-//		max_frame_usage = 0;    // Data Throughput , EBS, jisil
-
-		ts0710_upon_disconnect();
-		tty_ldisc_flush(tty);
-		if(tty->disc_data)
-		{
-			
-			kfree(tty->disc_data);
-			tty->disc_data = NULL;
+        TS0710_PRINTK("ts_ldisc_close write queue is freed\n");
+//LGE_GB_TELECA_MUX_FIX_543  -END
 		}
-
-		
-
-//		ifx_pmu_reset();	//cheolgwak CP reset
-
-		//ts0710_upon_disconnect();
-		
-		//tty_ldisc_flush(tty);
-		msleep(1000);	//cheolgwak
-		
-	}
-#endif
-
-// Data UDP up link throughput - [END]
-
 #if 0 //def RECOVERY_MODE // for ebs test
 	{
 		ts0710_con *ts0710 = &ts0710_connection;
 		u8 j;
 
-		
+		TS0710_PRINTK("%s - start recovery mode!!\n", __FUNCTION__);
 		if(hGpio==NULL)
 			hGpio =  (NvOdmServicesGpioHandle)NvOdmGpioOpen();
 		if(hPin==NULL)
@@ -2555,10 +2489,12 @@ static void ts_ldisc_close(struct tty_struct *tty)
 		//NvOdmGpioReleasePinHandle(hGpio, hPin);
 		
 		ts0710_upon_disconnect();
-		
+		//TS0710_PRINTK("%s - wait 5 seconds until cp rebooting!!\n", __FUNCTION__);
 		tty_ldisc_flush(tty);
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 		NvOsSleepMS(1000);
-		
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+		TS0710_PRINTK("%s - end recovery mode!!\n", __FUNCTION__);
 	}
 #endif //RECOVERY_MODE
 #endif //LGE_KERNEL_MUX
@@ -2572,7 +2508,7 @@ static void ts_ldisc_close(struct tty_struct *tty)
 
 static void ts_ldisc_wake(struct tty_struct *tty)
 {
-	
+	printk("ts wake\n");
 }
 
 static ssize_t ts_ldisc_read(struct tty_struct *tty, struct file *file,
@@ -2652,7 +2588,7 @@ static int __init mux_init(void)
 		mux_send_info_idx = 16;
 	}
 #endif
-	
+	TS0710_PRINTK("initializing mux with %d channels\n", NR_MUXS);
 
 	ts0710_init();
 
@@ -2699,23 +2635,21 @@ static int __init mux_init(void)
 	tty_set_operations(mux_driver, &mux_ops);
 
 	/* FIXME: No panic() here */
-//	if (result=tty_register_driver(mux_driver)){
-  result=tty_register_driver(mux_driver);	
-  if (result != 0 ){
-    
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
+	if (result=tty_register_driver(mux_driver)){
+        printk("TS0710:tty_register_driver returns %d",result);
 		panic("TS0710 :Couldn't register mux driver");
         }
 
 	for (j = 0; j < NR_MUXS; j++)
 		tty_register_device(mux_driver, j, NULL);
 #ifdef LGE_FROYO_BSP
-  result=tty_register_ldisc(N_TS2710, &ts_ldisc);
-  if (result != 0){
-//	if (result=tty_register_ldisc(N_TS2710, &ts_ldisc)){
+	if (result=tty_register_ldisc(N_TS2710, &ts_ldisc)){
 #else
 	if (result=tty_register_ldisc(N_TS2710, &ts_ldisc)){
 #endif
-	
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
+		printk("TS0710 :oops. cant register ldisc\n");
         }
 
 	return 0;

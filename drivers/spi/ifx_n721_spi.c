@@ -42,7 +42,9 @@
 #include <linux/completion.h>
 #include <linux/spi/spi.h>
 #include <linux/workqueue.h>
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 #include <plat/omap-pm.h>
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 #include <linux/spi/ifx_n721_spi.h>
 #include <linux/delay.h>	
 #define MRDY_DELAY_TIME 400     //20101127-1, syblue.lee@lge.com, Change delay time for transcation : 1000us -> 400us
@@ -52,7 +54,20 @@
 
 void dump_atcmd_simple(char *txt, char *data, int len) 
 {
+	int j ;
 	
+	if(len>20)
+		len = 10;
+
+	printk("%s ", txt);
+	for(j=0;j<len;j++)
+	{
+		if(data[j]>=32 && data[j]<=126)
+			printk("%c,",data[j]);	
+		else
+			printk("%x,",data[j]);	
+	}
+	printk("\n");
 }
 
 #ifdef CONFIG_SPI_DEBUG
@@ -118,13 +133,13 @@ void dump_atcmd(char *data)
 		uih_len = GET_LONG_LENGTH(long_pkt->h.length);
 		uih_data_start = long_pkt->h.data;
 #ifdef CONFIG_SPI_DEBUG
-		
+		//printk("long packet length %d\n", uih_len);
 #endif
 	} else {
 		uih_len = short_pkt->h.length.len;
 		uih_data_start = short_pkt->data;
 #ifdef CONFIG_SPI_DEBUG
-		
+		//printk("long packet length %d\n", uih_len);
 #endif
 	}
 	if(uih_len>10)
@@ -132,9 +147,12 @@ void dump_atcmd(char *data)
 	
 	for(i=0; i<uih_len; i++)
 	{
-		if(uih_data_start[i]>=32 && uih_data_start[i]<=126){}
-		else{}
+		if(uih_data_start[i]>=32 && uih_data_start[i]<=126)
+			SPI_DEBUG_PRINT("%c ", uih_data_start[i]);
+		else
+			SPI_DEBUG_PRINT("%x ", uih_data_start[i]);
 	}
+	SPI_DEBUG_PRINT("\n");
 }
 
 
@@ -308,11 +326,13 @@ static void dump_spi_buffer(const unsigned char *txt, const unsigned char *buf, 
         }
         *cur_str = 0;
 //#ifdef CONFIG_SPI_DEBUG	                     
+        printk("%s:count:%d [%s]\n", txt, count, dump_buf_str);                        
 //#endif
     }
     else
     {
 //#ifdef CONIFG_SPI_DEBUG               
+        printk("%s: buffer is NULL\n", txt);                 
 //#endif
     }
 }
@@ -340,15 +360,15 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 	spi_data->ifx_tty = tty;
 	spi_data->ifx_tty->low_latency = 1;
 	if( !buf ){
-
+		printk("File: ifx_n721_spi.c\tFunction: int ifx_spi_write()\t Buffer NULL\n");
 		return 0;
 	}
 	if(!count){
-
+		printk("File: ifx_n721_spi.c\tFunction: int ifx_spi_write()\t Count is ZERO\n");
 		return 0;
 	}
 #ifdef CONFIG_SPI_DEBUG
-
+	printk("[AP]----------------------[S] \n");
 #endif
 	spi_data->ifx_master_initiated_transfer  = 1;
 	spi_data->ifx_spi_buf  = buf;
@@ -361,28 +381,30 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 #else
 	ifx_spi_set_mrdy_signal(spi_data, 1);  
 #endif
-
+//	SPI_DEBUG_PRINT("%s : ", __FUNCTION__);
 //	dump_atcmd(buf+2) ; 	
 
 // LGE_UPDATE_S eungbo.shim@lge.com 20110111 -- SPI RETRY 
 #if 0
 	//wait_for_completion(&spi_data->ifx_read_write_completion);
 #else
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 	wait_for_completion_timeout(&spi_data->ifx_read_write_completion, 3*HZ);	
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 #endif
 	if(spi_data->ifx_ret_count==0)
 	{	
 //		lge_debug[D_SPI].enable = 1;
 		ifx_spi_set_mrdy_signal(spi_data, 0);
 //#ifdef CONFIG_SPI_DEBUG
-
+        printk("%s - timeout!! Can't get SRDY from CP for 10sec. Set MRDY high to low\n", __FUNCTION__, __LINE__); 
         dump_spi_buffer("timeout - ifx_spi_write()", buf, count);     
 //#endif
 	}
 // LGE_UPDATE_E eungbo.shim@lge.com 20110111 -- SPI RETRY 
 	init_completion(&spi_data->ifx_read_write_completion);
 #ifdef CONFIG_SPI_DEBUG
-
+	printk("[AP] ---------------------[END] \n");
 #endif
 	return spi_data->ifx_ret_count; /* Number of bytes sent to the device */
 }
@@ -466,7 +488,7 @@ ifx_spi_ap_ready(struct spi_device *spi, int enable)
 	ifx_spi_set_mrdy_signal(spi_data, enable);
 
 #ifdef CONFIG_SPI_DEBUG
-
+	printk("[LGE-SPI] Send ap_ready Signal, %d\n", enable);
 #endif
 }
 
@@ -489,7 +511,7 @@ ifx_spi_probe(struct spi_device *spi)
 
 	status = ifx_spi_allocate_frame_memory(spi_data, IFX_SPI_MAX_BUF_SIZE + IFX_SPI_HEADER_SIZE);
         if(status != 0){
-
+		printk("File: ifx_n721_spi.c\tFunction: int ifx_spi_probe\tFailed to allocate memory for buffers\n");
 		return -ENOMEM;
         }
 	
@@ -502,7 +524,7 @@ ifx_spi_probe(struct spi_device *spi)
 	spi_data->ifx_wq = create_singlethread_workqueue(spi_data->wq_name); //create_rt_workqueue
 
 	if(!spi_data->ifx_wq){
-        
+		printk("Failed to setup workqueue - ifx_wq \n");          
         }
 
 	init_completion(&spi_data->ifx_read_write_completion);
@@ -519,16 +541,16 @@ ifx_spi_probe(struct spi_device *spi)
 	spi_data->ifx_spi_lock = 1;
 
 	if(status < 0){
-
+		printk("Failed to setup SPI \n");
 	}             
 
 	if (gpio_request(spi_data->srdy_gpio, "ifx srdy") < 0) {
-
+		printk(KERN_ERR "Can't get SRDY GPIO\n");
 	}
 	gpio_direction_input(spi_data->srdy_gpio);
 
 	if (gpio_request(spi_data->mrdy_gpio, "ifx mrdy") < 0) {
-
+		printk(KERN_ERR "Can't get MRDY GPIO\n");
 	}
 	gpio_direction_output(spi_data->mrdy_gpio, 0);
 
@@ -537,8 +559,8 @@ ifx_spi_probe(struct spi_device *spi)
 	/* Enable SRDY Interrupt request - If the SRDY signal is high then ifx_spi_handle_srdy_irq() is called */
 	status = request_irq(spi->irq, ifx_spi_handle_srdy_irq,  IRQF_TRIGGER_RISING, spi->dev.driver->name, spi_data);
 	if (status != 0){
-
-
+		printk(KERN_ERR "Failed to request IRQ for SRDY\n");
+		printk(KERN_ERR "IFX SPI Probe Failed\n");
 		ifx_spi_free_frame_memory(spi_data);
 		if(spi_data){
 			kfree(spi_data);
@@ -586,7 +608,7 @@ ifx_spi_suspend(struct spi_device *spi, pm_message_t mesg)
 static int
 ifx_spi_resume(struct spi_device *spi)
 {
-
+    printk("modem_chk = %d \n",gpio_get_value(177));
     gpio_direction_output(MODEM_CHK,1);
     
     return 0;
@@ -641,12 +663,12 @@ ifx_spi_allocate_frame_memory(struct ifx_spi_data *spi_data, unsigned int memory
 	int status = 0;
 	spi_data->ifx_rx_buffer = kmalloc(memory_size+IFX_SPI_HEADER_SIZE, GFP_KERNEL);
 	if (!spi_data->ifx_rx_buffer){
-
+		printk("Open Failed ENOMEM\n");
 		status = -ENOMEM;
 	}
 	spi_data->ifx_tx_buffer = kmalloc(memory_size+IFX_SPI_HEADER_SIZE, GFP_KERNEL);
 	if (!spi_data->ifx_tx_buffer){		
-
+		printk("Open Failed ENOMEM\n");
 		status = -ENOMEM;
 	}
 	if(status == -ENOMEM){
@@ -717,7 +739,7 @@ ifx_spi_get_header_info(unsigned char *rx_buffer, unsigned int *valid_buf_size)
  //20101127-2, syblue.lee@lge.com, Discard if mux size is bigger than MAX SIZE [START]
        if(header.ifx_spi_header.curr_data_size > IFX_SPI_MAX_BUF_SIZE)   //20101201-1, syblue.lee@lge.com, bug fix : >= -> >
        {
-
+           printk("%s - invalid header : 0x%x 0x%x 0x%x 0x%x!!!\n", __FUNCTION__, header.framesbytes[0], header.framesbytes[1], header.framesbytes[2], header.framesbytes[3]);
            *valid_buf_size = 0;
         }
        else
@@ -725,7 +747,7 @@ ifx_spi_get_header_info(unsigned char *rx_buffer, unsigned int *valid_buf_size)
  //20101127-2, syblue.lee@lge.com, Discard if mux size is bigger than MAX SIZE [END]
 	if(header.ifx_spi_header.more)
 	{
-
+//		printk(KERN_ERR "ifx_spi_get_header_info, There is more packet = %d\n", header.ifx_spi_header.next_data_size);
 		return header.ifx_spi_header.next_data_size;
 	}
 	return 0;
@@ -740,7 +762,7 @@ ifx_spi_set_mrdy_signal(struct ifx_spi_data *spi_data, int value)
 	gpio_set_value(spi_data->mrdy_gpio, value);
 
 #ifdef CONFIG_SPI_DEBUG
-
+	printk("SEND MRDY SIGNAL = %d\n", value);
 #endif
 }
 
@@ -814,9 +836,12 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	int status = 0; 
 
 #ifdef CONFIG_SPI_DEBUG
+	printk("SPI READ & WRITE [S] \n");
 #endif
 	status = ifx_spi_sync_read_write(spi_data, spi_data->ifx_current_frame_size+IFX_SPI_HEADER_SIZE); /* 4 bytes for header */                       
 #ifdef CONFIG_SPI_DEBUG
+	printk("SPI READ & WRITE [END] \n");
+	SPI_DEBUG_PRINT("SPI TX : ");
 //	dump_atcmd(spi_data->ifx_tx_buffer+IFX_SPI_HEADER_SIZE+2) ; 	
 #endif
 
@@ -827,7 +852,7 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 		{
 //			if(spi_data->ifx_rx_buffer[i] != (i%256)){
 			if(spi_data->ifx_rx_buffer[i] != 0xAC){
-
+				printk(KERN_EMERG "rxbuf data error:[%d] %d\n", i, spi_data->ifx_rx_buffer[i]);
 				break;
 			}
 		}
@@ -845,7 +870,7 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 	{
 		spi_data->ifx_receiver_buf_size = 0;
 #ifdef CONFIG_SPI_DEBUG
-
+		printk("Recv is Nothing~~!! By Shim\n");
 #endif
 		return;
 	}
@@ -869,6 +894,7 @@ ifx_spi_send_and_receive_data(struct ifx_spi_data *spi_data)
 #ifdef SPI_TEST
 		tty_insert_flip_string(spi_data->ifx_tty, spi_data->ifx_rx_buffer, 2048);
 #else
+		SPI_DEBUG_PRINT("SPI RX : ");
 //		dump_atcmd(spi_data->ifx_rx_buffer+IFX_SPI_HEADER_SIZE+2) ;		
 		tty_insert_flip_string(spi_data->ifx_tty, spi_data->ifx_rx_buffer+IFX_SPI_HEADER_SIZE, rx_valid_buf_size);
 #endif
@@ -909,7 +935,7 @@ ifx_spi_sync_read_write(struct ifx_spi_data *spi_data, unsigned int len)
 			status = m.actual_length;
 	}
         else{
-
+		printk("File: ifx_n721_spi.c\nFunction: unsigned int ifx_spi_sync\nTransmission UNsuccessful\n");
         }
 	return status;
 }
@@ -924,10 +950,11 @@ ifx_spi_handle_srdy_irq(int irq, void *handle)
 {
 	struct ifx_spi_data *spi_data = (struct ifx_spi_data *)handle;
 #ifdef CONFIG_SPI_DEBUG		
-
+//	printk("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< CP ISR\n");
 #endif
 	queue_work(spi_data->ifx_wq, &spi_data->ifx_work);    
 
+	//SPI_DEBUG_PRINT("%s-%d\n",__FUNCTION__, __LINE__);
 
 	return IRQ_HANDLED; 
 }
@@ -943,8 +970,9 @@ ifx_spi_handle_work(struct work_struct *work)
 	if (!spi_data->ifx_master_initiated_transfer)
 	{
 #ifdef CONFIG_SPI_DEBUG
-
+		printk("<<<<<<<<<<<<<<<< CP [S] \n");
 #endif
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_Start
 //		omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT,800000);
 		ifx_spi_setup_transmission(spi_data);
 #ifdef CONFIG_LGE_SPI_MODE_SLAVE
@@ -976,14 +1004,14 @@ ifx_spi_handle_work(struct work_struct *work)
 #endif
 		}
 #ifdef CONFIG_SPI_DEBUG
-
+		printk("<<<<<<<<<<<<<<<< CP [END] \n");
 #endif
 	//	omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT,-1);
 	}
 	else
     {
 #ifdef CONFIG_SPI_DEBUG
-
+		printk("[LGE-SPI] INTERRUPT BY OMAP\n");
 #endif
 //		omap_pm_set_min_bus_tput(&(spi_data->spi->dev),OCP_INITIATOR_AGENT,800000);
 		ifx_spi_setup_transmission(spi_data);     
@@ -1008,6 +1036,7 @@ ifx_spi_handle_work(struct work_struct *work)
 
 	}
 }
+//LGSI_P970_WAP_24thGBXMM_BaselineAdoption_Santosh_End
 
 
 /* ################################################################################################################ */
@@ -1031,7 +1060,7 @@ int status = 0;
 	/* Allocate and Register a TTY device */
 	ifx_spi_tty_driver = alloc_tty_driver(IFX_N_SPI_MINORS);
 	if (!ifx_spi_tty_driver){
-
+		printk(KERN_ERR "Fail to allocate TTY Driver\n");
 		return -ENOMEM;
 	}
 
@@ -1051,7 +1080,7 @@ int status = 0;
 
 	status = tty_register_driver(ifx_spi_tty_driver);
 	if (status){
-
+		printk(KERN_ERR "Failed to register IFX SPI tty driver");
 		put_tty_driver(ifx_spi_tty_driver);
 		return status;
 	}
@@ -1059,7 +1088,7 @@ int status = 0;
 	/* Register SPI Driver */
 	status = spi_register_driver(&ifx_spi_driver);
 	if (status < 0){ 
-
+		printk("Failed to register SPI device");
 		tty_unregister_driver(ifx_spi_tty_driver);
 		put_tty_driver(ifx_spi_tty_driver);
 		return status;

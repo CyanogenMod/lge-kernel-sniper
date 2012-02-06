@@ -10,7 +10,7 @@
 
 #define EVDEV_MINOR_BASE	64
 #define EVDEV_MINORS		32
-#define EVDEV_BUFFER_SIZE	256 // 20110111 seven.kim@lge.com buffer changed 64 -> 256 for DV2 Touch Sensing TEST
+#define EVDEV_BUFFER_SIZE	64
 
 #include <linux/poll.h>
 #include <linux/sched.h>
@@ -295,6 +295,9 @@ static int evdev_open(struct inode *inode, struct file *file)
 
  err_free_client:
 	evdev_detach_client(evdev, client);
+//LGE_CHANGE_S [sunggyun.yu@lge.com] 2011-01-25, Google Patch 87/20587/2
+	wake_lock_destroy(&client->wake_lock);
+//LGE_CHANGE_E [sunggyun.yu@lge.com] 2011-01-25, Google Patch 87/20587/2
 	kfree(client);
  err_put_evdev:
 	put_device(&evdev->dev);

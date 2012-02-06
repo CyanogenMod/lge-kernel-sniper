@@ -177,7 +177,7 @@
 #define IMX072_GAIN_STEP		1
 
 /* Exposure time values */
-#define IMX072_MIN_EXPOSURE		24
+#define IMX072_MIN_EXPOSURE		200
 #define IMX072_MAX_EXPOSURE		200000
 #define IMX072_DEF_EXPOSURE	    33000
 #define IMX072_EXPOSURE_STEP		50

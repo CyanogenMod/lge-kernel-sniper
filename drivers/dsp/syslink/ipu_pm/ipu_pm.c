@@ -2915,7 +2915,7 @@ int ipu_pm_detach(u16 remote_proc_id)
 	struct ipu_pm_object *handle;
 	struct ipu_pm_params *params;
 	int retval = 0;
-
+	int countBeforeWhileBreak =0;
 	/* get the handle to proper ipu pm object */
 	handle = ipu_pm_get_handle(remote_proc_id);
 	if (WARN_ON(unlikely(handle == NULL))) {
@@ -2942,7 +2942,16 @@ int ipu_pm_detach(u16 remote_proc_id)
 		pr_debug("Recovering IPU\n");
 		while (!wait_for_completion_timeout(&ipu_clean_up_comp,
 					msecs_to_jiffies(params->timeout)))
+		 {
 			pr_warn("%s: handle(s) still opened\n", __func__);
+                        countBeforeWhileBreak ++;                          //forcing recovery if while loop take more time prakash.pathak@ti.com
+                        if (countBeforeWhileBreak >=2)
+                                {
+                                printk("\nwait_for_completion_timeout is taking more time, forcing the recovery");
+                                        break;
+                                }
+               	 }
+
 		/* Get rid of any pending work */
 		flush_workqueue(ipu_resources);
 	} else {

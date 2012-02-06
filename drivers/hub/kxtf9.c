@@ -749,13 +749,13 @@ static ssize_t kxvalue_store(struct device *dev,struct device_attribute *attr,co
 
 #endif
 
- static DEVICE_ATTR(tap_onoff,0666,NULL,kxtf9_tap_onoff_store);
- static DEVICE_ATTR(shake_onoff,0666,NULL,kxtf9_shake_onoff_store);
- static DEVICE_ATTR(flip_onoff,0666,NULL,kxtf9_flip_onoff_store);
- static DEVICE_ATTR(snap_onoff,0666,NULL,kxtf9_snap_onoff_store);
+ static DEVICE_ATTR(tap_onoff, 0664,NULL,kxtf9_tap_onoff_store);
+ static DEVICE_ATTR(shake_onoff, 0664,NULL,kxtf9_shake_onoff_store);
+ static DEVICE_ATTR(flip_onoff, 0664,NULL,kxtf9_flip_onoff_store);
+ static DEVICE_ATTR(snap_onoff, 0664,NULL,kxtf9_snap_onoff_store);
 #if DEBUG
- static DEVICE_ATTR(num,0666,NULL,kxindex_store);
- static DEVICE_ATTR(value,0666,NULL,kxvalue_store);
+ static DEVICE_ATTR(num, 0664,NULL,kxindex_store);
+ static DEVICE_ATTR(value, 0664,NULL,kxvalue_store);
 #endif
  
  static struct attribute* kxtf9_attributes[] = {

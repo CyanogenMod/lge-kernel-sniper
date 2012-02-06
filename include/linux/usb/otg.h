@@ -116,6 +116,18 @@ struct otg_transceiver {
 	/* start or continue HNP role switch */
 	int	(*start_hnp)(struct otg_transceiver *otg);
 
+	/* ask the link to save internal context */
+	void    (*link_save_context)(struct otg_transceiver *otg);
+
+	/* ask the link to restore internal context */
+	void    (*link_restore_context)(struct otg_transceiver *otg);
+
+	/* ask the link to always be in an active state */
+	void    (*link_force_active)(int enable);
+
+	/* pointer to the link driver */
+	void    *link;
+
 };
 
 

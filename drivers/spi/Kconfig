@@ -368,7 +368,7 @@ config LGE_SPI
 
 config LGE_SPI_MASTER
 	bool "LGE SPI Master"
-	depends on ARCH_OMAP24XX || ARCH_OMAP3 || ARCH_OMAP4
+	depends on (ARCH_OMAP24XX || ARCH_OMAP3 || ARCH_OMAP4) && !LGE_LAB3_BOARD
 	default y
 	help
 	Enable this to support LGE SPI Master

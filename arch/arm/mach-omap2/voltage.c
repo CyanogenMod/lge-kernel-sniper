@@ -41,16 +41,15 @@
 #include <plat/smartreflex.h>
 #include <plat/control.h>
 
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-#include <linux/dvs_suite.h>
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
-
+#include "cm.h"
+#include "cm-regbits-34xx.h"
 #include "prm-regbits-34xx.h"
 #include "prm44xx.h"
 #include "prm-regbits-44xx.h"
+#include "clock3xxx.h"
 
 #define VP_IDLE_TIMEOUT		200
-#define VP_TRANXDONE_TIMEOUT	300 /* need to check TI */
+#define VP_TRANXDONE_TIMEOUT	400
 
 /* Settling Time for ABB Transition in us */
 #define ABB_TRANXDONE_TIMEOUT  30
@@ -1540,36 +1539,36 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 
 	/* Init the voltage change notifier list */
 	srcu_init_notifier_head(&vdd->volt_change_notify_list);
-
+/*LGSI_P970_GB:veeru.sivangula@lge.com changed S_IWGRP | S_IWUSR for CTS */
 #ifdef CONFIG_PM_DEBUG
 	strcpy(name, "vdd_");
 	strcat(name, vdd->voltdm.name);
 	vdd_debug = debugfs_create_dir(name, voltage_dir);
-	(void) debugfs_create_file("vp_errorgain", S_IRUGO | S_IWUGO,
+	(void) debugfs_create_file("vp_errorgain", S_IWGRP | S_IWUSR | S_IRUGO,
 				vdd_debug,
 				&(vdd->vp_reg.vpconfig_errorgain),
 				&vp_debug_fops);
-	(void) debugfs_create_file("vp_smpswaittimemin", S_IRUGO | S_IWUGO,
+	(void) debugfs_create_file("vp_smpswaittimemin", S_IWGRP | S_IWUSR | S_IRUGO,
 				vdd_debug,
 				&(vdd->vp_reg.vstepmin_smpswaittimemin),
 				&vp_debug_fops);
-	(void) debugfs_create_file("vp_stepmin", S_IRUGO | S_IWUGO, vdd_debug,
+	(void) debugfs_create_file("vp_stepmin", S_IWGRP | S_IWUSR | S_IRUGO, vdd_debug,
 				&(vdd->vp_reg.vstepmin_stepmin),
 				&vp_debug_fops);
-	(void) debugfs_create_file("vp_smpswaittimemax", S_IRUGO | S_IWUGO,
+	(void) debugfs_create_file("vp_smpswaittimemax", S_IWGRP | S_IWUSR | S_IRUGO,
 				vdd_debug,
 				&(vdd->vp_reg.vstepmax_smpswaittimemax),
 				&vp_debug_fops);
-	(void) debugfs_create_file("vp_stepmax", S_IRUGO | S_IWUGO, vdd_debug,
+	(void) debugfs_create_file("vp_stepmax", S_IWGRP | S_IWUSR | S_IRUGO, vdd_debug,
 				&(vdd->vp_reg.vstepmax_stepmax),
 				&vp_debug_fops);
-	(void) debugfs_create_file("vp_vddmax", S_IRUGO | S_IWUGO, vdd_debug,
+	(void) debugfs_create_file("vp_vddmax", S_IWGRP | S_IWUSR | S_IRUGO, vdd_debug,
 				&(vdd->vp_reg.vlimitto_vddmax),
 				&vp_debug_fops);
-	(void) debugfs_create_file("vp_vddmin", S_IRUGO | S_IWUGO, vdd_debug,
+	(void) debugfs_create_file("vp_vddmin", S_IWGRP | S_IWUSR | S_IRUGO, vdd_debug,
 				&(vdd->vp_reg.vlimitto_vddmin),
 				&vp_debug_fops);
-	(void) debugfs_create_file("vp_timeout", S_IRUGO | S_IWUGO, vdd_debug,
+	(void) debugfs_create_file("vp_timeout", S_IWGRP | S_IWUSR | S_IRUGO, vdd_debug,
 				&(vdd->vp_reg.vlimitto_timeout),
 				&vp_debug_fops);
 	(void) debugfs_create_file("curr_vp_volt", S_IRUGO, vdd_debug,
@@ -1584,16 +1583,17 @@ static void __init vdd_data_configure(struct omap_vdd_info *vdd)
 				(void *) vdd, &calib_volt_debug_fops);
 #ifdef CONFIG_OMAP_ABB
 	if (cpu_is_omap44xx() && !strcmp("vdd_iva", name))
-		(void) debugfs_create_u8("fbb_enable", S_IRUGO | S_IWUGO,
+		(void) debugfs_create_u8("fbb_enable", S_IWGRP | S_IWUSR | S_IRUGO,
 				vdd_debug, &(vdd->volt_data[2].abb_type));
 
 	if ((cpu_is_omap3630() || cpu_is_omap44xx())
 			&& !strcmp("vdd_mpu", name))
-		(void) debugfs_create_u8("fbb_enable", S_IRUGO | S_IWUGO,
+		(void) debugfs_create_u8("fbb_enable", S_IWGRP | S_IWUSR | S_IRUGO,
 				vdd_debug, &(vdd->volt_data[3].abb_type));
 #endif
 #endif
 }
+/*LGSI_P970_GB:end*/
 static void __init init_voltagecontroller(void)
 {
 	if (cpu_is_omap34xx())
@@ -2045,15 +2045,7 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-    if(ds_status.mutex_lock_on_clock_state_cnt != 0) return 0;
-    ds_status.mutex_lock_on_clock_state_cnt ++;
-    ds_status.flag_mutex_lock_on_clock_state = 1;
-    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	mutex_lock(&vdd->scaling_mutex);
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-    ds_status.flag_mutex_lock_on_clock_state = 0;
-    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	plist_for_each_entry(user, &vdd->user_list, node) {
 		if (user->dev == dev) {
@@ -2081,9 +2073,6 @@ int omap_voltage_add_userreq(struct voltagedomain *voltdm, struct device *dev,
 	*volt = node->prio;
 
 	mutex_unlock(&vdd->scaling_mutex);
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	ds_status.mutex_lock_on_clock_state_cnt --;
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	return 0;
 }
@@ -2535,15 +2524,7 @@ int omap_voltage_scale(struct voltagedomain *voltdm)
 	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
 	vnom = omap_voltage_get_nom_volt(voltdm);
 
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-    if(ds_status.mutex_lock_on_clock_state_cnt != 0) return 0;
-    ds_status.mutex_lock_on_clock_state_cnt ++;
-    ds_status.flag_mutex_lock_on_clock_state = 1;
-    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	mutex_lock(&vdd->scaling_mutex);
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-    ds_status.flag_mutex_lock_on_clock_state = 0;
-    /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
 	curr_volt = vnom->volt_nominal;
 
@@ -2593,9 +2574,6 @@ int omap_voltage_scale(struct voltagedomain *voltdm)
 	omap_smartreflex_enable(voltdm);
 
 	mutex_unlock(&vdd->scaling_mutex);
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	ds_status.mutex_lock_on_clock_state_cnt --;
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
     /* calculate the voltages for dependent vdd's */
 	if (calc_dep_vdd_volt(&vdd->vdd_device, vdd, volt)) {
@@ -2668,15 +2646,30 @@ static int __init omap_voltage_init(void)
 			/* Trimm value is 0 for this unit.
 			 * we set force overide, insted of efuse.
 			 */
-			omap_ctrl_writel(0x0401040f,
+			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_MPU_VOLTAGE_CTRL);
-			omap_ctrl_writel(0x0401040f,
+			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_CORE_VOLTAGE_CTRL);
-			omap_ctrl_writel(0x0401040f,
+			omap_ctrl_writel(0x0400040f,
 			OMAP4_CTRL_MODULE_CORE_LDOSRAM_IVA_VOLTAGE_CTRL);
 			/* write value of 0x0 to VDAC as per trim recomendation */
 			omap_ctrl_writel(0x000001c0,
 			OMAP4_CTRL_MODULE_PAD_CORE_CONTROL_EFUSE_1);
+		} else {
+			/*
+			 * Set SRAM MPU/CORE/IVA LDO RETMODE
+			 * Setting RETMODE for un-trimmed units cause random
+			 * system hang. So enabling it only for trimmed units.
+			 */
+			prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+				OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_CORE_CTRL_OFFSET);
+				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_MPU_CTRL_OFFSET);
+				prm_rmw_mod_reg_bits(OMAP4430_RETMODE_ENABLE_MASK,
+				0x1 << OMAP4430_RETMODE_ENABLE_SHIFT,
+			OMAP4430_PRM_DEVICE_MOD, OMAP4_PRM_LDO_SRAM_IVA_CTRL_OFFSET);
 		}
 	}
 
@@ -2713,3 +2706,64 @@ static int __init omap_voltage_init(void)
 	return 0;
 }
 device_initcall(omap_voltage_init);
+
+
+#define OPP50RATE 100000000
+void set_dpll3_volt_freq(bool dpll3_restore)
+{
+	struct clk *dpll3_m2_ck = clk_get(NULL, "dpll3_m2_ck");
+	struct voltagedomain *voltdm = omap_voltage_domain_get("core");
+	struct omap_vdd_info *vdd;
+	int l3_div;
+	static struct omap_volt_data *vdd2_save_vdata;
+	static long dpll3_save_rate;
+
+	if (!dpll3_m2_ck || !voltdm)
+		return;
+
+	vdd = container_of(voltdm, struct omap_vdd_info, voltdm);
+
+	if (!dpll3_restore) {
+		/* Step 1, reduce DPLL3 to OPP50 */
+		dpll3_save_rate = clk_get_rate(dpll3_m2_ck);
+		l3_div = cm_read_mod_reg(CORE_MOD, CM_CLKSEL) &
+					OMAP3430_CLKSEL_L3_MASK;
+		/*
+		 * Using the direct call to the clock's set rate routine
+		 * rather than the clk_set_rate() infrastructure.  That is
+		 * because we don't want the normal notifications of clock
+		 * change sent out just because we are changing it for this
+		 * errata work around.  The old clock rate will be back as
+		 * soon as core (and anyone we would notify) turn back on.
+		 */
+		/* Is DPLL3 already at OPP50? */
+		if (dpll3_save_rate != OPP50RATE * l3_div)
+			omap3_core_dpll_m2_set_rate(dpll3_m2_ck,
+						OPP50RATE * l3_div);
+		else
+			dpll3_save_rate = 0;
+
+		/* Step 2, set VDD2 to OPP100 */
+		vdd2_save_vdata = omap_voltage_get_nom_volt(voltdm);
+		/* vdd2 already at OPP100 ? */
+		if (vdd2_save_vdata->volt_nominal !=
+					vdd->volt_data[1].volt_nominal)
+			vp_forceupdate_scale_voltage(vdd, &(vdd->volt_data[1]));
+		else
+			vdd2_save_vdata = NULL;
+	} else {
+		/* Step 1, return VDD2 back to its previous value */
+		if (vdd2_save_vdata) {
+			vp_forceupdate_scale_voltage(vdd, vdd2_save_vdata);
+			vdd2_save_vdata = NULL;
+		}
+
+		/* Step 2, return DPLL3 back to its previous value */
+		if (dpll3_save_rate) {
+			omap3_core_dpll_m2_set_rate(dpll3_m2_ck,
+							dpll3_save_rate);
+			dpll3_save_rate = 0;
+		}
+	}
+
+}

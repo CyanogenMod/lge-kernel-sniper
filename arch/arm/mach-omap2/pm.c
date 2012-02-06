@@ -13,24 +13,32 @@
 #include <linux/init.h>
 #include <linux/io.h>
 #include <linux/err.h>
+
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [START]
 #include <linux/notifier.h>
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [END]
 
 #include <plat/omap-pm.h>
 #include <plat/omap_device.h>
 #include <plat/common.h>
 
+#ifdef CONFIG_LGE_DVFS
 #include <linux/dvs_suite.h>
+#endif	// CONFIG_LGE_DVFS
 
 #include "omap3-opp.h"
 #include "opp44xx.h"
 
+// LGE_UPDATE_S
 #if defined(CONFIG_MACH_LGE_OMAP3)
 #include "pm.h"
 
 u32 sleep_while_idle;
 u32 enable_off_mode;
 #endif
+// LGE_UPDATE_E
 
+// 20100520 jugwan.eom@lge.com For power on cause and hidden reset [START_LGE]
 // TODO: make more pretty...
 enum {
 	RESET_NORMAL,
@@ -161,9 +169,6 @@ void omap_idle_notifier_end(void)
 
 struct device *omap2_get_mpuss_device(void)
 {
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_status.flag_correct_cpu_op_update_path == 0) 
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!mpu_dev);
 	return mpu_dev;
 }
@@ -171,9 +176,6 @@ EXPORT_SYMBOL(omap2_get_mpuss_device);
 
 struct device *omap2_get_iva_device(void)
 {
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_status.flag_correct_cpu_op_update_path == 0) 
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!iva_dev);
 	return iva_dev;
 }
@@ -181,9 +183,6 @@ EXPORT_SYMBOL(omap2_get_iva_device);
 
 struct device *omap2_get_l3_device(void)
 {
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_status.flag_correct_cpu_op_update_path == 0) 
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!l3_dev);
 	return l3_dev;
 }
@@ -191,9 +190,6 @@ EXPORT_SYMBOL(omap2_get_l3_device);
 
 struct device *omap4_get_dsp_device(void)
 {
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_status.flag_correct_cpu_op_update_path == 0) 
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 	WARN_ON_ONCE(!dsp_dev);
 	return dsp_dev;
 }
@@ -214,13 +210,15 @@ static struct kobj_attribute vdd2_lock_attr =
 	__ATTR(vdd2_lock, 0644, vdd_opp_show, vdd_opp_store);
 static struct kobj_attribute dsp_freq_attr =
 	__ATTR(dsp_freq, 0644, vdd_opp_show, vdd_opp_store);
+static struct kobj_attribute tick_control_attr =
+	__ATTR(tick, 0644, vdd_opp_show, vdd_opp_store);
 
 static int vdd1_locked = 0;
 static int vdd2_locked = 0;
 static struct device sysfs_cpufreq_dev;
+extern void tick_nohz_disable(int nohz);
 
-static ssize_t vdd_opp_show(struct kobject *kobj, struct kobj_attribute *attr,
-			 char *buf)
+static ssize_t vdd_opp_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
 	if (attr == &vdd1_opp_attr)
 		return sprintf(buf, "%hu\n", opp_find_freq_exact(mpu_dev, opp_get_rate(mpu_dev), true)->opp_id+1);
@@ -236,14 +234,22 @@ static ssize_t vdd_opp_show(struct kobject *kobj, struct kobj_attribute *attr,
 		return -EINVAL;
 }
 
-static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
-			  const char *buf, size_t n)
+static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t n)
 {
 	unsigned long value;
+#ifdef CONFIG_LGE_DVFS
+	unsigned long lc_freq = 0;
+#endif	// CONFIG_LGE_DVFS
 
 	if (sscanf(buf, "%lu", &value) != 1)
 		return -EINVAL;
 
+	if (attr == &tick_control_attr) {
+		if (value == 1)
+			tick_nohz_disable(1);
+		else if (value == 0)
+			tick_nohz_disable(0);
+	}
 	/* Check locks */
 	if (attr == &vdd1_lock_attr) {
 		if (vdd1_locked) {
@@ -253,6 +259,9 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 					printk(KERN_ERR "%s: Failed to remove vdd1_lock\n", __func__);
 				} else {
 					vdd1_locked = 0;
+#ifdef CONFIG_LGE_DVFS
+					per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = 300000000;
+#endif	// CONFIG_LGE_DVFS
 					return n;
 				}
 			} else {
@@ -272,6 +281,9 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 				for (i = 0; freq_table[i].frequency != CPUFREQ_TABLE_END; i++) {
 					if (freq_table[i].index == value - 1) {
 						freq = freq_table[i].frequency;
+#ifdef CONFIG_LGE_DVFS
+						lc_freq = freq * 1000;
+#endif	// CONFIG_LGE_DVFS
 						break;
 					}
 				}
@@ -282,6 +294,9 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 				if (omap_pm_set_min_mpu_freq(&sysfs_cpufreq_dev, freq * 1000)) {
 					printk(KERN_ERR "%s: Failed to add vdd1_lock\n", __func__);
 				} else {
+#ifdef CONFIG_LGE_DVFS
+					per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = lc_freq;
+#endif	// CONFIG_LGE_DVFS
 					vdd1_locked = value;
 				}
 			} else {
@@ -296,6 +311,9 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 				if (omap_pm_set_min_bus_tput(&sysfs_cpufreq_dev, OCP_INITIATOR_AGENT, 0)) {
 					printk(KERN_ERR "%s: Failed to remove vdd2_lock\n", __func__);
 				} else {
+#ifdef CONFIG_LGE_DVFS
+					per_cpu(ds_sys_status, 0).locked_min_l3_freq = 0;
+#endif	// CONFIG_LGE_DVFS
 					vdd2_locked = 0;
 					return n;
 				}
@@ -310,8 +328,14 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 				if (cpu_is_omap3630()) {
 					if(value == 1) {
 						freq = 100*1000*4;
+#ifdef CONFIG_LGE_DVFS
+						lc_freq = 100000000;
+#endif	// CONFIG_LGE_DVFS
 					} else if (value == 2) {
 						freq = 200*1000*4;
+#ifdef CONFIG_LGE_DVFS
+						lc_freq = 200000000;
+#endif	// CONFIG_LGE_DVFS
 					} else {
 						printk(KERN_ERR "%s: Invalid value [1,2]\n", __func__);
 						return -EINVAL;
@@ -346,6 +370,9 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 				if (omap_pm_set_min_bus_tput(&sysfs_cpufreq_dev, OCP_INITIATOR_AGENT, freq)) {
 					printk(KERN_ERR "%s: Failed to add vdd2_lock\n", __func__);
 				} else {
+#ifdef CONFIG_LGE_DVFS
+					per_cpu(ds_sys_status, 0).locked_min_l3_freq = lc_freq;
+#endif	// CONFIG_LGE_DVFS
 					vdd2_locked = value;
 				}
 				return n;
@@ -364,6 +391,30 @@ static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
 		for (i = 1; opp_table[i].rate; i++) {
 			if (opp_table[i].rate >= value) {
 				opp_id = i;
+#ifdef CONFIG_LGE_DVFS
+				switch(i){
+					case 1:
+						per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = 300000000;	// Unlocked.
+						per_cpu(ds_sys_status, 0).locked_min_iva_freq = 260000000;
+						break;
+					case 2:
+						per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = 600000000;
+						per_cpu(ds_sys_status, 0).locked_min_iva_freq = 520000000;
+						break;
+					case 3:
+						per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = 800000000;
+						per_cpu(ds_sys_status, 0).locked_min_iva_freq = 660000000;
+						break;
+					case 4:
+						per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = 1000000000;
+						per_cpu(ds_sys_status, 0).locked_min_iva_freq = 800000000;
+						break;
+					default:
+						per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = 1000000000;
+						per_cpu(ds_sys_status, 0).locked_min_iva_freq = 800000000;
+						break;
+				}
+#endif	// CONFIG_LGE_DVFS
 				break;
 			}
 		}
@@ -496,6 +547,11 @@ static int __init omap2_common_pm_init(void)
 			printk(KERN_ERR "%s: sysfs_create_file(vdd2_lock) failed %d\n", __func__, error);
 			return error;
 		}
+        error = sysfs_create_file(power_kobj, &tick_control_attr.attr);
+        if (error) {
+            printk(KERN_ERR "%s: sysfs_create_file(tick_control) failed: %d\n", __func__, error);
+            return error;
+        }
 	}
 #endif
 

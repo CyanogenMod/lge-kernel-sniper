@@ -44,8 +44,7 @@
 #include <plat/control.h>
 
 #include "../../arch/arm/mach-omap2/mux.h"
-int console_enabled = 0;
-EXPORT_SYMBOL(console_enabled);
+
 static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
 
 /* Forward declaration of functions */
@@ -73,6 +72,31 @@ static inline void serial_omap_clear_fifos(struct uart_omap_port *up)
 		       UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT);
 	serial_out(up, UART_FCR, 0);
 }
+
+#if defined(CONFIG_MACH_OMAP_ZOOM3) && defined(CONFIG_PM)
+/* This function needs to be exported since the QUART is not
+ * available, on the "arch/arm/mach-omap2/serial.c". Since
+ * the Core can hit Off mode either in Idle / Suspend path
+ * This function has to be called from both the code flow
+ * hence the suspend interface to the driver wouldnt be the
+ * right place to call this.
+ * the QUART registers have to saved and restored, since the
+ * Core when its Off state and Triton Turns off the Voltages
+ * the GPIO 152 is generating a Pulse from Low-High-Low, which
+ * Resets the QUART. Hence the context save and restore needs
+ * to added.
+ */
+void omap_quart_prepare(int power_state, int save)
+{
+	struct uart_omap_port *up = ui[3];
+
+	/* While Entering Off state, along with Voltage OFF */
+	omap_quart_prepare_context(&(up->port), power_state, save);
+
+	return;
+}
+EXPORT_SYMBOL(omap_quart_prepare);
+#endif /* CONFIG_MACH_OMAP_ZOOM3 */
 
 /**
  * serial_omap_get_divisor() - calculate divisor value
@@ -158,9 +182,11 @@ static void serial_omap_stop_rx(struct uart_port *port)
 	 * called it wont have any impact on the register values
 	 * for MUX configuration.
 	 */
-	if (!port->suspended)
-		omap_uart_cts_wakeup(up->pdev->id, 0);
-
+	/*Disable the UART CTS wakeup for UART1,UART2*/
+	if ((!port->suspended && (((up->pdev->id) == UART1) ||
+			((up->pdev->id) == UART2) ||
+			((up->pdev->id) == UART3))))
+		omap_uart_cts_wakeup((up->pdev->id), 0);
 }
 
 static inline void
@@ -1103,7 +1129,7 @@ serial_omap_console_setup(struct console *co, char *options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);
 
 	r = uart_set_options(&up->port, co, baud, parity, bits, flow);
-	console_enabled = 1;
+
 	return r;
 }
 

@@ -2903,7 +2903,7 @@ static int dsi_proto_config(struct omap_dss_device *dssdev)
 	/* XXX what values for the timeouts? */
 	dsi_set_stop_state_counter(ix, 0x1000, false, false);
 	dsi_set_ta_timeout(ix, 0x1fff, true, true);
-	//dsi_set_lp_rx_timeout(ix, 0x1fff, true, true);//OMAPS00246927
+	//dsi_set_lp_rx_timeout(ix, 0x1fff, true, true);//OMAPS00246927 //saravanan
 	dsi_set_hs_tx_timeout(ix, 0x1fff, true, true);
 
 	switch (dssdev->ctrl.pixel_size) {
@@ -3283,7 +3283,7 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 	if (p_dsi->te_enabled) {
 		/* disable LP_RX_TO, so that we can receive TE.  Time to wait
 		 * for TE is longer than the timer allows */
-		//REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15);//OMAPS00246927
+		//REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15);//OMAPS00246927 //saravanan
 
 		if (cpu_is_omap44xx())
 			dsi_vc_send_bta(ix, 0);
@@ -3334,12 +3334,12 @@ static void dsi_handle_framedone(enum omap_dsi_index ix, int error)
 	if (error == -ETIMEDOUT && device->manager)
 		/* Ensures recovery of DISPC after a failed lcd_enable*/
 		device->manager->disable(device->manager);
-#if 0 //OMAPS00246927
+#if 0 //OMAPS00246927 //saravanan
 	if (p_dsi->te_enabled) {
 		/* enable LP_RX_TO again after the TE */
 		REG_FLD_MOD(ix, DSI_TIMING2, cpu_is_omap44xx() ? 0 : 1, 15, 15);
 	}
-#endif//OMAPS00246927
+#endif//OMAPS00246927 //saravanan
 
 	/* RX_FIFO_NOT_EMPTY */
 	if (REG_GET(ix, DSI_VC_CTRL(channel), 20, 20)) {
@@ -3406,12 +3406,12 @@ static void dsi_framedone_irq_callback(void *data, u32 mask)
 	/* Note: We get FRAMEDONE when DISPC has finished sending pixels and
 	 * turns itself off. However, DSI still has the pixels in its buffers,
 	 * and is sending the data. */
-#if 0//OMAPS00246927
+#if 0//OMAPS00246927 //saravanan
 	if (p_dsi->te_enabled)
 		/* enable LP_RX_TO again after the TE */
 		REG_FLD_MOD(DSI1, DSI_TIMING2,
 					cpu_is_omap44xx() ? 0 : 1, 15, 15);
-#endif//OMAPS00246927
+#endif//OMAPS00246927 //saravanan
 	/* Send BTA after the frame. We need this for the TE to work, as TE
 	 * trigger is only sent for BTAs without preceding packet. Thus we need
 	 * to BTA after the pixel packets so that next BTA will cause TE
@@ -3531,12 +3531,13 @@ int omap_dsi_sched_update_lock(struct omap_dss_device *dssdev,
 			nu->y = min(y, nu->y);
 		} else {
 			INIT_WORK(&nu->work, omap_dsi_delayed_update);
-			queue_work(p_dsi->update_queue, &nu->work);
+			
 			nu->scheduled = true;
 			nu->x = x;
 			nu->y = y;
 			nu->w = w;
 			nu->h = h;
+			queue_work(p_dsi->update_queue, &nu->work);//paras_ti
 		}
 
 		if (sched_only)
@@ -3912,7 +3913,7 @@ int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 
 #if 1
 // rsy
-	if(lcd_off_boot==1) {
+	if(lcd_off_boot == 1){
 		goto err1;
 	}
 #endif
@@ -3940,6 +3941,27 @@ err0:
 }
 EXPORT_SYMBOL(omapdss_dsi_display_enable);
 
+#if 1 /* TI CSR OMAPS00250914 */ //saravanan
+static void dsi_clear_irq(struct omap_dss_device *dssdev) {
+	u32 l = 0xFFFFFFFF;
+	enum omap_dsi_index ix;
+	int i;
+
+	ix = (dssdev->channel == OMAP_DSS_CHANNEL_LCD) ? DSI1 : DSI2;
+
+	dsi_write_reg(ix, DSI_IRQSTATUS, l);
+	dsi_write_reg(ix, DSI_IRQENABLE, 0);
+
+	dsi_write_reg(ix, DSI_COMPLEXIO_IRQ_STATUS, l);
+	dsi_write_reg(ix, DSI_COMPLEXIO_IRQ_ENABLE, 0);
+
+	for (i = 0; i < 4; ++i) {
+		dsi_write_reg(ix, DSI_VC_IRQSTATUS(i), l);
+		dsi_write_reg(ix, DSI_VC_IRQENABLE(i), 0);
+	}
+}
+#endif 
+
 void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 {
 	struct dsi_struct *p_dsi;
@@ -3958,9 +3980,13 @@ void omapdss_dsi_display_disable(struct omap_dss_device *dssdev)
 
 	mutex_lock(&p_dsi->lock);
 
+#if 1 /* TI CSR OMAPS00250914 */ //saravanan
+	dsi_clear_irq(dssdev);
+#endif
+
 	dsi_display_uninit_dispc(dssdev);
 
-	if(!lcd_off_boot) {
+	if(!lcd_off_boot){
 	dsi_display_uninit_dsi(dssdev);
 
 	enable_clocks(0);

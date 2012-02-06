@@ -1,9 +1,7 @@
 #ifndef _LINUX_LIMITS_H
 #define _LINUX_LIMITS_H
 
-/* LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-03-22, Modify for test. (1024->4096)*/
-#define NR_OPEN	        4096
-/* LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-03-22, Modify for test. (1024->4096)*/
+#define NR_OPEN	        1024
 
 #define NGROUPS_MAX    65536	/* supplemental group IDs are available */
 #define ARG_MAX       131072	/* # bytes of args + environ for exec() */

@@ -764,7 +764,7 @@ static int configure_overlay(enum omap_plane plane)
 	u32 paddr;
 	int r;
 	u16 x_decim, y_decim;
-	bool three_tap;
+	bool three_tap = true;
 	u16 orig_w, orig_h, orig_outw, orig_outh;
 	bool source_of_wb = false;
 	DSSDBGF("%d", plane);
@@ -1762,6 +1762,11 @@ static int dss_mgr_disable(struct omap_overlay_manager *mgr)
 	return 0;
 }
 
+static bool dss_mgr_is_enabled(struct omap_overlay_manager *mgr)
+{
+	return dispc_is_channel_enabled(mgr->id);
+}
+
 static void omap_dss_add_overlay_manager(struct omap_overlay_manager *manager)
 {
 	++num_managers;
@@ -1822,6 +1827,7 @@ int dss_init_overlay_managers(struct platform_device *pdev)
 
 		mgr->enable = &dss_mgr_enable;
 		mgr->disable = &dss_mgr_disable;
+		mgr->is_enabled = &dss_mgr_is_enabled;
 
 		mgr->caps = OMAP_DSS_OVL_MGR_CAP_DISPC;
 

@@ -55,8 +55,8 @@
 
 #define OMAP4_MBOX_REG_SIZE		0x130
 
-#define MBOX_NR_REGS			3
-#define OMAP4_MBOX_NR_REGS		4
+#define MBOX_NR_REGS			2
+#define OMAP4_MBOX_NR_REGS		3
 
 static void __iomem *mbox_base;
 static u32 *mbox_ctx;
@@ -238,12 +238,10 @@ static int omap2_mbox_is_irq(struct omap_mbox *mbox,
 
 static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 {
-	int i = 0, j;
-
-	mbox_ctx[i] = mbox_read_reg(MAILBOX_SYSCONFIG);
+	int i, j;
 
 	/* Save irqs per user */
-	for (j = 0, i = 1; j < nr_mbox_users; i++, j++) {
+	for (j = 0, i = 0; j < nr_mbox_users; i++, j++) {
 		if (cpu_is_omap44xx())
 			mbox_ctx[i] = mbox_read_reg(OMAP4_MAILBOX_IRQENABLE(j));
 		else
@@ -252,16 +250,20 @@ static void omap2_mbox_save_ctx(struct omap_mbox *mbox)
 		dev_dbg(mbox->dev, "%s: [%02x] %08x\n", __func__,
 			i, mbox_ctx[i]);
 	}
+
+	// temporary blocked..
+	// omap2_mbox_shutdown(mbox);
 }
 
 static void omap2_mbox_restore_ctx(struct omap_mbox *mbox)
 {
-	int i = 0, j;
+	int i, j;
 
-	mbox_write_reg(mbox_ctx[i], MAILBOX_SYSCONFIG);
+	// temporary blocked..
+	//omap2_mbox_startup(mbox);
 
 	/* Restore irqs per user */
-	for (j = 0, i = 1; j < nr_mbox_users; i++, j++) {
+	for (j = 0, i = 0; j < nr_mbox_users; i++, j++) {
 		if (cpu_is_omap44xx())
 			mbox_write_reg(mbox_ctx[i], OMAP4_MAILBOX_IRQENABLE(j));
 		else

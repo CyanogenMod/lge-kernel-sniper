@@ -58,11 +58,6 @@
 
 #include <dspbridge/resourcecleanup.h>
 /*  ----------------------------------- Defines, Data Structures, Typedefs */
-
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-#include <linux/dvs_suite.h>
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
-
 #define MAXCMDLINELEN       255
 #define PROC_ENVPROCID      "PROC_ID=%d"
 #define MAXPROCIDLEN	(8 + 5)
@@ -962,14 +957,8 @@ int proc_load(void *hprocessor, IN CONST s32 argc_index,
 
 		/* Boost the OPP level to Maximum level supported by baseport */
 #if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-		ds_status.flag_correct_cpu_op_update_path = 1;
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 		if (pdata->cpu_set_freq)
 			(*pdata->cpu_set_freq) (pdata->mpu_max_speed);
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-		ds_status.flag_correct_cpu_op_update_path = 0;
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 		status = cod_load_base(cod_mgr, argc_index, (char **)user_args,
 				       dev_brd_write_fxn,
@@ -986,14 +975,8 @@ int proc_load(void *hprocessor, IN CONST s32 argc_index,
 		}
 		/* Requesting the lowest opp supported */
 #if defined(CONFIG_BRIDGE_DVFS) && !defined(CONFIG_CPU_FREQ)
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-		ds_status.flag_correct_cpu_op_update_path = 1;
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 		if (pdata->cpu_set_freq)
 			(*pdata->cpu_set_freq) (pdata->mpu_min_speed);
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-		ds_status.flag_correct_cpu_op_update_path = 0;
-		/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 
 	}

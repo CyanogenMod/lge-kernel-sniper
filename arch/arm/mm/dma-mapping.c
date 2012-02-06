@@ -437,6 +437,8 @@ void ___dma_single_dev_to_cpu(const void *kaddr, size_t size,
 }
 EXPORT_SYMBOL(___dma_single_dev_to_cpu);
 
+// Nagendra _TI_START
+#if 0
 static void dma_cache_maint_page(struct page *page, unsigned long offset,
 	size_t size, enum dma_data_direction dir,
 	void (*op)(const void *, size_t, int))
@@ -480,6 +482,66 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
 		left -= len;
 	} while (left);
 }
+#else
+static void dma_cache_maint_page(struct page *page, unsigned long offset,
+	size_t size, enum dma_data_direction dir,
+	void (*op)(const void *, size_t, int))
+{
+	/*
+	 * A single sg entry may refer to multiple physically contiguous
+	 * pages.  But we still need to process highmem pages individually.
+	 * If highmem is not configured then the bulk of this loop gets
+	 * optimized out.
+	 */
+
+	size_t left = size;
+	do {
+		size_t len = left;
+		void *vaddr;
+
+		if (PageHighMem(page)) {
+			if (len + offset > PAGE_SIZE) {
+				if (offset >= PAGE_SIZE) {
+					page += offset / PAGE_SIZE;
+					offset %= PAGE_SIZE;
+				}
+				len = PAGE_SIZE - offset;
+			}
+			vaddr = kmap_high_get(page);
+			if (vaddr) {
+				vaddr += offset;
+				op(vaddr, len, dir);
+				kunmap_high(page);
+			} else if (cache_is_vipt()) {
+				pte_t saved_pte;
+				vaddr = kmap_high_l1_vipt(page, &saved_pte);
+				if(vaddr) //TI
+				{ //TI
+				op(vaddr + offset, len, dir);
+				kunmap_high_l1_vipt(page, saved_pte);
+				}else //TI
+					printk(KERN_ERR "SSN: 1 vaddr is NULL\n");//TI
+			}
+			else //TI
+					printk(KERN_ERR "SSN: 2 vaddr is NULL\n"); //TI
+
+		} else {
+			vaddr = page_address(page) + offset;
+			if(vaddr) //TI
+				op(vaddr, len, dir);
+			else //TI
+				printk(KERN_ERR "SSN: 3 vaddr is NULL\n"); //TI
+		}
+		offset = 0;
+		page++;
+		left -= len;
+	} while (left);
+}
+
+
+#endif
+
+// Nagendra _TI_END
 
 void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
 	size_t size, enum dma_data_direction dir)

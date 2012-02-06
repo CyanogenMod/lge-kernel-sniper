@@ -52,6 +52,8 @@
 /* C6 - MPU OFF + Core RET */
 /* C7 - MPU OFF + Core OFF */
 static struct cpuidle_params sniper_cpuidle_params[] = {
+/* LGE_CHANGE_S [daewung.kim@lge.com], 2011-10-27 CPUIDLE optimization */
+#if 0
 	/* C1 */
 	{1, 110, 162, 5},
 	/* C2 */
@@ -66,6 +68,23 @@ static struct cpuidle_params sniper_cpuidle_params[] = {
 	{0, 7580, 4134, 484329},
 	/* C7 */
 	{1, 7505, 15274, 484329},
+#else
+	/* C1 */
+	{1, 110, 162, 5},
+	/* C2 */
+	{1, 106, 180, 309},
+	/* C3 */
+	{1, 107, 410, 46057},
+	/* C4 */
+	{1, 121, 3374, 46057},
+	/* C5 */
+	{0, 855, 1146, 46057},
+	/* C6 */
+	{1, 7580, 4134, 484329},
+	/* C7 */
+	{0, 7505, 15274, 484329},
+#endif
+/* LGE_CHANGE_E [daewung.kim@lge.com], 2011-10-27 CPUIDLE optimization */
 };
 #endif
 
@@ -112,7 +131,7 @@ static struct omap_volt_pmic_info omap_pmic_mpu = { /* and iva */
 	.sleep_cmd = omap_twl_sleep_cmd,
 	.vp_config_erroroffset = 0,
 	.vp_vstepmin_vstepmin = 0x01,
-	.vp_vstepmax_vstepmax = 0x08, /* 20110812 dongyu.gwak@lge.com SmartReflex 0x4->0x8 */
+	.vp_vstepmax_vstepmax = 0x04,
 	.vp_vlimitto_timeout_us = 0x200,
 	.vp_vlimitto_vddmin = 0x14,
 	.vp_vlimitto_vddmax = 0x44,
@@ -134,7 +153,7 @@ static struct omap_volt_pmic_info omap_pmic_core = {
 	.vp_vstepmin_vstepmin = 0x01,
 	.vp_vstepmax_vstepmax = 0x04,
 	.vp_vlimitto_timeout_us = 0x200,
-	.vp_vlimitto_vddmin = 0x13, /* 20110812 dongyu.gwak@lge.com 0x18->0x13*/
+	.vp_vlimitto_vddmin = 0x18,
 	.vp_vlimitto_vddmax = 0x42,
 };
 #endif /* CONFIG_TWL4030_CORE */

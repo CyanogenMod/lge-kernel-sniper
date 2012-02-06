@@ -1771,10 +1771,10 @@ static struct yacd5b1s_sensor yacd5b1s = {
 static int __init yacd5b1ssensor_init(void)
 {
 	int err;
-//LGE_CHANGE_S [] 2011-01-20, for factory process without sub-board
+//LGE_CHANGE_S [sunggyun.yu@lge.com] 2011-01-20, for factory process without sub-board
 //	extern int lcd_off_boot;
 //	if (lcd_off_boot) return -ENODEV;
-//LGE_CHANGE_E [] 2011-01-20, for factory process without sub-board
+//LGE_CHANGE_E [sunggyun.yu@lge.com] 2011-01-20, for factory process without sub-board
 
 	err = i2c_add_driver(&yacd5b1ssensor_i2c_driver);
 	if (err) {

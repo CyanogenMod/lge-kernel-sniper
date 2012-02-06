@@ -6,11 +6,11 @@
  *
  * Smart reflex class 1.5 is also called periodic SW Calibration
  * Some of the highlights are as follows:
- * – Host CPU triggers OPP calibration when transitioning to non calibrated
+ * ? Host CPU triggers OPP calibration when transitioning to non calibrated
  *   OPP
- * – SR-AVS + VP modules are used to perform calibration
- * – Once completed, the SmartReflex-AVS module can be disabled
- * – Enables savings based on process, supply DC accuracy and aging
+ * ? SR-AVS + VP modules are used to perform calibration
+ * ? Once completed, the SmartReflex-AVS module can be disabled
+ * ? Enables savings based on process, supply DC accuracy and aging
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -26,6 +26,7 @@
 #include <linux/kobject.h>
 #include <linux/workqueue.h>
 
+#include <plat/omap-pm.h>
 #include <plat/opp.h>
 #include <plat/smartreflex.h>
 #include <plat/voltage.h>
@@ -55,6 +56,7 @@ struct sr_class1p5_work_data {
 	struct delayed_work work;
 	struct voltagedomain *voltdm;
 	struct omap_volt_data *vdata;
+	struct pm_qos_request_list *qos_request;
 	u8 num_calib_triggers;
 	u8 num_osc_samples;
 	bool work_active;
@@ -270,6 +272,10 @@ done_calib:
 	 */
 	work_data->work_active = false;
 	omap_vscale_unpause(work_data->voltdm);
+
+	/* Release c-state constraint */
+	omap_pm_set_max_mpu_wakeup_lat(&work_data->qos_request, -1);
+	pr_debug("%s - %s: release c-state\n", __func__, voltdm->name);
 }
 
 #if CONFIG_OMAP_SR_CLASS1P5_RECALIBRATION_DELAY
@@ -355,6 +361,11 @@ static int sr_class1p5_enable(struct voltagedomain *voltdm,
 	work_data->vdata = volt_data;
 	work_data->work_active = true;
 	work_data->num_calib_triggers = 0;
+
+	/* Hold a c-state constraint */
+	omap_pm_set_max_mpu_wakeup_lat(&work_data->qos_request, 1000);
+	pr_debug("%s - %s: hold c-state\n", __func__, voltdm->name);
+
 	/* program the workqueue and leave it to calibrate offline.. */
 	schedule_delayed_work(&work_data->work,
 			      msecs_to_jiffies(SR1P5_SAMPLING_DELAY_MS *
@@ -395,6 +406,10 @@ static int sr_class1p5_disable(struct voltagedomain *voltdm,
 		sr_notifier_control(voltdm, false);
 		omap_vp_disable(voltdm);
 		sr_disable(voltdm);
+
+		/* Release c-state constraint */
+		omap_pm_set_max_mpu_wakeup_lat(&work_data->qos_request, -1);
+		pr_debug("%s - %s: release c-state\n", __func__, voltdm->name);
 	}
 
 	/* if already calibrated, nothin special to do here.. */

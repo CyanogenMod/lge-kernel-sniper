@@ -5,7 +5,7 @@
  */
 
 /* LKM START ***********************/
-#define __KERNEL__
+//#define __KERNEL__
 #define MODULE
 
 //#include <linux/modversions.h>
@@ -21,46 +21,9 @@
 #define DRIVER_DESC		"LG-DVFS"
 /* LKM END *************************/
 
-static const int ds_prio_to_weight[40] = {
- /* -20 */	 88761,	 71755,	 56483,	 46273,	 36291,
- /* -15 */	 29154,	 23254,	 18705,	 14949,	 11916,
- /* -10 */	  9548,	  7620,	  6100,	  4904,	  3906,
- /*  -5 */	  3121,	  2501,	  1991,	  1586,	  1277,
- /*   0 */	  1024,	   820,	   655,	   526,	   423,
- /*   5 */	   335,	   272,	   215,	   172,	   137,
- /*  10 */	   110,		87,		70,		56,		45,
- /*  15 */		36,		29,		23,		18,		15,
-};
-
-static const u32 ds_prio_to_wmult[40] = {
- /* -20 */	 48388,	 59856,	 76040,	 92818,	118348,
- /* -15 */	147320,	184698,	229616,	287308,	360437,
- /* -10 */	449829,	563644,	704093,	875809,   1099582,
- /*  -5 */   1376151,   1717300,   2157191,   2708050,   3363326,
- /*   0 */   4194304,   5237765,   6557202,   8165337,  10153587,
- /*   5 */  12820798,  15790321,  19976592,  24970740,  31350126,
- /*  10 */  39045157,  49367440,  61356676,  76695844,  95443717,
- /*  15 */ 119304647, 148102320, 186737708, 238609294, 286331153,
-};
-
-#if 0	// {
 /****************************************************************************************
  * Variables and data structures
  ****************************************************************************************/
-
-struct timeval ds_timeval;
-
-DS_CONF ds_configuration;
-DS_STAT ds_status;
-DS_COUNT ds_counter;
-DS_PARAM ds_parameter;
-
-/* Variables for AIDVS */
-DS_AIDVS_STAT_STRUCT ds_aidvs_status;
-
-/* Variables for GPScheDVS */
-DS_GPSCHEDVS_STAT_STRUCT ds_gpschedvs_status;
-#endif	// }
 
 /****************************************************************************************
  * Function definitions
@@ -69,8 +32,6 @@ DS_GPSCHEDVS_STAT_STRUCT ds_gpschedvs_status;
 /*====================================================================
 	The functions involved with U(20,12) fixed point format arithmetic.
 	====================================================================*/
-
-#if 0	// {
 
 /* The unsigned multiplication function for U(20,12) format
 	 fixed point fractional numbers.
@@ -107,8 +68,6 @@ unsigned long *multiplied)
 
 	return;
 }
-
-#endif	// }
 
 /* The unsigned division function for U(20,12) format fixed point fractional numbers.
 	 Dividend and divisor should be converted to U(20,12) format fixed point number
@@ -1049,325 +1008,403 @@ unsigned long perf_requirement_fra_fp12)
 		 which means that the required performance is greater than 1,
 		 apply the maximum CPU_OP. */
 	if(perf_requirement_int_ulong > 0){
-		return(DS_CPU_OP_INDEX_0);
-	}
-	else if((perf_requirement_fra_fp12 & 0xff) != 0){
-		switch(perf_requirement_fra_fp12 & 0xf00){
-			case 0xf00: return(DS_CPU_OP_INDEX_0);	/* > 0.9375 and < 1 */
-			case 0xe00: return(DS_CPU_OP_INDEX_0);	/* > 0.875 and < 0.9375 */
-			case 0xd00: return(DS_CPU_OP_INDEX_0);	/* > 0.8125 and < 0.875 */
-			case 0xc00: return(DS_CPU_OP_INDEX_1);	/* > 0.75 and < 0.8125 */
-			case 0xb00: return(DS_CPU_OP_INDEX_1);	/* > 0.6875 and < 0.75 */
-			case 0xa00: return(DS_CPU_OP_INDEX_1);	/* > 0.625 and < 0.6875 */
-			case 0x900: return(DS_CPU_OP_INDEX_2);	/* > 0.5625 and < 0.625 */
-			case 0x800: return(DS_CPU_OP_INDEX_2);	/* > 0.5 and < 0.5625 */
-			case 0x700: return(DS_CPU_OP_INDEX_2);	/* > 0.4375 and < 0.5 */
-			case 0x600: return(DS_CPU_OP_INDEX_2);	/* > 0.375 and < 0.4375 */
-			case 0x500: return(DS_CPU_OP_INDEX_2);	/* > 0.3125 and < 0.375 */
-			case 0x400: return(DS_CPU_OP_INDEX_3);	/* > 0.25 and < 0.3125 */
-			case 0x300: return(DS_CPU_OP_INDEX_3);	/* > 0.1875 and < 0.25 */
-			case 0x200: return(DS_CPU_OP_INDEX_3);	/* > 0.125 and < 0.1875 */
-			case 0x100: return(DS_CPU_OP_INDEX_3);	/* > 0.0625 and < 0.125 */
-			default: return(DS_CPU_OP_INDEX_3);	/* < 0.0625 */
-		}
+		return(DS_CPU_OP_INDEX_MAX);
 	}
 	else{
-		switch(perf_requirement_fra_fp12){
-			case 0xf00: return(DS_CPU_OP_INDEX_0);	/* == 0.9375 */
-			case 0xe00: return(DS_CPU_OP_INDEX_0);	/* == 0.875 */
-			case 0xd00: return(DS_CPU_OP_INDEX_0);	/* == 0.8125 */
-			case 0xc00: return(DS_CPU_OP_INDEX_1);	/* == 0.75 */
-			case 0xb00: return(DS_CPU_OP_INDEX_1);	/* == 0.6875 */
-			case 0xa00: return(DS_CPU_OP_INDEX_1);	/* == 0.625 */
-			case 0x900: return(DS_CPU_OP_INDEX_2);	/* == 0.5625 */
-			case 0x800: return(DS_CPU_OP_INDEX_2);	/* == 0.5 */
-			case 0x700: return(DS_CPU_OP_INDEX_2);	/* == 0.4375 */
-			case 0x600: return(DS_CPU_OP_INDEX_2);	/* == 0.375 */
-			case 0x500: return(DS_CPU_OP_INDEX_2);	/* == 0.3125 */
-			case 0x400: return(DS_CPU_OP_INDEX_3);	/* == 0.25 */
-			case 0x300: return(DS_CPU_OP_INDEX_3);	/* == 0.1875 */
-			case 0x200: return(DS_CPU_OP_INDEX_3);	/* == 0.125 */
-			case 0x100: return(DS_CPU_OP_INDEX_3);	/* == 0.0625 */
-			default: return(DS_CPU_OP_INDEX_3);	/* <= 0.0625 */
-		}
-	}
-}
-
-/*====================================================================
-	The function which finds and returns the next low CPU_OP index.
-	====================================================================*/
-
-unsigned int ds_get_next_low_cpu_op_index(
-unsigned long perf_requirement_int_ulong,
-unsigned long perf_requirement_fra_fp12)
-{
-
-	/* If perf_requirement_int_ulong > 0,
-		 which means that the required performance is greater than 1,
-		 apply the maximum CPU_OP. */
-	if(perf_requirement_int_ulong > 0){
-		return(DS_CPU_OP_INDEX_0);
-	}
-	else if((perf_requirement_fra_fp12 & 0xff) != 0){
 		switch(perf_requirement_fra_fp12 & 0xf00){
-			case 0xf00: return(DS_CPU_OP_INDEX_1);	/* > 0.9375 and < 1 */
-			case 0xe00: return(DS_CPU_OP_INDEX_1);	/* > 0.875 and < 0.9375 */
-			case 0xd00: return(DS_CPU_OP_INDEX_1);	/* > 0.8125 and < 0.875 */
-			case 0xc00: return(DS_CPU_OP_INDEX_2);	/* > 0.75 and < 0.8125 */
-			case 0xb00: return(DS_CPU_OP_INDEX_2);	/* > 0.6875 and < 0.75 */
-			case 0xa00: return(DS_CPU_OP_INDEX_2);	/* > 0.625 and < 0.6875 */
-			case 0x900: return(DS_CPU_OP_INDEX_3);	/* > 0.5625 and < 0.625 */
-			case 0x800: return(DS_CPU_OP_INDEX_3);	/* > 0.5 and < 0.5625 */
-			case 0x700: return(DS_CPU_OP_INDEX_3);	/* > 0.4375 and < 0.5 */
-			case 0x600: return(DS_CPU_OP_INDEX_3);	/* > 0.375 and < 0.4375 */
-			case 0x500: return(DS_CPU_OP_INDEX_3);	/* > 0.3125 and < 0.375 */
-			case 0x400: return(DS_CPU_OP_INDEX_3);	/* > 0.25 and < 0.3125 */
-			case 0x300: return(DS_CPU_OP_INDEX_3);	/* > 0.1875 and < 0.25 */
-			case 0x200: return(DS_CPU_OP_INDEX_3);	/* > 0.125 and < 0.1875 */
-			case 0x100: return(DS_CPU_OP_INDEX_3);	/* > 0.0625 and < 0.125 */
-			default: return(DS_CPU_OP_INDEX_3);	/* < 0.0625 */
+			case 0xf00: goto LC_LT_0XF00;	/* > 0.9375 and < 1 */
+			case 0xe00: goto LC_LT_0XE00;	/* > 0.875 and < 0.9375 */
+			case 0xd00: goto LC_LT_0XD00;	/* > 0.8125 and < 0.875 */
+			case 0xc00: goto LC_LT_0XC00;	/* > 0.75 and < 0.8125 */
+			case 0xb00: goto LC_LT_0XB00;	/* > 0.6875 and < 0.75 */
+			case 0xa00: goto LC_LT_0XA00;	/* > 0.625 and < 0.6875 */
+			case 0x900: goto LC_LT_0X900;	/* > 0.5625 and < 0.625 */
+			case 0x800: goto LC_LT_0X800;	/* > 0.5 and < 0.5625 */
+			case 0x700: goto LC_LT_0X700;	/* > 0.4375 and < 0.5 */
+			case 0x600: goto LC_LT_0X600;	/* > 0.375 and < 0.4375 */
+			case 0x500: goto LC_LT_0X500;	/* > 0.3125 and < 0.375 */
+			case 0x400: goto LC_LT_0X400;	/* > 0.25 and < 0.3125 */
+			case 0x300: goto LC_LT_0X300;	/* > 0.1875 and < 0.25 */
+			case 0x200: goto LC_LT_0X200;	/* > 0.125 and < 0.1875 */
+			case 0x100: goto LC_LT_0X100;	/* > 0.0625 and < 0.125 */
+			default: goto LC_LT_0X000;	/* < 0.0625 */
 		}
 	}
-	else{
-		switch(perf_requirement_fra_fp12){
-			case 0xf00: return(DS_CPU_OP_INDEX_1);	/* == 0.9375 */
-			case 0xe00: return(DS_CPU_OP_INDEX_1);	/* == 0.875 */
-			case 0xd00: return(DS_CPU_OP_INDEX_1);	/* == 0.8125 */
-			case 0xc00: return(DS_CPU_OP_INDEX_2);	/* == 0.75 */
-			case 0xb00: return(DS_CPU_OP_INDEX_2);	/* == 0.6875 */
-			case 0xa00: return(DS_CPU_OP_INDEX_2);	/* == 0.625 */
-			case 0x900: return(DS_CPU_OP_INDEX_3);	/* == 0.5625 */
-			case 0x800: return(DS_CPU_OP_INDEX_3);	/* == 0.5 */
-			case 0x700: return(DS_CPU_OP_INDEX_3);	/* == 0.4375 */
-			case 0x600: return(DS_CPU_OP_INDEX_3);	/* == 0.375 */
-			case 0x500: return(DS_CPU_OP_INDEX_3);	/* == 0.3125 */
-			case 0x400: return(DS_CPU_OP_INDEX_3);	/* == 0.25 */
-			case 0x300: return(DS_CPU_OP_INDEX_3);	/* == 0.1875 */
-			case 0x200: return(DS_CPU_OP_INDEX_3);	/* == 0.125 */
-			case 0x100: return(DS_CPU_OP_INDEX_3);	/* == 0.0625 */
-			default: return(DS_CPU_OP_INDEX_3);	/* <= 0.0625 */
-		}
+
+LC_LT_0XF00:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9961 and < 1 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9922 and < 0.9961 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9883 and < 0.9922 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9844 and < 0.9883 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9805 and < 0.9844 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9766 and < 0.9805 */
+		case 0x090: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9727 and < 0.9766 */
+		case 0x080: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9688 and < 0.9727 */
+		case 0x070: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9648 and < 0.9688 */
+		case 0x060: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9609 and < 0.9648 */
+		case 0x050: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9570 and < 0.9609 */
+		case 0x040: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9531 and < 0.9570 */
+		case 0x030: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9492 and < 0.9531 */
+		case 0x020: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9453 and < 0.9492 */
+		case 0x010: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9414 and < 0.9453 */
+		default: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9375 and < 0.9414 */
+	}
+LC_LT_0XE00:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9336 and < 0.9375 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9297 and < 0.9336 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9258 and < 0.9297 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9219 and < 0.9258 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9180 and < 0.9219 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9141 and < 0.9180 */
+		case 0x090: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9102 and < 0.9141 */
+		case 0x080: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9063 and < 0.9102 */
+		case 0x070: return(DS_CPU_OP_INDEX_MAX);	/* > 0.9023 and < 0.9063 */
+		case 0x060: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8984 and < 0.9023 */
+		case 0x050: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8945 and < 0.8984 */
+		case 0x040: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8906 and < 0.8945 */
+		case 0x030: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8867 and < 0.8906 */
+		case 0x020: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8828 and < 0.8867 */
+		case 0x010: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8789 and < 0.8828 */
+		default: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8750 and < 0.8789 */
+	}
+LC_LT_0XD00:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8711 and < 0.8750 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8672 and < 0.8711 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8633 and < 0.8672 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8594 and < 0.8633 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8555 and < 0.8594 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8516 and < 0.8555 */
+		case 0x090: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8477 and < 0.8516 */
+		case 0x080: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8438 and < 0.8477 */
+		case 0x070: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8398 and < 0.8438 */
+		case 0x060: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8359 and < 0.8398 */
+		case 0x050: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8320 and < 0.8359 */
+		case 0x040: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8281 and < 0.8320 */
+		case 0x030: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8242 and < 0.8281 */
+		case 0x020: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8203 and < 0.8242 */
+		case 0x010: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8164 and < 0.8203 */
+		default: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8125 and < 0.8164 */
+	}
+LC_LT_0XC00:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8086 and < 0.8125 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8047 and < 0.8086 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.8008 and < 0.8047 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MAX);	/* > 0.7969 and < 0.8008 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_1);	/* > 0.7930 and < 0.7969 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_1);	/* > 0.7891 and < 0.7930 */
+		case 0x090: return(DS_CPU_OP_INDEX_1);	/* > 0.7852 and < 0.7891 */
+		case 0x080: return(DS_CPU_OP_INDEX_1);	/* > 0.7813 and < 0.7852 */
+		case 0x070: return(DS_CPU_OP_INDEX_1);	/* > 0.7773 and < 0.7813 */
+		case 0x060: return(DS_CPU_OP_INDEX_1);	/* > 0.7734 and < 0.7773 */
+		case 0x050: return(DS_CPU_OP_INDEX_1);	/* > 0.7695 and < 0.7734 */
+		case 0x040: return(DS_CPU_OP_INDEX_1);	/* > 0.7656 and < 0.7695 */
+		case 0x030: return(DS_CPU_OP_INDEX_1);	/* > 0.7617 and < 0.7656 */
+		case 0x020: return(DS_CPU_OP_INDEX_1);	/* > 0.7578 and < 0.7617 */
+		case 0x010: return(DS_CPU_OP_INDEX_1);	/* > 0.7539 and < 0.7578 */
+		default: return(DS_CPU_OP_INDEX_1);	/* > 0.7500 and < 0.7539 */
+	}
+LC_LT_0XB00:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_1);	/* > 0.7461 and < 0.7500 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_1);	/* > 0.7422 and < 0.7461 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_1);	/* > 0.7383 and < 0.7422 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_1);	/* > 0.7344 and < 0.7383 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_1);	/* > 0.7305 and < 0.7344 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_1);	/* > 0.7266 and < 0.7305 */
+		case 0x090: return(DS_CPU_OP_INDEX_1);	/* > 0.7227 and < 0.7266 */
+		case 0x080: return(DS_CPU_OP_INDEX_1);	/* > 0.7188 and < 0.7227 */
+		case 0x070: return(DS_CPU_OP_INDEX_1);	/* > 0.7148 and < 0.7188 */
+		case 0x060: return(DS_CPU_OP_INDEX_1);	/* > 0.7109 and < 0.7148 */
+		case 0x050: return(DS_CPU_OP_INDEX_1);	/* > 0.7070 and < 0.7109 */
+		case 0x040: return(DS_CPU_OP_INDEX_1);	/* > 0.7031 and < 0.7070 */
+		case 0x030: return(DS_CPU_OP_INDEX_1);	/* > 0.6992 and < 0.7031 */
+		case 0x020: return(DS_CPU_OP_INDEX_1);	/* > 0.6953 and < 0.6992 */
+		case 0x010: return(DS_CPU_OP_INDEX_1);	/* > 0.6914 and < 0.6953 */
+		default: return(DS_CPU_OP_INDEX_1);	/* > 0.6875 and < 0.6914 */
+	}
+LC_LT_0XA00:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_1);	/* > 0.6836 and < 0.6875 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_1);	/* > 0.6797 and < 0.6836 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_1);	/* > 0.6758 and < 0.6797 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_1);	/* > 0.6719 and < 0.6758 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_1);	/* > 0.6680 and < 0.6719 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_1);	/* > 0.6641 and < 0.6680 */
+		case 0x090: return(DS_CPU_OP_INDEX_1);	/* > 0.6602 and < 0.6641 */
+		case 0x080: return(DS_CPU_OP_INDEX_1);	/* > 0.6563 and < 0.6602 */
+		case 0x070: return(DS_CPU_OP_INDEX_1);	/* > 0.6523 and < 0.6563 */
+		case 0x060: return(DS_CPU_OP_INDEX_1);	/* > 0.6484 and < 0.6523 */
+		case 0x050: return(DS_CPU_OP_INDEX_1);	/* > 0.6445 and < 0.6484 */
+		case 0x040: return(DS_CPU_OP_INDEX_1);	/* > 0.6406 and < 0.6445 */
+		case 0x030: return(DS_CPU_OP_INDEX_1);	/* > 0.6367 and < 0.6406 */
+		case 0x020: return(DS_CPU_OP_INDEX_1);	/* > 0.6328 and < 0.6367 */
+		case 0x010: return(DS_CPU_OP_INDEX_1);	/* > 0.6289 and < 0.6328 */
+		default: return(DS_CPU_OP_INDEX_1);	/* > 0.6250 and < 0.6289 */
+	}
+LC_LT_0X900:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_1);	/* > 0.6211 and < 0.6250 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_1);	/* > 0.6172 and < 0.6211 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_1);	/* > 0.6133 and < 0.6172 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_1);	/* > 0.6093 and < 0.6133 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_1);	/* > 0.6055 and < 0.6093 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_1);	/* > 0.6016 and < 0.6055 */
+		case 0x090: return(DS_CPU_OP_INDEX_1);	/* > 0.5977 and < 0.6016 */
+		case 0x080: return(DS_CPU_OP_INDEX_2);	/* > 0.5938 and < 0.5977 */
+		case 0x070: return(DS_CPU_OP_INDEX_2);	/* > 0.5898 and < 0.5938 */
+		case 0x060: return(DS_CPU_OP_INDEX_2);	/* > 0.5859 and < 0.5898 */
+		case 0x050: return(DS_CPU_OP_INDEX_2);	/* > 0.5820 and < 0.5859 */
+		case 0x040: return(DS_CPU_OP_INDEX_2);	/* > 0.5781 and < 0.5820 */
+		case 0x030: return(DS_CPU_OP_INDEX_2);	/* > 0.5742 and < 0.5781 */
+		case 0x020: return(DS_CPU_OP_INDEX_2);	/* > 0.5703 and < 0.5742 */
+		case 0x010: return(DS_CPU_OP_INDEX_2);	/* > 0.5664 and < 0.5703 */
+		default: return(DS_CPU_OP_INDEX_2);	/* > 0.5625 and < 0.5664 */
+	}
+LC_LT_0X800:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_2);	/* > 0.5586 and < 0.5625 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_2);	/* > 0.5547 and < 0.5586 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_2);	/* > 0.5508 and < 0.5547 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_2);	/* > 0.5469 and < 0.5508 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_2);	/* > 0.5430 and < 0.5469 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_2);	/* > 0.5391 and < 0.5430 */
+		case 0x090: return(DS_CPU_OP_INDEX_2);	/* > 0.5352 and < 0.5391 */
+		case 0x080: return(DS_CPU_OP_INDEX_2);	/* > 0.5313 and < 0.5352 */
+		case 0x070: return(DS_CPU_OP_INDEX_2);	/* > 0.5273 and < 0.5313 */
+		case 0x060: return(DS_CPU_OP_INDEX_2);	/* > 0.5234 and < 0.5273 */
+		case 0x050: return(DS_CPU_OP_INDEX_2);	/* > 0.5195 and < 0.5234 */
+		case 0x040: return(DS_CPU_OP_INDEX_2);	/* > 0.5156 and < 0.5195 */
+		case 0x030: return(DS_CPU_OP_INDEX_2);	/* > 0.5117 and < 0.5156 */
+		case 0x020: return(DS_CPU_OP_INDEX_2);	/* > 0.5078 and < 0.5117 */
+		case 0x010: return(DS_CPU_OP_INDEX_2);	/* > 0.5039 and < 0.5078 */
+		default: return(DS_CPU_OP_INDEX_2);	/* > 0.5000 and < 0.5039 */
+	}
+LC_LT_0X700:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_2);	/* > 0.4961 and < 0.5000 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_2);	/* > 0.4922 and < 0.4961 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_2);	/* > 0.4883 and < 0.4922 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_2);	/* > 0.4844 and < 0.4883 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_2);	/* > 0.4805 and < 0.4844 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_2);	/* > 0.4766 and < 0.4805 */
+		case 0x090: return(DS_CPU_OP_INDEX_2);	/* > 0.4727 and < 0.4766 */
+		case 0x080: return(DS_CPU_OP_INDEX_2);	/* > 0.4688 and < 0.4727 */
+		case 0x070: return(DS_CPU_OP_INDEX_2);	/* > 0.4648 and < 0.4688 */
+		case 0x060: return(DS_CPU_OP_INDEX_2);	/* > 0.4609 and < 0.4648 */
+		case 0x050: return(DS_CPU_OP_INDEX_2);	/* > 0.4570 and < 0.4609 */
+		case 0x040: return(DS_CPU_OP_INDEX_2);	/* > 0.4531 and < 0.4570 */
+		case 0x030: return(DS_CPU_OP_INDEX_2);	/* > 0.4492 and < 0.4531 */
+		case 0x020: return(DS_CPU_OP_INDEX_2);	/* > 0.4453 and < 0.4492 */
+		case 0x010: return(DS_CPU_OP_INDEX_2);	/* > 0.4414 and < 0.4453 */
+		default: return(DS_CPU_OP_INDEX_2);	/* > 0.4375 and < 0.4414 */
+	}
+LC_LT_0X600:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_2);	/* > 0.4336 and < 0.4375 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_2);	/* > 0.4297 and < 0.4336 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_2);	/* > 0.4258 and < 0.4297 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_2);	/* > 0.4219 and < 0.4258 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_2);	/* > 0.4180 and < 0.4219 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_2);	/* > 0.4141 and < 0.4180 */
+		case 0x090: return(DS_CPU_OP_INDEX_2);	/* > 0.4102 and < 0.4141 */
+		case 0x080: return(DS_CPU_OP_INDEX_2);	/* > 0.4063 and < 0.4102 */
+		case 0x070: return(DS_CPU_OP_INDEX_2);	/* > 0.4023 and < 0.4063 */
+		case 0x060: return(DS_CPU_OP_INDEX_2);	/* > 0.3984 and < 0.4023 */
+		case 0x050: return(DS_CPU_OP_INDEX_2);	/* > 0.3945 and < 0.3984 */
+		case 0x040: return(DS_CPU_OP_INDEX_2);	/* > 0.3906 and < 0.3945 */
+		case 0x030: return(DS_CPU_OP_INDEX_2);	/* > 0.3867 and < 0.3906 */
+		case 0x020: return(DS_CPU_OP_INDEX_2);	/* > 0.3828 and < 0.3867 */
+		case 0x010: return(DS_CPU_OP_INDEX_2);	/* > 0.3789 and < 0.3828 */
+		default: return(DS_CPU_OP_INDEX_2);	/* > 0.3750 and < 0.3789 */
+	}
+LC_LT_0X500:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_2);	/* > 0.3711 and < 0.3750 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_2);	/* > 0.3672 and < 0.3711 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_2);	/* > 0.3633 and < 0.3672 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_2);	/* > 0.3594 and < 0.3633 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_2);	/* > 0.3555 and < 0.3594 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_2);	/* > 0.3516 and < 0.3555 */
+		case 0x090: return(DS_CPU_OP_INDEX_2);	/* > 0.3477 and < 0.3516 */
+		case 0x080: return(DS_CPU_OP_INDEX_2);	/* > 0.3438 and < 0.3477 */
+		case 0x070: return(DS_CPU_OP_INDEX_2);	/* > 0.3398 and < 0.3438 */
+		case 0x060: return(DS_CPU_OP_INDEX_2);	/* > 0.3359 and < 0.3398 */
+		case 0x050: return(DS_CPU_OP_INDEX_2);	/* > 0.3320 and < 0.3359 */
+		case 0x040: return(DS_CPU_OP_INDEX_2);	/* > 0.3281 and < 0.3320 */
+		case 0x030: return(DS_CPU_OP_INDEX_2);	/* > 0.3242 and < 0.3281 */
+		case 0x020: return(DS_CPU_OP_INDEX_2);	/* > 0.3203 and < 0.3242 */
+		case 0x010: return(DS_CPU_OP_INDEX_2);	/* > 0.3164 and < 0.3203 */
+		default: return(DS_CPU_OP_INDEX_2);	/* > 0.3125 and < 0.3164 */
+	}
+LC_LT_0X400:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_2);	/* > 0.3086 and < 0.3125 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_2);	/* > 0.3047 and < 0.3086 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_2);	/* > 0.3008 and < 0.3047 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_2);	/* > 0.2969 and < 0.3008 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2930 and < 0.2969 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2891 and < 0.2930 */
+		case 0x090: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2852 and < 0.2891 */
+		case 0x080: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2813 and < 0.2852 */
+		case 0x070: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2773 and < 0.2813 */
+		case 0x060: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2734 and < 0.2773 */
+		case 0x050: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2695 and < 0.2734 */
+		case 0x040: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2656 and < 0.2695 */
+		case 0x030: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2617 and < 0.2656 */
+		case 0x020: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2578 and < 0.2617 */
+		case 0x010: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2539 and < 0.2578 */
+		default: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2500 and < 0.2539 */
+	}
+LC_LT_0X300:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2461 and < 0.2500 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2422 and < 0.2461 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2383 and < 0.2422 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2344 and < 0.2383 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2305 and < 0.2344 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2266 and < 0.2305 */
+		case 0x090: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2227 and < 0.2266 */
+		case 0x080: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2188 and < 0.2227 */
+		case 0x070: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2148 and < 0.2188 */
+		case 0x060: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2109 and < 0.2148 */
+		case 0x050: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2070 and < 0.2109 */
+		case 0x040: return(DS_CPU_OP_INDEX_MIN);	/* > 0.2031 and < 0.2070 */
+		case 0x030: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1992 and < 0.2031 */
+		case 0x020: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1953 and < 0.1992 */
+		case 0x010: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1914 and < 0.1953 */
+		default: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1875 and < 0.1914 */
+	}
+LC_LT_0X200:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1836 and < 0.1875 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1797 and < 0.1836 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1758 and < 0.1797 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1719 and < 0.1758 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1680 and < 0.1719 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1641 and < 0.1680 */
+		case 0x090: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1602 and < 0.1641 */
+		case 0x080: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1563 and < 0.1602 */
+		case 0x070: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1523 and < 0.1563 */
+		case 0x060: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1484 and < 0.1523 */
+		case 0x050: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1445 and < 0.1484 */
+		case 0x040: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1406 and < 0.1445 */
+		case 0x030: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1367 and < 0.1406 */
+		case 0x020: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1328 and < 0.1367 */
+		case 0x010: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1289 and < 0.1328 */
+		default: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1250 and < 0.1289 */
+	}
+LC_LT_0X100:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1211 and < 0.1250 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1172 and < 0.1211 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1133 and < 0.1172 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1094 and < 0.1133 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1055 and < 0.1094 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.1016 and < 0.1055 */
+		case 0x090: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0977 and < 0.1016 */
+		case 0x080: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0938 and < 0.0977 */
+		case 0x070: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0898 and < 0.0938 */
+		case 0x060: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0859 and < 0.0898 */
+		case 0x050: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0820 and < 0.0859 */
+		case 0x040: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0781 and < 0.0820 */
+		case 0x030: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0742 and < 0.0781 */
+		case 0x020: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0703 and < 0.0742 */
+		case 0x010: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0664 and < 0.0703 */
+		default: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0625 and < 0.0664 */
+	}
+LC_LT_0X000:
+	switch(perf_requirement_fra_fp12 & 0x0f0){
+		case 0x0f0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0586 and < 0.0625 */
+		case 0x0e0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0547 and < 0.0586 */
+		case 0x0d0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0508 and < 0.0547 */
+		case 0x0c0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0469 and < 0.0508 */
+		case 0x0b0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0430 and < 0.0469 */
+		case 0x0a0: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0391 and < 0.0430 */
+		case 0x090: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0352 and < 0.0391 */
+		case 0x080: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0313 and < 0.0352 */
+		case 0x070: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0273 and < 0.0313 */
+		case 0x060: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0234 and < 0.0273 */
+		case 0x050: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0195 and < 0.0234 */
+		case 0x040: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0156 and < 0.0195 */
+		case 0x030: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0117 and < 0.0156 */
+		case 0x020: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0078 and < 0.0117 */
+		case 0x010: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0039 and < 0.0078 */
+		default: return(DS_CPU_OP_INDEX_MIN);	/* > 0.0000 and < 0.0039 */
 	}
 }
 
 /*====================================================================
 	The function which updates the fractions of
-	busy (= task + schedule + dvs suite) and idle time at each CPU_OP.
+	elapsed and busy time both in wall time and full speed equivalent time.
 	====================================================================*/
 
-int ds_update_time_counter(void){
+int ds_update_time_counter(int ds_cpu){
 
-	unsigned long lc_sec_interval = 0;
+	cputime64_t lc_usec_wall_cur = 0;
+	cputime64_t lc_usec_idle_cur = 0;
+	cputime64_t lc_usec_iowait_cur = 0;
+
 	unsigned long lc_usec_interval = 0;
-	unsigned long lc_usec_interval_fse = 0;
-	unsigned long lc_usec_interval_fse_fra_fp12 = 0;
+	unsigned long lc_usec_idle = 0;
+	unsigned long lc_usec_iowait = 0;
+	unsigned long lc_usec_busy = 0;
 
-	/* (1) No rdtsc support in ARM.
-			So, we instead use ds_status.cpu_op_index for the last time interval
-			to calculate the full speed equivalent elapsed time.
-			I.e., the fse elapsed time = 
-			elapsed time (measured by do_gettimeofday) * scaling factor
-	 */
+	if(per_cpu(ds_counter, ds_cpu).counter_mutex != 0) return(0);
+	per_cpu(ds_counter, ds_cpu).counter_mutex ++;
 
-	do_gettimeofday(&ds_timeval);
-	ds_status.tv_sec_curr = ds_timeval.tv_sec;
-	ds_status.tv_usec_curr = ds_timeval.tv_usec;
+	lc_usec_wall_cur = jiffies64_to_cputime64(get_jiffies_64());
+	lc_usec_idle_cur = get_cpu_idle_time_us(ds_cpu, &lc_usec_wall_cur);
+	lc_usec_iowait_cur = get_cpu_iowait_time_us(ds_cpu, &lc_usec_wall_cur);
 
-	if(ds_status.flag_time_base_initialized == 0){
-		lc_usec_interval = 0;
-		ds_status.flag_time_base_initialized = 1;
+	if(per_cpu(ds_counter, ds_cpu).flag_counter_initialized == 0){
+		per_cpu(ds_counter, ds_cpu).flag_counter_initialized = 1;
 	}
 	else{
-		if(ds_status.tv_sec_curr == ds_status.tv_sec_base){
-			if(ds_status.tv_usec_curr >= ds_status.tv_usec_base){
-				lc_usec_interval = ds_status.tv_usec_curr - ds_status.tv_usec_base;
-			}
-			else{
-				/* Time inversion. 
-					This happens due to the inaccuracy in do_gettimeofday() function
-					when it is called consecutively in a very short time inverval.
-					In this case, we apply 1msec, which is the minimum context switch interval, 
-					as default.
-				 */
-				lc_usec_interval = 1000;
-			}
-		}
-		else{
-			/* ds_status.tv_usec_curr should be ds_status.tv_usec_base + 1.
-				This is because of that, 
-				no matter how long the interval between two consecutive 
-				ds_update_time_counter() calls is, it never ever able to 
-				exceed 1 sec in Linux kernel since the function is called
-				4 times at every context swtiching.
-			 */
-			lc_usec_interval = ds_status.tv_usec_curr + 1000000 - ds_status.tv_usec_base;
-		}
+		lc_usec_interval = 
+			(unsigned long)(lc_usec_wall_cur - per_cpu(ds_counter, ds_cpu).wall_usec_base);
+		lc_usec_idle = 
+			(unsigned long)(lc_usec_idle_cur - per_cpu(ds_counter, ds_cpu).idle_usec_base);
+		lc_usec_iowait = 
+			(unsigned long)(lc_usec_iowait_cur - per_cpu(ds_counter, ds_cpu).iowait_usec_base);
 
-	}
-	ds_status.tv_sec_base = ds_status.tv_sec_curr;
-	ds_status.tv_usec_base = ds_status.tv_usec_curr;
-
-	switch(ds_status.cpu_op_index){
-		case DS_CPU_OP_INDEX_0:
-		lc_usec_interval_fse = lc_usec_interval;
-		lc_usec_interval_fse_fra_fp12 = 0x0;
-		break;
-	case DS_CPU_OP_INDEX_1:
-		ds_fpmul(lc_usec_interval, 0, 0, 0xccc, 
-			 &lc_usec_interval_fse, &lc_usec_interval_fse_fra_fp12);
-		break;
-	case DS_CPU_OP_INDEX_2:
-		ds_fpmul(lc_usec_interval, 0, 0, 0x999, 
-			 &lc_usec_interval_fse, &lc_usec_interval_fse_fra_fp12);
-		break;
-	case DS_CPU_OP_INDEX_3:
-		ds_fpmul(lc_usec_interval, 0, 0, 0x4cc, 
-			 &lc_usec_interval_fse, &lc_usec_interval_fse_fra_fp12);
-	default:
-		lc_usec_interval_fse = lc_usec_interval;
-		lc_usec_interval_fse_fra_fp12 = 0x0;
-		break;
-	}
-
-	/* (2) Update ds_counter by using lc_usec_interval, lc_usec_interval_fse,
-				 lc_usec_interval_fse_fra_fp12, ds_status.cpu_op_index,
-				 ds_status.cpu_op_sf, ds_status.cpu_op_index_nr,
-				 ds_status.cpu_op_mhz, and ds_status.cpu_mode.
-	 */
-
-	/* Elapsed */
-	ds_counter.elapsed_usec += lc_usec_interval;
-	if(ds_counter.elapsed_usec >= 1000000){
-		ds_counter.elapsed_sec += 1;
-		ds_counter.elapsed_usec -= 1000000;
-	}
-
-	/* Idle */
-	if(ds_status.cpu_mode == DS_CPU_MODE_IDLE){
-#if 0	// Not needed unless we want statistics
-		ds_counter.idle_usec[ds_status.cpu_op_index_nr] += lc_usec_interval;
-		if(ds_counter.idle_usec[ds_status.cpu_op_index_nr] >= 1000000){
-			ds_counter.idle_sec[ds_status.cpu_op_index_nr] += 1;
-			ds_counter.idle_usec[ds_status.cpu_op_index_nr] -= 1000000;
-		}
-
-		ds_counter.idle_total_usec += lc_usec_interval;
-		if(ds_counter.idle_total_usec >= 1000000){
-			ds_counter.idle_total_sec += 1;
-			ds_counter.idle_total_usec -= 1000000;
-		}
-#endif
-	}
-	/* Busy */
-	else{
-#if 0	// Not needed unless we want statistics
-		ds_counter.busy_usec[ds_status.cpu_op_index_nr] += lc_usec_interval;
-		if(ds_counter.busy_usec[ds_status.cpu_op_index_nr] >= 1000000){
-			ds_counter.busy_sec[ds_status.cpu_op_index_nr] += 1;
-			ds_counter.busy_usec[ds_status.cpu_op_index_nr] -= 1000000;
-		}
+#if 0
+		if(lc_usec_idle > lc_usec_iowait)
+			lc_usec_idle -= lc_usec_iowait;
+		else
+			lc_usec_idle = 0;
 #endif
 
-		ds_counter.busy_total_usec += lc_usec_interval;
-		if(ds_counter.busy_total_usec >= 1000000){
-			ds_counter.busy_total_sec += 1;
-			ds_counter.busy_total_usec -= 1000000;
-		}
+		if(lc_usec_interval > lc_usec_idle)
+			lc_usec_busy = lc_usec_interval - lc_usec_idle;
+		else
+			lc_usec_busy = 0;
 
-		ds_counter.busy_fse_usec += lc_usec_interval_fse;
-		if(ds_counter.busy_fse_usec >= 1000000){
-			ds_counter.busy_fse_sec += 1;
-			ds_counter.busy_fse_usec -= 1000000;
-		}
-		ds_counter.busy_fse_usec_fra_fp12 += lc_usec_interval_fse_fra_fp12;
-		if(ds_counter.busy_fse_usec_fra_fp12 >= 0x1000){
-			ds_counter.busy_fse_usec += 1;
-			ds_counter.busy_fse_usec_fra_fp12 -= 0x1000;
-		}
-
-#if 0	// Not needed unless we want statistics
-		switch(ds_status.cpu_mode){
-
-			case DS_CPU_MODE_TASK:
-
-				ds_counter.busy_task_usec[ds_status.cpu_op_index_nr] += lc_usec_interval;
-				if(ds_counter.busy_task_usec[ds_status.cpu_op_index_nr] >= 1000000){
-					ds_counter.busy_task_sec[ds_status.cpu_op_index_nr] += 1;
-					ds_counter.busy_task_usec[ds_status.cpu_op_index_nr] -= 1000000;
+		/* Elapsed */
+		per_cpu(ds_counter, ds_cpu).elapsed_sec += (lc_usec_interval / 1000000);
+		per_cpu(ds_counter, ds_cpu).elapsed_usec += (lc_usec_interval % 1000000);
+		if(per_cpu(ds_counter, ds_cpu).elapsed_usec >= 1000000){
+			per_cpu(ds_counter, ds_cpu).elapsed_sec += 1;
+			per_cpu(ds_counter, ds_cpu).elapsed_usec -= 1000000;
 				}
 
-				ds_counter.busy_task_total_usec += lc_usec_interval;
-				if(ds_counter.busy_task_total_usec >= 1000000){
-					ds_counter.busy_task_total_sec += 1;
-					ds_counter.busy_task_total_usec -= 1000000;
+		/* Busy */
+		per_cpu(ds_counter, ds_cpu).busy_sec += (lc_usec_busy / 1000000);
+		per_cpu(ds_counter, ds_cpu).busy_usec += (lc_usec_busy % 1000000);
+		if(per_cpu(ds_counter, ds_cpu).busy_usec >= 1000000){
+			per_cpu(ds_counter, ds_cpu).busy_sec += 1;
+			per_cpu(ds_counter, ds_cpu).busy_usec -= 1000000;
+				}
 				}
 
-				ds_counter.busy_task_fse_usec += lc_usec_interval_fse;
-				if(ds_counter.busy_task_fse_usec >= 1000000){
-					ds_counter.busy_task_fse_sec += 1;
-					ds_counter.busy_task_fse_usec -= 1000000;
-				}
-				ds_counter.busy_task_fse_usec_fra_fp12 += lc_usec_interval_fse_fra_fp12;
-				if(ds_counter.busy_task_fse_usec_fra_fp12 >= 0x1000){
-					ds_counter.busy_task_fse_usec += 1;
-					ds_counter.busy_task_fse_usec_fra_fp12 -= 0x1000;
-				}
-				break;
+	per_cpu(ds_counter, ds_cpu).wall_usec_base = lc_usec_wall_cur;
+	per_cpu(ds_counter, ds_cpu).idle_usec_base = lc_usec_idle_cur;
+	per_cpu(ds_counter, ds_cpu).iowait_usec_base = lc_usec_iowait_cur;
 
-			case DS_CPU_MODE_SCHEDULE:
-
-				ds_counter.busy_schedule_usec[ds_status.cpu_op_index_nr] += lc_usec_interval;
-				if(ds_counter.busy_schedule_usec[ds_status.cpu_op_index_nr] >= 1000000){
-					ds_counter.busy_schedule_sec[ds_status.cpu_op_index_nr] += 1;
-					ds_counter.busy_schedule_usec[ds_status.cpu_op_index_nr] -= 1000000;
-				}
-
-				ds_counter.busy_schedule_total_usec += lc_usec_interval;
-				if(ds_counter.busy_schedule_total_usec >= 1000000){
-					ds_counter.busy_schedule_total_sec += 1;
-					ds_counter.busy_schedule_total_usec -= 1000000;
-				}
-
-				ds_counter.busy_schedule_fse_usec += lc_usec_interval_fse;
-				if(ds_counter.busy_schedule_fse_usec >= 1000000){
-					ds_counter.busy_schedule_fse_sec += 1;
-					ds_counter.busy_schedule_fse_usec -= 1000000;
-				}
-				ds_counter.busy_schedule_fse_usec_fra_fp12 += lc_usec_interval_fse_fra_fp12;
-				if(ds_counter.busy_schedule_fse_usec_fra_fp12 >= 0x1000){
-					ds_counter.busy_schedule_fse_usec += 1;
-					ds_counter.busy_schedule_fse_usec_fra_fp12 -= 0x1000;
-				}
-				break;
-
-			case DS_CPU_MODE_DVS_SUITE:
-
-				ds_counter.busy_dvs_suite_usec[ds_status.cpu_op_index_nr] += lc_usec_interval;
-				if(ds_counter.busy_dvs_suite_usec[ds_status.cpu_op_index_nr] >= 1000000){
-					ds_counter.busy_dvs_suite_sec[ds_status.cpu_op_index_nr] += 1;
-					ds_counter.busy_dvs_suite_usec[ds_status.cpu_op_index_nr] -= 1000000;
-				}
-
-				ds_counter.busy_dvs_suite_total_usec += lc_usec_interval;
-				if(ds_counter.busy_dvs_suite_total_usec >= 1000000){
-					ds_counter.busy_dvs_suite_total_sec += 1;
-					ds_counter.busy_dvs_suite_total_usec -= 1000000;
-				}
-
-				ds_counter.busy_dvs_suite_fse_usec += lc_usec_interval_fse;
-				if(ds_counter.busy_dvs_suite_fse_usec >= 1000000){
-					ds_counter.busy_dvs_suite_fse_sec += 1;
-					ds_counter.busy_dvs_suite_fse_usec -= 1000000;
-				}
-				ds_counter.busy_dvs_suite_fse_usec_fra_fp12 += lc_usec_interval_fse_fra_fp12;
-				if(ds_counter.busy_dvs_suite_fse_usec_fra_fp12 >= 0x1000){
-					ds_counter.busy_dvs_suite_fse_usec += 1;
-					ds_counter.busy_dvs_suite_fse_usec_fra_fp12 -= 0x1000;
-				}
-				break;
-		}
-#endif
-	}
+	per_cpu(ds_counter, ds_cpu).counter_mutex --;
 
 	return(0);
 }
@@ -1377,515 +1414,148 @@ int ds_update_time_counter(void){
 	AIDVS.
 	====================================================================*/
 
-#if 0
-int ds_do_dvs_aidvs(unsigned int *target_cpu_op_index, 
-					DS_AIDVS_STAT_STRUCT *stat,
-					int target_static_prio, 
-					int interval_window_size,
-					unsigned long interval_window_length,
-					unsigned long speedup_threshold, 
-					unsigned long speedup_interval)
+int ds_do_dvs_aidvs(int ds_cpu, unsigned int *target_cpu_op_index, DS_AIDVS_STAT_STRUCT *stat)
 {
 	unsigned long lc_time_usec_interval_inc = 0;
 	unsigned long lc_time_usec_work_inc = 0;
-	unsigned long lc_time_usec_work_in_window = 0;
-	unsigned long lc_time_usec_interval_in_window = 0;
-	unsigned long lc_time_usec_since_last_util_calc = 0;
 
-	unsigned long lc_utilization_int_ulong_old_by_weight = 0;
-	unsigned long lc_utilization_fra_fp12_old_by_weight = 0;
+	unsigned long lc_old_moving_avg_int_ulong = 0;
+	unsigned long lc_old_moving_avg_fra_fp12 = 0x0;
+	unsigned long lc_old_utilization_int_ulong = 0;
+	unsigned long lc_old_utilization_fra_fp12 = 0x0;
+	unsigned long lc_old_moving_avg_int_ulong_by_weight = 0;
+	unsigned long lc_old_moving_avg_fra_fp12_by_weight = 0x0;
 	unsigned long lc_numerator_int_ulong = 0;
-	unsigned long lc_numerator_fra_fp12 = 0;
-	unsigned long lc_moving_avg_int_ulong = 0;
-	unsigned long lc_moving_avg_fra_fp12 = 0;
+	unsigned long lc_numerator_fra_fp12 = 0x0;
 
-	/* (1) Update stat->time_usec_interval, 
-			stat->time_usec_work_fse,
-			stat->time_usec_work_fse_lasting, OR
-			stat->time_usec_work,
-			stat->time_usec_work_lasting.
-	 */
-	if(stat->base_initialized == 0 ||
-		(stat->base_initialized != 0 &&
-		ds_counter.elapsed_sec > stat->time_sec_interval_inc_base + 1))
-	{
-		stat->time_usec_util_calc_base = ds_counter.elapsed_usec;
-		stat->time_usec_interval_inc_base = ds_counter.elapsed_usec;
-		stat->time_sec_interval_inc_base = ds_counter.elapsed_sec;
-		stat->time_usec_work_inc_base = ds_counter.busy_total_usec;
-		stat->cpu_op_index = DS_CPU_OP_INDEX_MAX;
-		stat->base_initialized = 1;
-	}
-
-	/* This calaculation assumes that the interval
-	   between any consecutive context switches is shorter than 1 sec.
-	 */
-	if(ds_counter.elapsed_usec >= stat->time_usec_interval_inc_base){
+	/* Calc interval */
+	if(per_cpu(ds_counter, ds_cpu).elapsed_usec >= stat->time_usec_interval_inc_base){
 		lc_time_usec_interval_inc =
-			ds_counter.elapsed_usec - stat->time_usec_interval_inc_base;
+			per_cpu(ds_counter, ds_cpu).elapsed_usec - stat->time_usec_interval_inc_base;
 	}
 	else{
 		lc_time_usec_interval_inc =
-			ds_counter.elapsed_usec + (1000000 - stat->time_usec_interval_inc_base);
+			per_cpu(ds_counter, ds_cpu).elapsed_usec + (1000000 - stat->time_usec_interval_inc_base);
 	}
 	stat->time_usec_interval += lc_time_usec_interval_inc;
-	stat->time_usec_interval_inc_base = ds_counter.elapsed_usec;
-	stat->time_sec_interval_inc_base = ds_counter.elapsed_sec;
+	stat->time_sec_interval_inc_base = per_cpu(ds_counter, ds_cpu).elapsed_sec;
+	stat->time_usec_interval_inc_base = per_cpu(ds_counter, ds_cpu).elapsed_usec;
 
-	if(stat->flag_in_busy_half == 1){
-		if(ds_counter.busy_total_usec >= stat->time_usec_work_inc_base){
+	/* Calc work */
+	if(per_cpu(ds_counter, ds_cpu).busy_usec >= stat->time_usec_work_inc_base){
 			lc_time_usec_work_inc =
-				ds_counter.busy_total_usec - stat->time_usec_work_inc_base;
+			per_cpu(ds_counter, ds_cpu).busy_usec - stat->time_usec_work_inc_base;
 		}
 		else{
 			lc_time_usec_work_inc =
-				ds_counter.busy_total_usec + (1000000 - stat->time_usec_work_inc_base);
+			per_cpu(ds_counter, ds_cpu).busy_usec + (1000000 - stat->time_usec_work_inc_base);
 		}
 		stat->time_usec_work += lc_time_usec_work_inc;
-		stat->time_usec_work_lasting += lc_time_usec_work_inc;
-		stat->time_usec_work_inc_base = ds_counter.busy_total_usec;
-	}
+	stat->time_sec_work_inc_base = per_cpu(ds_counter, ds_cpu).busy_sec;
+	stat->time_usec_work_inc_base = per_cpu(ds_counter, ds_cpu).busy_usec;
 
-	/* (2) If a series of workload lasts over speedup_threshold,
-			update CPU_OP to cope with this workload burst.
-	 */
-	if((stat->consecutive_speedup_count == 0 &&
-		stat->time_usec_work_lasting >= speedup_threshold) ||
-		(stat->consecutive_speedup_count > 0 &&
-		stat->time_usec_work_lasting >= speedup_interval))
+	/* Determine interval_length to use */
+	if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0){
+		stat->interval_length = ds_control.aidvs_interval_length;
+			}
+			else{
+		stat->interval_length = DS_AIDVS_PE_INTERVAL_LENGTH;
+			}
+
+	/* Calc cpu_op if we reached interval_window_legnth */
+	if(stat->time_usec_interval >= stat->interval_length)
 	{
-		/* Rampup stat->cpu_op_index by one available level */
-		switch(stat->cpu_op_index){
-			case DS_CPU_OP_INDEX_0: break;
-			case DS_CPU_OP_INDEX_1: stat->cpu_op_index = DS_CPU_OP_INDEX_0; break;
-			case DS_CPU_OP_INDEX_2: stat->cpu_op_index = DS_CPU_OP_INDEX_1; break;
-			case DS_CPU_OP_INDEX_3: stat->cpu_op_index = DS_CPU_OP_INDEX_2; break;
-			default: stat->cpu_op_index = DS_CPU_OP_INDEX_0; break;
-		}
-
-		/* After the speedup, initialize followings */
-		stat->time_usec_work_lasting = 0;
-		stat->consecutive_speedup_count ++;
-	}
-
-	/* (3) Basic AIDVS operation at every context switch.
-	 */
-
-	/* If ds_parameter.entry_type == DS_ENTRY_SWITCH_TO */
-	if(ds_parameter.entry_type == DS_ENTRY_SWITCH_TO){
-
-		/* Idle -> Busy, i.e. the boundary of two consecutive intervals. */
-		if((ds_parameter.prev_p->static_prio > target_static_prio ||
-			ds_parameter.prev_p->pid == 0) &&
-			ds_parameter.next_p->static_prio <= target_static_prio)
-		{
-
-			/* Until all the stat->interval_window_array[] is filled, 
-				this calculation is based on the less number of intervals 
-				than interval_window_size.
-				The following code automatically discards the oldest interval's
-				time_usec_interval and time_usec_work_fse OR time_usec_work 
-				to keep the number of intervals that are used for 
-				the calculation interval_window_size.
-			 */
-#if 0	// MOVING WINDOW
-			if(stat->time_usec_interval_in_window < 
-				stat->interval_window_array[stat->interval_window_index].time_usec_interval)
-				stat->time_usec_interval_in_window = 0;
-			else
-				stat->time_usec_interval_in_window -=
-					stat->interval_window_array[stat->interval_window_index].time_usec_interval;
-
-			if(stat->time_usec_work_fse_in_window < 
-				stat->interval_window_array[stat->interval_window_index].time_usec_work_fse)
-				stat->time_usec_work_fse_in_window = 0;
-			else
-				stat->time_usec_work_fse_in_window -=
-					stat->interval_window_array[stat->interval_window_index].time_usec_work_fse;
-
-			stat->interval_window_array[stat->interval_window_index].time_usec_interval = 
-				stat->time_usec_interval;
-			stat->interval_window_array[stat->interval_window_index].time_usec_work_fse = 
-				stat->time_usec_work_fse;
-
-			stat->time_usec_interval_in_window +=
-				stat->interval_window_array[stat->interval_window_index].time_usec_interval;
-			stat->time_usec_work_fse_in_window +=
-				stat->interval_window_array[stat->interval_window_index].time_usec_work_fse;
-#endif
-
-			stat->time_usec_interval_in_window += stat->time_usec_interval;
-			stat->time_usec_work_in_window += stat->time_usec_work;
-
-			if(stat->time_usec_interval_in_window > 1000000){
-				lc_time_usec_interval_in_window = stat->time_usec_interval_in_window / 1000;
-				lc_time_usec_work_in_window = stat->time_usec_work_in_window / 1000;
-			}
-			else{
-				lc_time_usec_interval_in_window = stat->time_usec_interval_in_window;
-				lc_time_usec_work_in_window = stat->time_usec_work_in_window;
-			}
-
-#if 0	// MOVING WINDOW
-			if(stat->interval_window_index == interval_window_size - 1)
-				stat->interval_window_index = 0;
-			else
-				stat->interval_window_index ++;
-#endif
-
-			// DS_GPSCHEDVS_Lx_MIN_WINDOW_LENGTH
-			if(ds_counter.elapsed_usec >= stat->time_usec_util_calc_base){
-				lc_time_usec_since_last_util_calc =
-					ds_counter.elapsed_usec - stat->time_usec_util_calc_base;
-			}
-			else{
-				lc_time_usec_since_last_util_calc =
-					ds_counter.elapsed_usec + (1000000 - stat->time_usec_util_calc_base);
-			}
-
-			if(lc_time_usec_since_last_util_calc >= interval_window_length){
-
-				/* Calculate OLD x 3 */
-				ds_fpmul(stat->utilization_int_ulong, 
-						stat->utilization_fra_fp12, 
-						DS_AIDVS_MOVING_AVG_WEIGHT, 
-						0x0,
-						&lc_utilization_int_ulong_old_by_weight, 
-						&lc_utilization_fra_fp12_old_by_weight);
+		/* SAVE OLD */
+		lc_old_utilization_int_ulong = stat->utilization_int_ulong;
+		lc_old_utilization_fra_fp12 = stat->utilization_fra_fp12;
+		lc_old_moving_avg_int_ulong = stat->moving_avg_int_ulong;
+		lc_old_moving_avg_fra_fp12 = stat->moving_avg_fra_fp12;
 	
 				/* Calculate NEW, i.e., the current interval window's utilization */
-				if(lc_time_usec_interval_in_window == 0){
+		/* In wall clock time */
+		if(stat->time_usec_interval == 0){
 					stat->utilization_int_ulong = 1;
-					stat->utilization_fra_fp12 = 0;
-				}
-				else{
-					if(ds_fpdiv(lc_time_usec_work_in_window,
-								0,
-								lc_time_usec_interval_in_window,
-								0,
-								&stat->utilization_int_ulong,
-								&stat->utilization_fra_fp12) < 0){
-						printk(KERN_INFO "[ds_do_dvs_aidvs] Error: ds_fpdiv failed. \
-										 Current DVS scheme is disabled.\n");
-						ds_configuration.on_dvs = 0;
-						return(-1);
-					}
-				}
-
-				/* Calculate OLD x 3 + NEW, i.e., the numerator of moving average */
-				lc_numerator_int_ulong = 
-					lc_utilization_int_ulong_old_by_weight + stat->utilization_int_ulong;
-				lc_numerator_fra_fp12 = 
-					lc_utilization_fra_fp12_old_by_weight + stat->utilization_fra_fp12;
-				if(lc_numerator_fra_fp12 >= 0x1000){
-					lc_numerator_int_ulong += 1;
-					lc_numerator_fra_fp12 -= 0x1000;
-				}
-
-				/* Calculate (OLD x 3 + NEW) / 4, i.e., the moving average */
-				ds_fpdiv(lc_numerator_int_ulong, lc_numerator_fra_fp12, 
-						DS_AIDVS_MOVING_AVG_WEIGHT+1, 0,
-						&lc_moving_avg_int_ulong, &lc_moving_avg_fra_fp12);
-
-				/* Find the CPU_OP_INDEX corresponding to the calculated utilization */
-				stat->cpu_op_index = 
-					ds_get_next_high_cpu_op_index(lc_moving_avg_int_ulong, lc_moving_avg_fra_fp12);
-
-				stat->time_usec_interval_in_window = 0;
-				stat->time_usec_work_in_window = 0;
-				stat->interval_window_index = 0;
-				stat->time_usec_util_calc_base = ds_counter.elapsed_usec;
-			}
-
-			/* Upon every new arrival of a busy half, initialize followings.
-			 */
-			stat->time_usec_work = 0;
-			stat->time_usec_interval = 0;
-
-			/* As GPScheDVS uses a multiple number of AIDVS each of them sees
-				a particular priority range of tasks, we have to initialize
-				time_usec_work_fse_inc_base OR time_usec_work_inc 
-				at every beginning of a new interval.
-				Otherwise, all the tasks executed during this particular AIDVS's
-				idle half (i.e., not the busy half) will be added into
-				stat->interval_window_array[stat->interval_window_index].time_usec_work_fse
-				and then stat->time_usec_work_fse_in_window OR
-				stat->interval_window_array[stat->interval_window_index].time_usec_work
-				and then stat->time_usec_work_in_window. */
-			stat->time_usec_work_inc_base = ds_counter.busy_usec;
-
-			/* Upon the end of an interval, set flag_in_busy_half for the next interval. */
-			stat->flag_in_busy_half = 1;
-		}
-
-		/* Busy -> Idle, i.e., the end of the busy half of the current interval */
-		else if(ds_parameter.prev_p->static_prio <= target_static_prio &&
-				(ds_parameter.next_p->static_prio > target_static_prio || 
-				ds_parameter.next_p->pid == 0))
-		{
-			stat->time_usec_work_lasting = 0;
-			stat->consecutive_speedup_count = 0;
-			stat->flag_in_busy_half = 0;
-		}
-	}
-
-	/* (4) Determine *target_cpu_op_index.
-	 */
-	*target_cpu_op_index = stat->cpu_op_index;
-
-	return(0);
-}
-#endif
-
-int ds_do_dvs_aidvs(unsigned int *target_cpu_op_index, 
-					DS_AIDVS_STAT_STRUCT *stat,
-					int target_static_prio, 
-					int interval_window_size,
-					unsigned long interval_window_length,
-					unsigned long speedup_threshold, 
-					unsigned long speedup_interval)
-{
-	unsigned long lc_time_usec_interval_inc = 0;
-	unsigned long lc_time_usec_work_fse_inc = 0;
-	unsigned long lc_time_usec_work_fse_in_window = 0;
-	unsigned long lc_time_usec_interval_in_window = 0;
-	unsigned long lc_time_usec_since_last_util_calc = 0;
-
-	unsigned long lc_utilization_int_ulong_old_by_weight = 0;
-	unsigned long lc_utilization_fra_fp12_old_by_weight = 0;
-	unsigned long lc_numerator_int_ulong = 0;
-	unsigned long lc_numerator_fra_fp12 = 0;
-	unsigned long lc_moving_avg_int_ulong = 0;
-	unsigned long lc_moving_avg_fra_fp12 = 0;
-
-	/* (1) Update stat->time_usec_interval, 
-			stat->time_usec_work_fse,
-			stat->time_usec_work_fse_lasting, OR
-			stat->time_usec_work,
-			stat->time_usec_work_lasting.
-	 */
-	if(stat->base_initialized == 0 ||
-		(stat->base_initialized != 0 &&
-		ds_counter.elapsed_sec > stat->time_sec_interval_inc_base + 1))
-	{
-		stat->time_usec_util_calc_base = ds_counter.elapsed_usec;
-		stat->time_usec_interval_inc_base = ds_counter.elapsed_usec;
-		stat->time_sec_interval_inc_base = ds_counter.elapsed_sec;
-		stat->time_usec_work_fse_inc_base = ds_counter.busy_fse_usec;
-		stat->cpu_op_index = DS_CPU_OP_INDEX_MAX;
-		stat->base_initialized = 1;
-	}
-
-	/* This calaculation assumes that the interval
-	   between any consecutive context switches is shorter than 1 sec.
-	 */
-	if(ds_counter.elapsed_usec >= stat->time_usec_interval_inc_base){
-		lc_time_usec_interval_inc =
-			ds_counter.elapsed_usec - stat->time_usec_interval_inc_base;
-	}
-	else{
-		lc_time_usec_interval_inc =
-			ds_counter.elapsed_usec + (1000000 - stat->time_usec_interval_inc_base);
-	}
-	stat->time_usec_interval += lc_time_usec_interval_inc;
-	stat->time_usec_interval_inc_base = ds_counter.elapsed_usec;
-	stat->time_sec_interval_inc_base = ds_counter.elapsed_sec;
-
-	if(stat->flag_in_busy_half == 1){
-		if(ds_counter.busy_fse_usec >= stat->time_usec_work_fse_inc_base){
-			lc_time_usec_work_fse_inc =
-				ds_counter.busy_fse_usec - stat->time_usec_work_fse_inc_base;
+			stat->utilization_fra_fp12 = 0x0;
 		}
 		else{
-			lc_time_usec_work_fse_inc =
-				ds_counter.busy_fse_usec + (1000000 - stat->time_usec_work_fse_inc_base);
-		}
-		stat->time_usec_work_fse += lc_time_usec_work_fse_inc;
-		stat->time_usec_work_fse_lasting += lc_time_usec_work_fse_inc;
-		stat->time_usec_work_fse_inc_base = ds_counter.busy_fse_usec;
-	}
-
-	/* (2) If a series of workload lasts over speedup_threshold,
-			update CPU_OP to cope with this workload burst.
-	 */
-	if((stat->consecutive_speedup_count == 0 &&
-		stat->time_usec_work_fse_lasting >= speedup_threshold) ||
-		(stat->consecutive_speedup_count > 0 &&
-		stat->time_usec_work_fse_lasting >= speedup_interval))
+			if(ds_fpdiv(stat->time_usec_work,
+					0x0,
+					stat->time_usec_interval,
+					0x0,
+					&(stat->utilization_int_ulong),
+					&(stat->utilization_fra_fp12)) < 0)
 	{
-		/* Rampup stat->cpu_op_index by one available level */
-		switch(stat->cpu_op_index){
-			case DS_CPU_OP_INDEX_0: break;
-			case DS_CPU_OP_INDEX_1: stat->cpu_op_index = DS_CPU_OP_INDEX_0; break;
-			case DS_CPU_OP_INDEX_2: stat->cpu_op_index = DS_CPU_OP_INDEX_1; break;
-			case DS_CPU_OP_INDEX_3: stat->cpu_op_index = DS_CPU_OP_INDEX_2; break;
-			default: stat->cpu_op_index = DS_CPU_OP_INDEX_0; break;
+				printk(KERN_INFO "[ds_do_dvs_aidvs 1] Error: ds_fpdiv failed. \
+						dvs_suite gonna be off.\n");
+				ds_control.on_dvs = 0;
+				ds_control.flag_run_dvs = 0;
+				return(-1);
 		}
-
-		/* After the speedup, initialize followings */
-		stat->time_usec_work_fse_lasting = 0;
-		stat->consecutive_speedup_count ++;
 	}
 
-	/* (3) Basic AIDVS operation at every context switch.
-	 */
-
-	/* If ds_parameter.entry_type == DS_ENTRY_SWITCH_TO */
-	if(ds_parameter.entry_type == DS_ENTRY_SWITCH_TO){
-
-		/* Idle -> Busy, i.e. the boundary of two consecutive intervals. */
-		if((ds_parameter.prev_p->static_prio > target_static_prio ||
-			ds_parameter.prev_p->pid == 0) &&
-			ds_parameter.next_p->static_prio <= target_static_prio)
-		{
-
-			/* Until all the stat->interval_window_array[] is filled, 
-				this calculation is based on the less number of intervals 
-				than interval_window_size.
-				The following code automatically discards the oldest interval's
-				time_usec_interval and time_usec_work_fse OR time_usec_work 
-				to keep the number of intervals that are used for 
-				the calculation interval_window_size.
-			 */
-#if 0	// MOVING WINDOW
-			if(stat->time_usec_interval_in_window < 
-				stat->interval_window_array[stat->interval_window_index].time_usec_interval)
-				stat->time_usec_interval_in_window = 0;
+		/* Determine WEIGHT */
+		if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0){
+			stat->moving_avg_weight = ds_control.aidvs_moving_avg_weight;
+			}
 			else
-				stat->time_usec_interval_in_window -=
-					stat->interval_window_array[stat->interval_window_index].time_usec_interval;
+			stat->moving_avg_weight = DS_AIDVS_PE_MOVING_AVG_WEIGHT;
 
-			if(stat->time_usec_work_fse_in_window < 
-				stat->interval_window_array[stat->interval_window_index].time_usec_work_fse)
-				stat->time_usec_work_fse_in_window = 0;
-			else
-				stat->time_usec_work_fse_in_window -=
-					stat->interval_window_array[stat->interval_window_index].time_usec_work_fse;
-
-			stat->interval_window_array[stat->interval_window_index].time_usec_interval = 
-				stat->time_usec_interval;
-			stat->interval_window_array[stat->interval_window_index].time_usec_work_fse = 
-				stat->time_usec_work_fse;
-
-			stat->time_usec_interval_in_window +=
-				stat->interval_window_array[stat->interval_window_index].time_usec_interval;
-			stat->time_usec_work_fse_in_window +=
-				stat->interval_window_array[stat->interval_window_index].time_usec_work_fse;
-#endif
-
-			stat->time_usec_interval_in_window += stat->time_usec_interval;
-			stat->time_usec_work_fse_in_window += stat->time_usec_work_fse;
-
-			if(stat->time_usec_interval_in_window > 1000000){
-				lc_time_usec_interval_in_window = stat->time_usec_interval_in_window / 1000;
-				lc_time_usec_work_fse_in_window = stat->time_usec_work_fse_in_window / 1000;
-			}
-			else{
-				lc_time_usec_interval_in_window = stat->time_usec_interval_in_window;
-				lc_time_usec_work_fse_in_window = stat->time_usec_work_fse_in_window;
-			}
-
-#if 0	// MOVING WINDOW
-			if(stat->interval_window_index == interval_window_size - 1)
-				stat->interval_window_index = 0;
-			else
-				stat->interval_window_index ++;
-#endif
-
-			// DS_GPSCHEDVS_Lx_MIN_WINDOW_LENGTH
-			if(ds_counter.elapsed_usec >= stat->time_usec_util_calc_base){
-				lc_time_usec_since_last_util_calc =
-					ds_counter.elapsed_usec - stat->time_usec_util_calc_base;
-			}
-			else{
-				lc_time_usec_since_last_util_calc =
-					ds_counter.elapsed_usec + (1000000 - stat->time_usec_util_calc_base);
-			}
-
-			if(lc_time_usec_since_last_util_calc >= interval_window_length){
-
-				/* Calculate OLD x 3 */
-				ds_fpmul(stat->utilization_int_ulong, 
-						stat->utilization_fra_fp12, 
-						DS_AIDVS_MOVING_AVG_WEIGHT, 
+		/* Calculate OLD x WEIGHT */
+		if(ds_fpmul(lc_old_moving_avg_int_ulong, 
+					lc_old_moving_avg_fra_fp12, 
+					stat->moving_avg_weight,
 						0x0,
-						&lc_utilization_int_ulong_old_by_weight, 
-						&lc_utilization_fra_fp12_old_by_weight);
-	
-				/* Calculate NEW, i.e., the current interval window's utilization */
-				if(lc_time_usec_interval_in_window == 0){
-					stat->utilization_int_ulong = 1;
-					stat->utilization_fra_fp12 = 0;
-				}
-				else{
-					if(ds_fpdiv(lc_time_usec_work_fse_in_window,
-								0,
-								lc_time_usec_interval_in_window,
-								0,
-								&stat->utilization_int_ulong,
-								&stat->utilization_fra_fp12) < 0){
-						printk(KERN_INFO "[ds_do_dvs_aidvs] Error: ds_fpdiv failed. \
-										 Current DVS scheme is disabled.\n");
-						ds_configuration.on_dvs = 0;
+					&lc_old_moving_avg_int_ulong_by_weight, 
+					&lc_old_moving_avg_fra_fp12_by_weight) < 0)
+		{
+			printk(KERN_INFO "[ds_do_dvs_aidvs 4] Error: ds_fpmul failed. \
+					dvs_suite gonna be off.\n");
+			ds_control.on_dvs = 0;
+			ds_control.flag_run_dvs = 0;
 						return(-1);
 					}
-				}
 
-				/* Calculate OLD x 3 + NEW, i.e., the numerator of moving average */
+		/* Calculate OLD x WEIGHT + NEW, i.e., the numerator of moving average */
 				lc_numerator_int_ulong = 
-					lc_utilization_int_ulong_old_by_weight + stat->utilization_int_ulong;
+			lc_old_moving_avg_int_ulong_by_weight + stat->utilization_int_ulong;
 				lc_numerator_fra_fp12 = 
-					lc_utilization_fra_fp12_old_by_weight + stat->utilization_fra_fp12;
+			lc_old_moving_avg_fra_fp12_by_weight + stat->utilization_fra_fp12;
 				if(lc_numerator_fra_fp12 >= 0x1000){
 					lc_numerator_int_ulong += 1;
 					lc_numerator_fra_fp12 -= 0x1000;
 				}
 
-				/* Calculate (OLD x 3 + NEW) / 4, i.e., the moving average */
-				ds_fpdiv(lc_numerator_int_ulong, lc_numerator_fra_fp12, 
-						DS_AIDVS_MOVING_AVG_WEIGHT+1, 0,
-						&lc_moving_avg_int_ulong, &lc_moving_avg_fra_fp12);
+		/* Calculate (OLD x WEIGHT + NEW) / (WEIGHT + 1), i.e., the moving average */
+		if(ds_fpdiv(lc_numerator_int_ulong, 
+					lc_numerator_fra_fp12, 
+					stat->moving_avg_weight+1, 
+					0x0,
+					&stat->moving_avg_int_ulong, 
+					&stat->moving_avg_fra_fp12) < 0)
+		{
+			printk(KERN_INFO "[ds_do_dvs_aidvs 5] Error: ds_fpdiv failed. \
+					dvs_suite gonna be off.\n");
+			ds_control.on_dvs = 0;
+			ds_control.flag_run_dvs = 0;
+			return(-1);
+		}
 
 				/* Find the CPU_OP_INDEX corresponding to the calculated utilization */
 				stat->cpu_op_index = 
-					ds_get_next_high_cpu_op_index(lc_moving_avg_int_ulong, lc_moving_avg_fra_fp12);
-
-				stat->time_usec_interval_in_window = 0;
-				stat->time_usec_work_fse_in_window = 0;
-				stat->interval_window_index = 0;
-				stat->time_usec_util_calc_base = ds_counter.elapsed_usec;
+			ds_get_next_high_cpu_op_index(stat->moving_avg_int_ulong, stat->moving_avg_fra_fp12);
+		/* TODO: Tune for OMAP */
+		if(ds_cpu){
+			switch(stat->cpu_op_index){
+				case DS_CPU_OP_INDEX_0:	stat->cpu_op_index = DS_CPU_OP_INDEX_0; break;
+				case DS_CPU_OP_INDEX_1:	stat->cpu_op_index = DS_CPU_OP_INDEX_1; break;
+				case DS_CPU_OP_INDEX_2:	stat->cpu_op_index = DS_CPU_OP_INDEX_2; break;
+				case DS_CPU_OP_INDEX_3:	stat->cpu_op_index = DS_CPU_OP_INDEX_3; break;
+				default:	stat->cpu_op_index = DS_CPU_OP_INDEX_0; break;
+			}
 			}
 
-			/* Upon every new arrival of a busy half, initialize followings.
-			 */
-			stat->time_usec_work_fse = 0;
 			stat->time_usec_interval = 0;
-
-			/* As GPScheDVS uses a multiple number of AIDVS each of them sees
-				a particular priority range of tasks, we have to initialize
-				time_usec_work_fse_inc_base OR time_usec_work_inc 
-				at every beginning of a new interval.
-				Otherwise, all the tasks executed during this particular AIDVS's
-				idle half (i.e., not the busy half) will be added into
-				stat->interval_window_array[stat->interval_window_index].time_usec_work_fse
-				and then stat->time_usec_work_fse_in_window OR
-				stat->interval_window_array[stat->interval_window_index].time_usec_work
-				and then stat->time_usec_work_in_window. */
-			stat->time_usec_work_fse_inc_base = ds_counter.busy_fse_usec;
-
-			/* Upon the end of an interval, set flag_in_busy_half for the next interval. */
-			stat->flag_in_busy_half = 1;
-		}
-
-		/* Busy -> Idle, i.e., the end of the busy half of the current interval */
-		else if(ds_parameter.prev_p->static_prio <= target_static_prio &&
-				(ds_parameter.next_p->static_prio > target_static_prio || 
-				ds_parameter.next_p->pid == 0))
-		{
-			stat->time_usec_work_fse_lasting = 0;
-			stat->consecutive_speedup_count = 0;
-			stat->flag_in_busy_half = 0;
-		}
+		stat->time_usec_work = 0;
 	}
 
 	/* (4) Determine *target_cpu_op_index.
@@ -1899,254 +1569,395 @@ int ds_do_dvs_aidvs(unsigned int *target_cpu_op_index,
 	The functions to perform DVS scheme:
 	GPScheDVS.
 	====================================================================*/
-
-int ds_do_dvs_gpschedvs(unsigned int *target_cpu_op_index){
+int ds_do_dvs_gpschedvs(int ds_cpu, unsigned int *target_cpu_op_index){
 
 	unsigned int lc_target_cpu_op_index_highest = DS_CPU_OP_INDEX_MIN;
-	unsigned int lc_target_cpu_op_index_aidvs_l1 = DS_CPU_OP_INDEX_MIN;
-	unsigned int lc_target_cpu_op_index_aidvs_l2 = DS_CPU_OP_INDEX_MIN;
-	unsigned int lc_target_cpu_op_index_aidvs_l3 = DS_CPU_OP_INDEX_MIN;
+	unsigned int lc_target_cpu_op_index_aidvs = DS_CPU_OP_INDEX_MIN;
 	unsigned int lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MIN;
 
-	if(ds_status.flag_do_post_early_suspend == 0){
+	/* Calc target_cpu_op based on workload */
+	ds_do_dvs_aidvs(ds_cpu, &lc_target_cpu_op_index_aidvs, &(per_cpu(ds_aidvs_status, ds_cpu)));
 
-		//if(ds_status.touch_timeout_sec == 0){
-#if 0
-		/* AIDVS for HRT tasks */
-		if(ds_do_dvs_aidvs(&lc_target_cpu_op_index_highest,
-							 &ds_gpschedvs_status.aidvs_l0_status,
-							 DS_HRT_STATIC_PRIO,
-							 DS_GPSCHEDVS_L0_INTERVALS_IN_AN_WINDOW,
-							 DS_GPSCHEDVS_L0_MIN_WINDOW_LENGTH,
-							 DS_GPSCHEDVS_L0_SPEEDUP_THRESHOLD,
-							 DS_GPSCHEDVS_L0_SPEEDUP_INTERVAL) < 0)
-		{
-			printk(KERN_INFO "[ds_do_dvs_gpschedvs] Error: ds_do_dvs_aidvs for level0 failed. \
-							 Current DVS scheme is disabled.\n");
-			ds_configuration.on_dvs = 0;
-			return(-1);
-		}
-#endif
+	lc_target_cpu_op_index_highest = lc_target_cpu_op_index_aidvs;
 
-#if 0
-		/* AIDVS for HRT + DBSRT tasks */
-		if(ds_do_dvs_aidvs(&lc_target_cpu_op_index_aidvs_l1,
-							 &ds_gpschedvs_status.aidvs_l1_status,
-							 DS_DBSRT_STATIC_PRIO,
-							 DS_GPSCHEDVS_L1_INTERVALS_IN_AN_WINDOW,
-							 DS_GPSCHEDVS_L1_MIN_WINDOW_LENGTH,
-							 DS_GPSCHEDVS_L1_SPEEDUP_THRESHOLD,
-							 DS_GPSCHEDVS_L1_SPEEDUP_INTERVAL) < 0)
-		{
-			printk(KERN_INFO "[ds_do_dvs_gpschedvs] Error: ds_do_dvs_aidvs for level1 failed. \
-							 Current DVS scheme is disabled.\n");
-			ds_configuration.on_dvs = 0;
-			return(-1);
-		}
-		if(lc_target_cpu_op_index_aidvs_l1 > lc_target_cpu_op_index_highest)
-			lc_target_cpu_op_index_highest = lc_target_cpu_op_index_aidvs_l1;
-#endif
+	/* LCD is on (i.e., before early suspend) */
+	if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0){
 
-#if 1
-		/* AIDVS for HRT + DBSRT + RBSRT tasks */
-		if(ds_do_dvs_aidvs(&lc_target_cpu_op_index_aidvs_l2,
-							 &ds_gpschedvs_status.aidvs_l2_status,
-							 DS_RBSRT_STATIC_PRIO,
-							 DS_GPSCHEDVS_L2_INTERVALS_IN_AN_WINDOW,
-							 DS_GPSCHEDVS_L2_MIN_WINDOW_LENGTH,
-							 DS_GPSCHEDVS_L2_SPEEDUP_THRESHOLD,
-							 DS_GPSCHEDVS_L2_SPEEDUP_INTERVAL) < 0)
-		{
-			printk(KERN_INFO "[ds_do_dvs_gpschedvs] Error: ds_do_dvs_aidvs for level2 failed. \
-							 Current DVS scheme is disabled.\n");
-			ds_configuration.on_dvs = 0;
-			return(-1);
-		}
-		if(lc_target_cpu_op_index_aidvs_l2 > lc_target_cpu_op_index_highest)
-			lc_target_cpu_op_index_highest = lc_target_cpu_op_index_aidvs_l2;
-#endif
+		/* Touch event occurred and being processed - Begin */
+		if(per_cpu(ds_sys_status, 0).flag_touch_timeout_count != 0){
 
-		/* AIDVS for HRT + DBSRT + RBSRT + NRT tasks */
-		/* If ds_configuration.gpschedvs_strategy == 1, i.e., CPU power centric
-			 strategy, GPScheDVS intentionally applies the lowest CPU_OP to every
-			 NRT task so as to reduce CPU energy consumption at the cost of NRT
-			 tasks' final completion time and thus the system energy consumption.
-		 */
-#if 1
-		if(ds_configuration.gpschedvs_strategy == 0){
-			if(ds_do_dvs_aidvs(&lc_target_cpu_op_index_aidvs_l3,
-								 &ds_gpschedvs_status.aidvs_l3_status,
-								 DS_NRT_STATIC_PRIO,
-								 DS_GPSCHEDVS_L3_INTERVALS_IN_AN_WINDOW,
-								 DS_GPSCHEDVS_L3_MIN_WINDOW_LENGTH,
-								 DS_GPSCHEDVS_L3_SPEEDUP_THRESHOLD,
-								 DS_GPSCHEDVS_L3_SPEEDUP_INTERVAL) < 0)
+			/* If DS_TOUCH_CPU_OP_UP_INTERVAL is over */
+			if((per_cpu(ds_counter, ds_cpu).elapsed_sec * 1000000 + 
+				per_cpu(ds_counter, ds_cpu).elapsed_usec) >= 
+				(per_cpu(ds_sys_status, 0).touch_timeout_sec * 1000000 +
+				per_cpu(ds_sys_status, 0).touch_timeout_usec))
 			{
-				printk(KERN_INFO "[ds_do_dvs_gpschedvs] Error: ds_do_dvs_aidvs level3 failed. \
-								 Current DVS scheme is disabled.\n");
-				ds_configuration.on_dvs = 0;
-				return(-1);
+				if(per_cpu(ds_counter, ds_cpu).elapsed_usec + DS_TOUCH_CPU_OP_UP_INTERVAL < 1000000){
+					per_cpu(ds_sys_status, 0).touch_timeout_sec = 
+						per_cpu(ds_counter, ds_cpu).elapsed_sec;
+					per_cpu(ds_sys_status, 0).touch_timeout_usec = 
+						per_cpu(ds_counter, ds_cpu).elapsed_usec + DS_TOUCH_CPU_OP_UP_INTERVAL;
 			}
+				else{
+					per_cpu(ds_sys_status, 0).touch_timeout_sec = 
+						per_cpu(ds_counter, ds_cpu).elapsed_sec + 1;
+					per_cpu(ds_sys_status, 0).touch_timeout_usec = 
+						(per_cpu(ds_counter, ds_cpu).elapsed_usec + DS_TOUCH_CPU_OP_UP_INTERVAL) - 1000000;
 		}
-		if(lc_target_cpu_op_index_aidvs_l3 > lc_target_cpu_op_index_highest)
-			lc_target_cpu_op_index_highest = lc_target_cpu_op_index_aidvs_l3;
-#endif
-		//}
-#if 1
-		/* Additional treatment for touch input event.
-			Once we got an touch interrupt, we apply 
-			a high CPU frequency for a while.
-		 */
-		if(ds_status.touch_timeout_sec != 0){
 
-			/* If DS_TOUCH_TIMEOUT is over */
-			if(ds_counter.elapsed_sec > ds_status.touch_timeout_sec ||
-				(ds_counter.elapsed_sec == ds_status.touch_timeout_sec &&
-				ds_counter.elapsed_usec > ds_status.touch_timeout_usec))
-			{
-				switch(ds_status.flag_touch_timeout_count){
-					case DS_TOUCH_TIMEOUT_COUNT_MAX:	// 7
-						if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
-							ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
-						}
-						else{
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
-							ds_status.touch_timeout_usec = 
-								(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
-						}
-						ds_status.flag_touch_timeout_count = 6;
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MAX;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
+				switch(per_cpu(ds_sys_status, 0).flag_touch_timeout_count){
+					case DS_TOUCH_CPU_OP_UP_CNT_MAX:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 39;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH39;
+						break;
+					case 39:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 38;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH38;
+						break;
+					case 38:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 37;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH37;
+						break;
+					case 37:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 36;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH36;
+						break;
+					case 36:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 35;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH35;
+						break;
+					case 35:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 34;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH34;
+						break;
+					case 34:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 33;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH33;
+						break;
+					case 33:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 32;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH32;
+						break;
+					case 32:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 31;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH31;
+						break;
+					case 31:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 30;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH30;
+						break;
+					case 30:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 29;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH29;
+						break;
+					case 29:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 28;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH28;
+						break;
+					case 28:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 27;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH27;
+						break;
+					case 27:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 26;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH26;
+						break;
+					case 26:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 25;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH25;
+						break;
+					case 25:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 24;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH24;
+						break;
+					case 24:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 23;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH23;
+						break;
+					case 23:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 22;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH22;
+						break;
+					case 22:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 21;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH21;
+						break;
+					case 21:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 20;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH20;
+						break;
+					case 20:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 19;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH19;
+						break;
+					case 19:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 18;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH18;
+						break;
+					case 18:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 17;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH17;
+						break;
+					case 17:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 16;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH16;
+						break;
+					case 16:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 15;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH15;
+						break;
+					case 15:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 14;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH14;
+						break;
+					case 14:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 13;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH13;
+						break;
+					case 13:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 12;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH12;
+						break;
+					case 12:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 11;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH11;
+						break;
+					case 11:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 10;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH10;
+						break;
+					case 10:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 9;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH9;
+						break;
+					case 9:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 8;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH8;
+						break;
+					case 8:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 7;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH7;
+						break;
+					case 7:
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 6;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH6;
 						break;
 					case 6:
-						if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
-							ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
-						}
-						else{
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
-							ds_status.touch_timeout_usec = 
-								(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
-						}
-						ds_status.flag_touch_timeout_count = 5;
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MAX;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 5;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH5;
 						break;
 					case 5:
-						if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
-							ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
-						}
-						else{
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
-							ds_status.touch_timeout_usec = 
-								(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
-						}
-						ds_status.flag_touch_timeout_count = 4;
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 4;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH4;
 						break;
 					case 4:
-						if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
-							ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
-						}
-						else{
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
-							ds_status.touch_timeout_usec = 
-								(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
-						}
-						ds_status.flag_touch_timeout_count = 3;
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 3;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH3;
 						break;
 					case 3:
-						if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
-							ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
-						}
-						else{
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
-							ds_status.touch_timeout_usec = 
-								(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
-						}
-						ds_status.flag_touch_timeout_count = 2;
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 2;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH2;
 						break;
 					case 2:
-						if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
-							ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
-						}
-						else{
-							ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
-							ds_status.touch_timeout_usec = 
-								(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
-						}
-						ds_status.flag_touch_timeout_count = 1;
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MIN;
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 1;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH1;
 						break;
 					case 1:
-						ds_status.touch_timeout_sec = 0;
-						ds_status.touch_timeout_usec = 0;
-						ds_status.flag_touch_timeout_count = 0;
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 0;
 						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MIN;
+						per_cpu(ds_sys_status, 0).touch_timeout_sec = 0;
+						per_cpu(ds_sys_status, 0).touch_timeout_usec = 0;
 						break;
 					default:
-						ds_status.touch_timeout_sec = 0;
-						ds_status.touch_timeout_usec = 0;
-						ds_status.flag_touch_timeout_count = 0;
+						per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 0;
 						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MIN;
+						per_cpu(ds_sys_status, 0).touch_timeout_sec = 0;
+						per_cpu(ds_sys_status, 0).touch_timeout_usec = 0;
 						break;
 				}
 			}
-			/* If DS_TOUCH_TIMEOUT is not over yet */
+			/* If DS_TOUCH_CPU_OP_UP_INTERVAL is not over yet */
 			else
 			{
-				switch(ds_status.flag_touch_timeout_count){
-					case DS_TOUCH_TIMEOUT_COUNT_MAX:	// 7
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MAX;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
+				switch(per_cpu(ds_sys_status, 0).flag_touch_timeout_count){
+					case DS_TOUCH_CPU_OP_UP_CNT_MAX:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH40;
+						break;
+					case 39:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH39;
+						break;
+					case 38:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH38;
+						break;
+					case 37:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH37;
+						break;
+					case 36:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH36;
+						break;
+					case 35:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH35;
+						break;
+					case 34:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH34;
+						break;
+					case 33:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH33;
+						break;
+					case 32:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH32;
+						break;
+					case 31:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH31;
+						break;
+					case 30:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH30;
+						break;
+					case 29:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH29;
+						break;
+					case 28:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH28;
+						break;
+					case 27:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH27;
+						break;
+					case 26:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH26;
+						break;
+					case 25:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH25;
+						break;
+					case 24:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH24;
+						break;
+					case 23:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH23;
+						break;
+					case 22:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH22;
+						break;
+					case 21:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH21;
+						break;
+					case 20:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH20;
+						break;
+					case 19:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH19;
+						break;
+					case 18:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH18;
+						break;
+					case 17:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH17;
+						break;
+					case 16:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH16;
+						break;
+					case 15:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH15;
+						break;
+					case 14:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH14;
+						break;
+					case 13:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH13;
+						break;
+					case 12:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH12;
+						break;
+					case 11:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH11;
+						break;
+					case 10:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH10;
+						break;
+					case 9:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH9;
+						break;
+					case 8:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH8;
+						break;
+					case 7:
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH7;
 						break;
 					case 6:
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MAX;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH6;
 						break;
 					case 5:
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MAX;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH5;
 						break;
 					case 4:
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH4;
 						break;
 					case 3:
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_1;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH3;
 						break;
 					case 2:
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH2;
 						break;
 					case 1:
-						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_2;
-						//lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MIN;
+						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_TOUCH1;
 						break;
 					default:
 						lc_target_cpu_op_index_touch = DS_CPU_OP_INDEX_MIN;
 						break;
 				}
 			}
-		}
-		if(lc_target_cpu_op_index_touch > lc_target_cpu_op_index_highest)
+
+			/* Ramping up cpu op upon touch events */
+			if(lc_target_cpu_op_index_highest < lc_target_cpu_op_index_touch)
 			lc_target_cpu_op_index_highest = lc_target_cpu_op_index_touch;
-		/* End of the special treatment for touch events */
-#endif
 	}
-	else
+		/* Touch event occurred and being processed - End */
+
+		/* Special treatment upon frequency ceiling or flooring - Begin */
+		/* Ceiled by long consecutive touches */
+		if(per_cpu(ds_sys_status, 0).flag_long_consecutive_touches == 1){
+			if(lc_target_cpu_op_index_highest > DS_CPU_OP_INDEX_CONT_TOUCH)
+				lc_target_cpu_op_index_highest = DS_CPU_OP_INDEX_CONT_TOUCH;
+		}
+		/* Ceiled by cpufreq sysfs */
+		if(per_cpu(ds_sys_status, 0).locked_max_cpu_op_index < DS_CPU_OP_INDEX_MAX){
+			if(lc_target_cpu_op_index_highest > per_cpu(ds_sys_status, 0).locked_max_cpu_op_index)
+				lc_target_cpu_op_index_highest = per_cpu(ds_sys_status, 0).locked_max_cpu_op_index;
+		}
+		/* Floored by cpufreq sysfs */
+		if(per_cpu(ds_sys_status, 0).locked_min_cpu_op_index > DS_CPU_OP_INDEX_MIN){
+			per_cpu(ds_sys_status, 0).locked_min_cpu_op_release_sec = 
+				per_cpu(ds_counter, ds_cpu).elapsed_sec + DS_CPU_OP_LOCK_SUSTAIN_SEC;
+			per_cpu(ds_sys_status, 0).flag_locked_min_cpu_op = 1;
+			if(per_cpu(ds_sys_status, 0).locked_min_cpu_op_index > DS_CPU_OP_INDEX_LOCKED_MIN){
+				if(lc_target_cpu_op_index_highest < DS_CPU_OP_INDEX_LOCKED_MIN)
+					lc_target_cpu_op_index_highest = DS_CPU_OP_INDEX_LOCKED_MIN;
+			}
+			else{
+				if(lc_target_cpu_op_index_highest < per_cpu(ds_sys_status, 0).locked_min_cpu_op_index)
+					lc_target_cpu_op_index_highest = per_cpu(ds_sys_status, 0).locked_min_cpu_op_index;
+			}
+		}
+		/* Frequency had been floored. But not now */
+		else{
+			if(per_cpu(ds_sys_status, 0).locked_min_cpu_op_release_sec >
+				per_cpu(ds_counter, ds_cpu).elapsed_sec)
+			{
+				per_cpu(ds_sys_status, 0).flag_locked_min_cpu_op = 1;
+				if(lc_target_cpu_op_index_highest < DS_CPU_OP_INDEX_LOCKED_MIN)
+					lc_target_cpu_op_index_highest = DS_CPU_OP_INDEX_LOCKED_MIN;
+			}
+			else{
+				per_cpu(ds_sys_status, 0).locked_min_cpu_op_release_sec = 0;
+				per_cpu(ds_sys_status, 0).flag_locked_min_cpu_op = 0;
+			}
+		}
+		/* Special care for the frequency locking through cpufreq sysfs - End */
+	}
+	/* LCD is off (i.e., after early suspend) */
+	else{
+		if(lc_target_cpu_op_index_highest < DS_CPU_OP_INDEX_MAX)
 		lc_target_cpu_op_index_highest = DS_CPU_OP_INDEX_MIN;
+	}
 
 	*target_cpu_op_index = lc_target_cpu_op_index_highest;
 
@@ -2154,269 +1965,147 @@ int ds_do_dvs_gpschedvs(unsigned int *target_cpu_op_index){
 }
 
 /*====================================================================
-	The functions to initialize dvs_suite.
+	The functions to initialize dvs_suite_system_status structure.
 	====================================================================*/
 
-/*
-	 1. Initialize 
-			ds_status.flag_time_base_initialized,
-			ds_status.cpu_op_index,
-			ds_status.cpu_op_sf,
-			ds_status.cpu_op_index_nr,
-			ds_status.cpu_op_mhz,
-			ds_status.cpu_mode.
-	 2. Initialize the variables involved with DVS schemes.
- */
-int ds_initialize_dvs_suite(int cpu_mode){
+int ds_initialize_ds_control(void){
 
-	int i;
-	unsigned int lc_current_cpu_op_index;
+	ds_control.aidvs_moving_avg_weight = DS_AIDVS_NM_MOVING_AVG_WEIGHT;
+	ds_control.aidvs_interval_length = DS_AIDVS_NM_INTERVAL_LENGTH;
 
-	ds_status.flag_run_dvs = 0;
+	return(0);
+}
 
-	/* Reset ds_status.flag_time_base_initialized.
-	 * It will be initialized later.
-	 */
-	ds_status.flag_time_base_initialized = 0;
+/*====================================================================
+	The functions to initialize dvs_suite_system_status structure.
+	====================================================================*/
 
-	/* Initialize ds_status.cpu_op_index, ds_status.cpu_op_sf, ds_status.cpu_op_index_nr,
-		 ds_status.cpu_op_mhz, ds_status.cpu_op_dirty, and ds_status.cpu_mode.
-	 */
-	lc_current_cpu_op_index = DS_CPU_OP_INDEX_MAX;
-	ds_status.cpu_op_index = lc_current_cpu_op_index;
-	ds_status.cpu_op_sf = DS_INDEX2SF(ds_status.cpu_op_index);
-	ds_status.cpu_op_index_nr = DS_INDEX2NR(lc_current_cpu_op_index);
-	ds_status.cpu_op_mhz = DS_INDEX2MHZPRECISE(lc_current_cpu_op_index);
-	ds_status.cpu_mode = cpu_mode;
+int ds_initialize_ds_sys_status(void){
 
-	/* Initialize ds_status's fields */
-	ds_status.flag_update_cpu_op = 0;
-	ds_status.target_cpu_op_index = DS_CPU_OP_INDEX_MAX;
-	ds_status.cpu_op_last_update_sec = 0;
-	ds_status.cpu_op_last_update_usec = 0;
-	ds_status.current_dvs_scheme = 0;
-	for(i=0;i<DS_PID_LIMIT;i++){
-		ds_status.scheduler[i] = 0;
-		ds_status.type[i] = 0;
-		ds_status.type_fixed[i] = 0;
-		ds_status.type_need_to_be_changed[i] = 0;
-		ds_status.tgid[i] = 0;
-		ds_status.tgid_type_changed[i] = 0;
-		ds_status.tgid_type_change_causer[i] = 0;
-		ds_status.ipc_timeout_sec[i] = 0;
-		ds_status.ipc_timeout_usec[i] = 0;
+	per_cpu(ds_sys_status, 0).locked_min_cpu_op_index = DS_CPU_OP_INDEX_MIN;
+	per_cpu(ds_sys_status, 0).locked_min_cpu_op_release_sec = 0;
+	per_cpu(ds_sys_status, 0).flag_locked_min_cpu_op = 0;
+	per_cpu(ds_sys_status, 0).locked_max_cpu_op_index = DS_CPU_OP_INDEX_MAX;
+	per_cpu(ds_sys_status, 0).locked_min_iva_freq = 0;
+	per_cpu(ds_sys_status, 0).locked_min_l3_freq = 0;
+
+	per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 0;
+	per_cpu(ds_sys_status, 0).touch_timeout_sec = 0;
+	per_cpu(ds_sys_status, 0).touch_timeout_usec = 0;
+
+	per_cpu(ds_sys_status, 0).flag_consecutive_touches = 0;
+	per_cpu(ds_sys_status, 0).new_touch_sec = 0;
+	per_cpu(ds_sys_status, 0).new_touch_usec = 0;
+	per_cpu(ds_sys_status, 0).first_consecutive_touch_sec = 0;
+	per_cpu(ds_sys_status, 0).flag_long_consecutive_touches = 0;
+
+	per_cpu(ds_sys_status, 0).flag_post_early_suspend = 0;
+	per_cpu(ds_sys_status, 0).flag_do_post_early_suspend = 0;
+	per_cpu(ds_sys_status, 0).do_post_early_suspend_sec = 0;
+
+	return(0);
+}
+
+/*====================================================================
+	The functions to initialize dvs_suite_cpu_status structure.
+	====================================================================*/
+
+int ds_initialize_ds_cpu_status(int ds_cpu, int cpu_mode){
+
+	per_cpu(ds_cpu_status, ds_cpu).cpu_mode = cpu_mode;
+	per_cpu(ds_cpu_status, ds_cpu).dvs_suite_mutex = 0;
+
+	per_cpu(ds_cpu_status, ds_cpu).flag_update_cpu_op = 0;
+	per_cpu(ds_cpu_status, ds_cpu).cpu_op_mutex = 0;
+
+	per_cpu(ds_cpu_status, ds_cpu).current_cpu_op_index = DS_CPU_OP_INDEX_INI;
+	per_cpu(ds_cpu_status, ds_cpu).target_cpu_op_index = DS_CPU_OP_INDEX_INI;
+	per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_sec = 0;
+	per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_usec = 0;
+
+	return(0);
+}
+
+/*====================================================================
+	The functions to initialize dvs_suite_counter structure.
+	====================================================================*/
+
+int ds_initialize_ds_counter(int ds_cpu, int mode){
+
+	if(mode == 0) per_cpu(ds_counter, ds_cpu).flag_counter_initialized = 0;
+	per_cpu(ds_counter, ds_cpu).counter_mutex = 0;
+
+	if(mode == 0){
+		per_cpu(ds_counter, ds_cpu).wall_usec_base = 0;
+		per_cpu(ds_counter, ds_cpu).idle_usec_base = 0;
+		per_cpu(ds_counter, ds_cpu).iowait_usec_base = 0;
+
+		per_cpu(ds_counter, ds_cpu).elapsed_sec = 0;
+		per_cpu(ds_counter, ds_cpu).elapsed_usec = 0;
+
+		per_cpu(ds_counter, ds_cpu).busy_sec = 0;
+		per_cpu(ds_counter, ds_cpu).busy_usec = 0;
 	}
-	ds_status.flag_touch_timeout_count = 0;
-	ds_status.touch_timeout_sec = 0;
-	ds_status.touch_timeout_usec = 0;
+	else{
+		per_cpu(ds_counter, ds_cpu).wall_usec_base = per_cpu(ds_counter, 0).wall_usec_base;
+		per_cpu(ds_counter, ds_cpu).idle_usec_base = per_cpu(ds_counter, 0).idle_usec_base;
+		per_cpu(ds_counter, ds_cpu).iowait_usec_base = per_cpu(ds_counter, 0).iowait_usec_base;
 
-	ds_status.flag_mutex_lock_on_clock_state = 0;
-	ds_status.mutex_lock_on_clock_state_cnt = 0;
-	ds_status.flag_correct_cpu_op_update_path = 0;
+		per_cpu(ds_counter, ds_cpu).elapsed_sec = per_cpu(ds_counter, 0).elapsed_sec;
+		per_cpu(ds_counter, ds_cpu).elapsed_usec = per_cpu(ds_counter, 0).elapsed_usec;
 
-	ds_status.flag_post_early_suspend = 0;
-	ds_status.post_early_suspend_sec = 0;
-	ds_status.post_early_suspend_usec = 0;
-	ds_status.flag_do_post_early_suspend = 0;
-
-	ds_status.mpu_min_freq_to_lock = 0;
-	ds_status.l3_min_freq_to_lock = 0;
-	ds_status.iva_min_freq_to_lock = 0;
-
-	/* Initialize ds_counter's fields */
-	ds_counter.elapsed_sec = 0;
-	ds_counter.elapsed_usec = 0;
-#if 0	// Not needed unless we want statistics.
-	for(i=0;i<DS_CPU_OP_LIMIT;i++){
-		ds_counter.idle_sec[i] = 0;
-		ds_counter.idle_usec[i] = 0;
-		ds_counter.busy_sec[i] = 0;
-		ds_counter.busy_usec[i] = 0;
-		ds_counter.busy_task_sec[i] = 0;
-		ds_counter.busy_task_usec[i] = 0;
-		ds_counter.busy_schedule_sec[i] = 0;
-		ds_counter.busy_schedule_usec[i] = 0;
-		ds_counter.busy_dvs_suite_sec[i] = 0;
-		ds_counter.busy_dvs_suite_usec[i] = 0;
+		per_cpu(ds_counter, ds_cpu).busy_sec = per_cpu(ds_counter, 0).busy_sec;
+		per_cpu(ds_counter, ds_cpu).busy_usec = per_cpu(ds_counter, 0).busy_usec;
 	}
-#endif
-#if 0	// Not needed unless we want statistics.
-	ds_counter.idle_total_sec = 0;
-	ds_counter.idle_total_usec = 0;
-#endif
-	ds_counter.busy_total_sec = 0;
-	ds_counter.busy_total_usec = 0;
-	ds_counter.busy_fse_sec = 0;
-	ds_counter.busy_fse_usec = 0;
-	ds_counter.busy_fse_usec_fra_fp12 = 0;
-#if 0	// Not needed unless we want statistics.
-	ds_counter.busy_task_total_sec = 0;
-	ds_counter.busy_task_total_usec = 0;
-	ds_counter.busy_task_fse_sec = 0;
-	ds_counter.busy_task_fse_usec = 0;
-	ds_counter.busy_task_fse_usec_fra_fp12 = 0;
-	ds_counter.busy_hrt_task_sec = 0;
-	ds_counter.busy_hrt_task_usec = 0;
-	ds_counter.busy_hrt_task_fse_sec = 0;
-	ds_counter.busy_hrt_task_fse_usec = 0;
-	ds_counter.busy_hrt_task_fse_usec_fra_fp12 = 0;
-	ds_counter.busy_dbsrt_task_sec = 0;
-	ds_counter.busy_dbsrt_task_usec = 0;
-	ds_counter.busy_dbsrt_task_fse_sec = 0;
-	ds_counter.busy_dbsrt_task_fse_usec = 0;
-	ds_counter.busy_dbsrt_task_fse_usec_fra_fp12 = 0;
-	ds_counter.busy_rbsrt_task_sec = 0;
-	ds_counter.busy_rbsrt_task_usec = 0;
-	ds_counter.busy_rbsrt_task_fse_sec = 0;
-	ds_counter.busy_rbsrt_task_fse_usec = 0;
-	ds_counter.busy_rbsrt_task_fse_usec_fra_fp12 = 0;
-	ds_counter.busy_nrt_task_sec = 0;
-	ds_counter.busy_nrt_task_usec = 0;
-	ds_counter.busy_nrt_task_fse_sec = 0;
-	ds_counter.busy_nrt_task_fse_usec = 0;
-	ds_counter.busy_nrt_task_fse_usec_fra_fp12 = 0;
-	ds_counter.busy_schedule_total_sec = 0;
-	ds_counter.busy_schedule_total_usec = 0;
-	ds_counter.busy_schedule_fse_sec = 0;
-	ds_counter.busy_schedule_fse_usec = 0;
-	ds_counter.busy_schedule_fse_usec_fra_fp12 = 0;
-	ds_counter.busy_dvs_suite_total_sec = 0;
-	ds_counter.busy_dvs_suite_total_usec = 0;
-	ds_counter.busy_dvs_suite_fse_sec = 0;
-	ds_counter.busy_dvs_suite_fse_usec = 0;
-	ds_counter.busy_dvs_suite_fse_usec_fra_fp12 = 0;
-	ds_counter.ds_cpu_op_adjustment_no = 0;
-	ds_counter.schedule_no = 0;
-	ds_counter.ret_from_system_call_no = 0;
-#endif
 
-	/* Initialize each DVS scheme related variables */
+	return(0);
+}
 
-	/* GPScheDVS */
-	ds_configuration.gpschedvs_strategy = 0;
-	ds_configuration.aidvs_interval_window_size = DS_AIDVS_INTERVALS_IN_AN_WINDOW;
-	ds_configuration.aidvs_speedup_threshold = DS_AIDVS_SPEEDUP_THRESHOLD;
-	ds_configuration.aidvs_speedup_interval = DS_AIDVS_SPEEDUP_INTERVAL;
+/*====================================================================
+	The functions to initialize ds_aidvs_status structure.
+	====================================================================*/
 
-	ds_gpschedvs_status.current_strategy = ds_configuration.gpschedvs_strategy;
+int ds_initialize_aidvs(int ds_cpu, int mode){
 
-	// aidvs_l3_status
-	ds_gpschedvs_status.aidvs_l3_status.base_initialized = 0;
-	ds_gpschedvs_status.aidvs_l3_status.flag_in_busy_half = 0;
+	per_cpu(ds_aidvs_status, ds_cpu).moving_avg_weight = ds_control.aidvs_moving_avg_weight;
+	per_cpu(ds_aidvs_status, ds_cpu).interval_length = ds_control.aidvs_interval_length;
 
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_interval = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_sec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work_fse = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work_fse_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work_fse_lasting = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work_lasting = 0;
-	for(i=0;i<DS_GPSCHEDVS_L3_INTERVALS_IN_AN_WINDOW;i++){
-		ds_gpschedvs_status.aidvs_l3_status.interval_window_array[i].time_usec_interval = 0;
-		ds_gpschedvs_status.aidvs_l3_status.interval_window_array[i].time_usec_work_fse = 0;
-		ds_gpschedvs_status.aidvs_l3_status.interval_window_array[i].time_usec_work = 0;
+	if(mode == 0){
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_interval = 0;
+		per_cpu(ds_aidvs_status, ds_cpu).time_sec_interval_inc_base =
+			per_cpu(ds_counter, ds_cpu).elapsed_sec;
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_interval_inc_base =
+			per_cpu(ds_counter, ds_cpu).elapsed_usec;
+
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_work = 0;
+		per_cpu(ds_aidvs_status, ds_cpu).time_sec_work_inc_base =
+			per_cpu(ds_counter, ds_cpu).busy_sec;
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_work_inc_base =
+			per_cpu(ds_counter, ds_cpu).busy_usec;
 	}
-	ds_gpschedvs_status.aidvs_l3_status.interval_window_index = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_interval_in_window = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work_fse_in_window = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_work_in_window = 0;
-	ds_gpschedvs_status.aidvs_l3_status.consecutive_speedup_count = 0;
-	ds_gpschedvs_status.aidvs_l3_status.utilization_int_ulong = 1;	/* Begin with the max. perf. */
-	ds_gpschedvs_status.aidvs_l3_status.utilization_fra_fp12 = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_usec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l3_status.time_sec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l3_status.cpu_op_index = DS_CPU_OP_INDEX_0;
+	else{
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_interval =
+			per_cpu(ds_aidvs_status, 0).time_usec_interval;
+		per_cpu(ds_aidvs_status, ds_cpu).time_sec_interval_inc_base =
+			per_cpu(ds_aidvs_status, 0).time_sec_interval_inc_base;
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_interval_inc_base =
+			per_cpu(ds_aidvs_status, 0).time_usec_interval_inc_base;
 
-	// aidvs_l2_status
-	ds_gpschedvs_status.aidvs_l2_status.base_initialized = 0;
-	ds_gpschedvs_status.aidvs_l2_status.flag_in_busy_half = 0;
-
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_interval = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_sec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work_fse = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work_fse_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work_fse_lasting = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work_lasting = 0;
-	for(i=0;i<DS_GPSCHEDVS_L3_INTERVALS_IN_AN_WINDOW;i++){
-		ds_gpschedvs_status.aidvs_l2_status.interval_window_array[i].time_usec_interval = 0;
-		ds_gpschedvs_status.aidvs_l2_status.interval_window_array[i].time_usec_work_fse = 0;
-		ds_gpschedvs_status.aidvs_l2_status.interval_window_array[i].time_usec_work = 0;
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_work =
+			per_cpu(ds_aidvs_status, 0).time_usec_work;
+		per_cpu(ds_aidvs_status, ds_cpu).time_sec_work_inc_base =
+			per_cpu(ds_aidvs_status, 0).time_sec_work_inc_base;
+		per_cpu(ds_aidvs_status, ds_cpu).time_usec_work_inc_base =
+			per_cpu(ds_aidvs_status, 0).time_usec_work_inc_base;
 	}
-	ds_gpschedvs_status.aidvs_l2_status.interval_window_index = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_interval_in_window = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work_fse_in_window = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_work_in_window = 0;
-	ds_gpschedvs_status.aidvs_l2_status.consecutive_speedup_count = 0;
-	ds_gpschedvs_status.aidvs_l2_status.utilization_int_ulong = 1;	/* Begin with the max. perf. */
-	ds_gpschedvs_status.aidvs_l2_status.utilization_fra_fp12 = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_usec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l2_status.time_sec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l2_status.cpu_op_index = DS_CPU_OP_INDEX_0;
 
-	// aidvs_l1_status
-	ds_gpschedvs_status.aidvs_l1_status.base_initialized = 0;
-	ds_gpschedvs_status.aidvs_l1_status.flag_in_busy_half = 0;
+	per_cpu(ds_aidvs_status, ds_cpu).utilization_int_ulong = 1;
+	per_cpu(ds_aidvs_status, ds_cpu).utilization_fra_fp12 = 0x0;
 
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_interval = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_sec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work_fse = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work_fse_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work_fse_lasting = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work_lasting = 0;
-	for(i=0;i<DS_GPSCHEDVS_L3_INTERVALS_IN_AN_WINDOW;i++){
-		ds_gpschedvs_status.aidvs_l1_status.interval_window_array[i].time_usec_interval = 0;
-		ds_gpschedvs_status.aidvs_l1_status.interval_window_array[i].time_usec_work_fse = 0;
-		ds_gpschedvs_status.aidvs_l1_status.interval_window_array[i].time_usec_work = 0;
-	}
-	ds_gpschedvs_status.aidvs_l1_status.interval_window_index = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_interval_in_window = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work_fse_in_window = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_work_in_window = 0;
-	ds_gpschedvs_status.aidvs_l1_status.consecutive_speedup_count = 0;
-	ds_gpschedvs_status.aidvs_l1_status.utilization_int_ulong = 1;	/* Begin with the max. perf. */
-	ds_gpschedvs_status.aidvs_l1_status.utilization_fra_fp12 = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_usec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l1_status.time_sec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l1_status.cpu_op_index = DS_CPU_OP_INDEX_0;
+	per_cpu(ds_aidvs_status, ds_cpu).moving_avg_int_ulong = 1;
+	per_cpu(ds_aidvs_status, ds_cpu).moving_avg_fra_fp12 = 0x0;
 
-	// aidvs_l0_status
-	ds_gpschedvs_status.aidvs_l0_status.base_initialized = 0;
-	ds_gpschedvs_status.aidvs_l0_status.flag_in_busy_half = 0;
-
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_interval = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_sec_interval_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work_fse = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work_fse_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work_fse_lasting = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work_inc_base = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work_lasting = 0;
-	for(i=0;i<DS_GPSCHEDVS_L3_INTERVALS_IN_AN_WINDOW;i++){
-		ds_gpschedvs_status.aidvs_l0_status.interval_window_array[i].time_usec_interval = 0;
-		ds_gpschedvs_status.aidvs_l0_status.interval_window_array[i].time_usec_work_fse = 0;
-		ds_gpschedvs_status.aidvs_l0_status.interval_window_array[i].time_usec_work = 0;
-	}
-	ds_gpschedvs_status.aidvs_l0_status.interval_window_index = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_interval_in_window = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work_fse_in_window = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_work_in_window = 0;
-	ds_gpschedvs_status.aidvs_l0_status.consecutive_speedup_count = 0;
-	ds_gpschedvs_status.aidvs_l0_status.utilization_int_ulong = 1;	/* Begin with the max. perf. */
-	ds_gpschedvs_status.aidvs_l0_status.utilization_fra_fp12 = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_usec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l0_status.time_sec_util_calc_base = 0;
-	ds_gpschedvs_status.aidvs_l0_status.cpu_op_index = DS_CPU_OP_INDEX_0;
-
-	ds_status.ds_initialized = 1;
+	per_cpu(ds_aidvs_status, ds_cpu).cpu_op_index = DS_CPU_OP_INDEX_INI;
 
 	return(0);
 }
@@ -2427,48 +2116,48 @@ int ds_initialize_dvs_suite(int cpu_mode){
 		  On the other hand, we apply the normal scheduler for
 		  other tasks.
 	====================================================================*/
-int ds_update_priority_normal(struct task_struct *p){
+
+int ds_update_priority_normal(int ds_cpu, struct task_struct *p){
 
 	int lc_existing_nice = 0;
 	int lc_nice_by_type = 0;
-	//int lc_static_prio_by_type = 0;
+	int lc_static_prio_by_type = 0;
 	int lc_resultant_nice = 0;
-	//int lc_resultant_static_prio = 0;
-
-	if(ds_status.type_need_to_be_changed[p->pid] == 0) return(0);
+	int lc_resultant_static_prio = 0;
 
 	if(p == 0 || p->pid == 0) return(0);
+	if((per_cpu(ds_sys_status, 0).type[p->pid] & DS_TYPE_2B_CHANGED_M) == 0) return(0);
 
 	lc_existing_nice = p->static_prio - 120;
 
-	switch(ds_status.type[p->pid]){
+	switch(per_cpu(ds_sys_status, 0).type[p->pid] & DS_TYPE_M){
 		case DS_HRT_TASK:
 			lc_nice_by_type = DS_HRT_NICE;
-			//lc_static_prio_by_type = DS_HRT_STATIC_PRIO;
+			lc_static_prio_by_type = DS_HRT_STATIC_PRIO;
 			break;
 		case DS_SRT_UI_SERVER_TASK:
 			lc_nice_by_type = DS_DBSRT_NICE;
-			//lc_static_prio_by_type = DS_DBSRT_STATIC_PRIO;
+			lc_static_prio_by_type = DS_DBSRT_STATIC_PRIO;
 			break;
 		case DS_SRT_UI_CLIENT_TASK:
 			lc_nice_by_type = DS_DBSRT_NICE;
-			//lc_static_prio_by_type = DS_DBSRT_STATIC_PRIO;
+			lc_static_prio_by_type = DS_DBSRT_STATIC_PRIO;
 			break;
 		case DS_SRT_KERNEL_THREAD:
 			lc_nice_by_type = DS_RBSRT_NICE;
-			//lc_static_prio_by_type = DS_RBSRT_STATIC_PRIO;
+			lc_static_prio_by_type = DS_RBSRT_STATIC_PRIO;
 			break;
 		case DS_SRT_DAEMON_TASK:
 			lc_nice_by_type = DS_RBSRT_NICE;
-			//lc_static_prio_by_type = DS_RBSRT_STATIC_PRIO;
+			lc_static_prio_by_type = DS_RBSRT_STATIC_PRIO;
 			break;
 		case DS_NRT_TASK:
 			lc_nice_by_type = DS_NRT_NICE;
-			//lc_static_prio_by_type = DS_NRT_STATIC_PRIO;
+			lc_static_prio_by_type = DS_NRT_STATIC_PRIO;
 			break;
-		case 0:
+		default:
 			lc_nice_by_type = DS_NRT_NICE;
-			//lc_static_prio_by_type = DS_NRT_STATIC_PRIO;
+			lc_static_prio_by_type = DS_NRT_STATIC_PRIO;
 			break;
 	}
 
@@ -2476,9 +2165,7 @@ int ds_update_priority_normal(struct task_struct *p){
 	if(lc_resultant_nice < -20) lc_resultant_nice = -20;
 	if(lc_resultant_nice > 19) lc_resultant_nice = 19;
 
-	set_user_nice(p, lc_resultant_nice);
-
-#if 0
+#if 1
 	lc_resultant_static_prio = lc_static_prio_by_type + lc_existing_nice;
 	if(lc_resultant_static_prio < 100) lc_resultant_static_prio = 100;
 	if(lc_resultant_static_prio > 139) lc_resultant_static_prio = 139;
@@ -2486,60 +2173,11 @@ int ds_update_priority_normal(struct task_struct *p){
 	p->static_prio = lc_resultant_static_prio;
 	p->normal_prio = p->static_prio;
 	p->prio = p->static_prio;
-	p->se.load.weight = ds_prio_to_weight[lc_resultant_nice+20];
-	p->se.load.inv_weight = ds_prio_to_wmult[lc_resultant_nice+20];
 #endif
 
-	ds_status.type_need_to_be_changed[p->pid] = 0;
+	set_user_nice(p, lc_resultant_nice);
 
-	return(0);
-}
-
-/*====================================================================
-	Function to change the priority of real-time tasks
-	NOTE: We apply the RR rt scheduler for HRT and DS_SRT_UI_SERVER_TASK.
-		  On the other hand, we apply the normal scheduler for
-		  other tasks.
-	====================================================================*/
-int ds_update_priority_rt(struct task_struct *p){
-
-	struct sched_param lc_sched_param;
-
-	if(ds_status.type_need_to_be_changed[p->pid] == 0) return(0);
-
-	if(p == 0 || p->pid == 0) return(0);
-
-	switch(ds_status.type[p->pid]){
-		case DS_HRT_TASK:
-			ds_status.scheduler[p->pid] = DS_SCHED_RR;
-			lc_sched_param.sched_priority = DS_HRT_RR_PRIO;
-			sched_setscheduler(p, SCHED_RR, &lc_sched_param);
-			break;
-		case DS_SRT_UI_SERVER_TASK:
-			ds_status.scheduler[p->pid] = DS_SCHED_RR;
-			lc_sched_param.sched_priority = DS_DBSRT_RR_PRIO;
-			sched_setscheduler(p, SCHED_RR, &lc_sched_param);
-			break;
-		case DS_SRT_UI_CLIENT_TASK:
-			//ds_status.scheduler[p->pid] = DS_SCHED_RR;
-			//lc_sched_param.sched_priority = DS_DBSRT_RR_PRIO;
-			//sched_setscheduler(p, SCHED_RR, &lc_sched_param);
-			break;
-		case DS_SRT_KERNEL_THREAD:
-		case DS_SRT_DAEMON_TASK:
-			//ds_status.scheduler[p->pid] = DS_SCHED_NORMAL;
-			//lc_sched_param.sched_priority = 0;
-			//sched_setscheduler(p, SCHED_NORMAL, &lc_sched_param);
-			break;
-		case DS_NRT_TASK:
-		case 0:
-			//ds_status.scheduler[p->pid] = DS_SCHED_NORMAL;
-			//lc_sched_param.sched_priority = 0;
-			//sched_setscheduler(p, SCHED_NORMAL, &lc_sched_param);
-			break;
-	}
-
-	ds_status.type_need_to_be_changed[p->pid] = 0;
+	per_cpu(ds_sys_status, 0).type[p->pid] &= DS_TYPE_2B_CHANGED_N;
 
 	return(0);
 }
@@ -2547,144 +2185,146 @@ int ds_update_priority_rt(struct task_struct *p){
 /*====================================================================
 	Function to trace every task's type
 	====================================================================*/
-int ds_detect_task_type(void){
+int ds_detect_task_type(int ds_cpu){
 
 	int old_type = 0;
 	int new_type = 0;
 	int i = 0;
 
-	struct sched_param lc_sched_param;
+	int next_pid;
 
 	/* Upon ds_parameter.entry_type == DS_ENTRY_SWITCH_TO, do followings.
 
 		 For ds_parameter.next_p:
 
-		(1) Check if ds_status.type[ds_parameter.next_p->pid] is still its initial value.
+		(1) Check if per_cpu(ds_sys_status, 0).type[next_pid] & DS_TYPE_M is still its initial value.
 			If it is, determine it.
-
-		(2) Check if the UI timeout of ds_parameter.next_p has been expired.
-			If so, reset ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] and
-			ds_status.ipc_timeout_usec[ds_parameter.next_p->pid].
-			Then, re-determine the type of this task.
 	 */
-	if(ds_parameter.entry_type == DS_ENTRY_SWITCH_TO){
+	if(ds_parameter.entry_type == DS_ENTRY_SWITCH_TO)
+	{
 
 		/* For prev_p */
+#if 0
 		if(ds_parameter.prev_p != 0){
 			if(ds_parameter.prev_p->pid != 0){
 				// Nothing to do now.
 			}
 		}
+#endif
 
 		/* For next_p */
-		if(ds_parameter.next_p != 0){
+		if(ds_parameter.next_p != 0)
+		{
 
-			if(ds_parameter.next_p->pid != 0){
+			next_pid = ds_parameter.next_p->pid;
 
-				if(ds_parameter.next_p->pid == ds_parameter.next_p->tgid){
+			if(next_pid != 0){
+
+				if(next_pid == ds_parameter.next_p->tgid)
+				{
 					for(i=0;i<16;i++)
-						ds_status.tg_owner_comm[ds_parameter.next_p->pid][i] = 
+						per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid][i] = 
 						*(ds_parameter.next_p->comm+i);
 				}
 
-				ds_status.tgid[ds_parameter.next_p->pid] = ds_parameter.next_p->tgid;
-
 				/* Get old type. */
-				old_type = ds_status.type[ds_parameter.next_p->pid];
+				old_type = per_cpu(ds_sys_status, 0).type[next_pid] & DS_TYPE_M;
 				if(old_type == 0) old_type = DS_NRT_TASK;
 
 				/* C) Initialize and then determine new type. */
 				new_type = old_type;
 
-				switch(*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+0)){
+				/*----------------------------------------------------------------------
+				 * Manual type detection
+				 ----------------------------------------------------------------------*/
+				switch(*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+0)){
 					case 'a':
-#if 0	// audio out. Audio related [daemon process].
+#if 0	// youtube. [application process].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'u' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == ' ' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'u' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 't'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'u' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'u' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'e'
 						)
 						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-#if 0	// adbd. ADB related [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'b' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'd'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'b':
-#if 0	// binder. [kernel thread].
+#if 0	// /system/bin/dbus-daemon. bluetooth related [daemon process].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'r'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'i' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'n' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == '/' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'd' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'b' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'u' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 's' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == '-' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'd' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'n'
 						)
 						{
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else
+#endif
+#if 0	// /system/bin/mediaserver. [daemon process].
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'v' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'r'
+						)
+						{
+							//new_type = DS_HRT_TASK;
 							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 1	// btld. bluetooth reltated daemon-like [application].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'd'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 1	// bluetoothd. Bluetooth reltated [daemon process]. HRT.
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'u' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'h' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'd'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
@@ -2692,552 +2332,411 @@ int ds_detect_task_type(void){
 						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'c':
-#if 0	// com.lge.osp. LGE On-Screen Phone [application]. O 4 touch.
+#if 1	// com.lge.camera. LGE On-Screen Phone [application]. O 4 touch.
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'm' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'l' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'g' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'p'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'o' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'm' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'l' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'g' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'c' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'a' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'a'
 						)
 						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
-						else 
+						else
 #endif
 #if 0	// com.lge.media. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'm' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'l' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'g' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'm' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'a'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'o' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'm' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'l' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'g' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'm' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'a'
 						)
 						{
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
 							new_type = DS_SRT_UI_CLIENT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else 
-#endif
-#if 0	// com.android.mms. [application].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 's'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
 #if 0	// com.broadcom.bt.app.pbap. bluetooth. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'b' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'b' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'p'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'p'
 						)
 						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 'd':
-#if 0	// dbus-daemon. bluetooth related [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'b' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'u' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == '-' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'd' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'a' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'm' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'n'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 1	// com.android.camera. [application].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'r' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'i' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'c' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'a'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// android.process.media. [application].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'p' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'r' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'c' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'a'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// com.android.bluetooth. [application].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'r' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'i' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'b' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'l' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'u' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'h'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// android.process.acore. Contact, home, and etc. [application].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'p' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'r' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'c' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'e'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 'e':
-#if 0	// events/0. [kernel thread].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'v' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'n' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 't' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == '/'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// com.google.process.gapps. [application]. Google services.
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'p' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'r' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'o' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'c' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 's' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == '.' && 
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'g' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 's'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 'f':
-#if 1	// fw3a_core. camera related [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'w' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == '3' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == '_' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'e'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
 						goto DS_UNKNOWN_TASK_NAME;
 						break;
-					case 'g':
-#if 0	// glgps. GPS server [daemon process]. < HRT.
+					case 'd':
+#if 1	// com.android.lgecamera. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'g' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 's'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'r' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'o' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'i' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'd' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'l' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'g' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'c' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'a'
 						)
 						{
 							//new_type = DS_HRT_TASK;
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else 
+#endif
+#if 0	// android.process.media. [application].
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'p' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'r' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'o' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'c' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 's' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 's' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'a'
+						)
+						{
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else 
+#endif
+#if 0	// com.android.bluetooth. [application].
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'r' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'o' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'i' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'd' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'b' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'l' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'u' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'h'
+						)
+						{
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-						//goto DS_UNKNOWN_TASK_NAME;
+#if 1	// android.process.acore. Contact, home, and etc. [application].
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'p' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'r' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'o' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'c' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 's' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 's' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'c' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'e'
+						)
+						{
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_SRT_KERNEL_TASK;
+							//new_type = DS_NRT_TASK;
+#if 0
+if(per_cpu(ds_sys_status, 0).flag_touch_timeout_count != 0){
+printk(KERN_DEBUG "\n");
+}
+#endif
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else
+#endif
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 'e':
+#if 0	// com.google.process.gapps. [application]. Google services.
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'p' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'r' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'o' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'c' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'e' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 's' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 's' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == '.' && 
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'g' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 's'
+						)
+						{
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else
+#endif
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 'f':
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 'g':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'h':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'i':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'j':
-#if 0	// jbd2/mmcblk0p*-. [kernel thread].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'b' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == '2' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == '/' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'b' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'k'
-						)
-						{
-							new_type = DS_HRT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'k':
-#if 0	// ksoftirqd/0. [kernel thread].
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 'l':
+#if 0	// com.lge.videoplayer. [application process].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'f' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'q' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'd'
-						)
-						{
-							new_type = DS_SRT_KERNEL_THREAD;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// kmmcd. [kernel thread].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd'
-						)
-						{
-							new_type = DS_HRT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// keystore. Key related [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'y' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'e'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'g' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'v' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'l' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'r'
 						)
 						{
 							//new_type = DS_HRT_TASK;
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 'l':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'm':
-#if 0	// mmcqd. [kernel thread].
+#if 0	// com.lge.launcher2. [application process].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'q' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'l' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'g' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'l' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'u' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'c' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'h' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == '2'
 						)
 						{
-							new_type = DS_HRT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 1	// mediaserver. Android system service [daemon process]. O 4 touch.
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'v' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'r'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							//per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
 #if 0	// com.android.phone. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'h' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'e'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'h' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'e'
 						)
 						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
 #if 0	// com.android.music. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'u' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'c'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'u' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'c'
 						)
 						{
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
 							//new_type = DS_SRT_DAEMON_TASK;
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// com.android.email. [application]. HRT.
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'l'
-						)
-						{
-							new_type = DS_HRT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
 #if 0	// com.broadcom.bt.app.system. bluetooth. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'b' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'y' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'm'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'm'
 						)
 						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
@@ -3245,527 +2744,425 @@ int ds_detect_task_type(void){
 						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'n':
-#if 0	// netd. Network related [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'd'
-						)
-						{
-							new_type = DS_HRT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
 #if 0	// com.android.systemui. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'y' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'u' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'i'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'u' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'i'
 						)
 						{
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
 							new_type = DS_SRT_UI_CLIENT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-#if 0	// com.android.settings. [application] X.
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'g' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 's'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'o':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'p':
-#if 0	// pvr_*. [kernel thread].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'v' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == '_'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'q':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'r':
-#if 0	// rild. RIL related [daemon process]. < HRT.
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 's':
+#if 1	// system_server. Android system service [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'd'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == '_' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'v' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'r'
 						)
 						{
 							//new_type = DS_HRT_TASK;
 							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 's':
-#if 0	// servicemanager. Android system service [daemon process]
+#if 0	// /system/bin/netd. Network related [daemon process].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'v' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'g' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'r'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-#if 0	// system_server. Android system service [application].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'y' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == '_' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'v' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'r'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 't':
-						break;
-					case 'u':
-#if 0	// ueventd. Polling server [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'v' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'd'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 'v':
-#if 0	// vold. Volume (sdcard etc.) server [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'd'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
-						break;
-					case 'w':
-#if 0	// wpa_supplicant. Wifi related [daemon process]. HRT.
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == '_' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'u' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 't'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'd'
 						)
 						{
 							new_type = DS_HRT_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-						//goto DS_UNKNOWN_TASK_NAME;
+#if 0	// /system/bin/rild. RIL related [daemon process].
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'l' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'd'
+						)
+						{
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else
+#endif
+#if 0	// /system/bin/vold. Volume (sdcard etc.) server [daemon process].
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'v' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'l' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'd'
+						)
+						{
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else
+#endif
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 't':
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 'u':
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 'v':
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case 'w':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'x':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'y':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'z':
 #if 0	// zygote. Android process spawning [daemon process].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'y' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'g' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'e'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'y' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'g' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'e'
 						)
 						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'A':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'B':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'C':
-#if 0	// Camera* threads of mediaserver. camera. [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'a'
-						)
-						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'D':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'E':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'F':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'G':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'H':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'I':
-#if 0	// InputDeviceRead. Android input device reader process. [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'n' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'u' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'D' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'v' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'R' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'd'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'J':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'K':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'L':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'M':
-#if 0	// Mixer Thread. [daemon process].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'x' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == ' ' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'T' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'h' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'd'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'N':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'O':
-#if 0	// OMAPVOUT. [kernel thread].
-						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'M' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'A' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'P' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'V' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'O' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'U' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'T'
-						)
-						{
-							new_type = DS_SRT_UI_SERVER_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
-							goto DS_TASK_TYPE_DETECTION_DONE;
-						}
-						else
-#endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'P':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'Q':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'R':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'S':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'T':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'U':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'V':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'W':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'X':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'Y':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case 'Z':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case ' ':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case '_':
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 					case '/':
-						break;
-					case '.':
-#if 0	// android.process.lghome. [application]. O 4 touch.
+#if 0	// /system/bin/servicemanager. Android system service [daemon process]
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'p' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'g' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'h' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'e'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'v' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'c' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'a' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'g' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'r'
 						)
 						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_HRT_TASK;
+							new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-#if 0	// com.lge.cameratest. [application].
+#if 0	// /sbin/ueventd. Polling server [daemon process].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'g' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'a' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 't' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 't'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'b' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == '/' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'u' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 'v' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'n' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 't' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'd'
 						)
 						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							//new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+							goto DS_TASK_TYPE_DETECTION_DONE;
+						}
+						else
+#endif
+						goto DS_UNKNOWN_TASK_NAME;
+						break;
+					case '.':
+#if 0	// android.process.lghome. [application].
+						if(
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'p' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'c' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == 'l' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'g' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'h' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'e'
+						)
+						{
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
 #if 0	// com.cooliris.media. Gallary related. [application].
 						if(
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+1) == 'c' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+2) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+3) == 'o' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+4) == 'l' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+5) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+6) == 'r' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+7) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+8) == 's' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+9) == '.' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+10) == 'm' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+11) == 'e' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+12) == 'd' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+13) == 'i' &&
-							*(ds_status.tg_owner_comm[ds_parameter.next_p->pid]+14) == 'a'
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+1) == 'c' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+2) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+3) == 'o' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+4) == 'l' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+5) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+6) == 'r' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+7) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+8) == 's' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+9) == '.' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+10) == 'm' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+11) == 'e' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+12) == 'd' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+13) == 'i' &&
+							*(per_cpu(ds_sys_status, 0).tg_owner_comm[next_pid]+14) == 'a'
 						)
 						{
-							new_type = DS_SRT_DAEMON_TASK;
-							ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-							ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-							ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+							//new_type = DS_HRT_TASK;
+							//new_type = DS_SRT_UI_SERVER_TASK;
+							new_type = DS_SRT_UI_CLIENT_TASK;
+							//new_type = DS_SRT_KERNEL_THREAD;
+							//new_type = DS_SRT_DAEMON_TASK;
+							//new_type = DS_NRT_TASK;
+							per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 							goto DS_TASK_TYPE_DETECTION_DONE;
 						}
 						else
 #endif
-						//goto DS_UNKNOWN_TASK_NAME;
+						goto DS_UNKNOWN_TASK_NAME;
 						break;
 				}
 
 DS_UNKNOWN_TASK_NAME:
 
+				/*----------------------------------------------------------------------
+				 * Autonomous type detection
+				 ----------------------------------------------------------------------*/
 #if 0
-				/* If this task was UI client */
-				if(old_type == DS_SRT_UI_CLIENT_TASK)
-				{
-					/* If DS_SRT_UI_IPC_TIMEOUT is over */
-					if(ds_counter.elapsed_sec > ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] ||
-						(ds_counter.elapsed_sec == ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] &&
-						ds_counter.elapsed_usec > ds_status.ipc_timeout_usec[ds_parameter.next_p->pid]))
-					{
-						ds_status.ipc_timeout_sec[ds_parameter.next_p->pid] = 0;
-						ds_status.ipc_timeout_usec[ds_parameter.next_p->pid] = 0;
-
-						//if(ds_parameter.next_p->parent->pid == 1){
-						//	new_type = DS_SRT_DAEMON_TASK;
-						//}
-						//else{
-							new_type = DS_NRT_TASK;
-//printk(KERN_WARNING "%16s = DS_NRT_TASK\n", ds_parameter.next_p->comm);
-						//}
-					}
-					/* If DS_SRT_UI_IPC_TIMEOUT is not over yet */
-					else{
-						new_type = DS_SRT_UI_CLIENT_TASK;
-//printk(KERN_WARNING "%16s = DS_SRT_UI_CLIENT_TASK\n", ds_parameter.next_p->comm);
-					}
-				}
-#if 0
-				else{
-					if(ds_parameter.next_p->pid == 1 ||
-						ds_parameter.next_p->pid == 2 ||
+				if(next_pid == 1 ||
+					next_pid == 2 ||
 						ds_parameter.next_p->parent->pid == 2)
 					{
 						new_type = DS_SRT_KERNEL_THREAD;
-						ds_status.type_fixed[ds_parameter.next_p->pid] = 1;
+					per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
 						goto DS_TASK_TYPE_DETECTION_DONE;
 					}
 					else if(ds_parameter.next_p->parent->pid == 1){
@@ -3774,141 +3171,20 @@ DS_UNKNOWN_TASK_NAME:
 					else{
 						new_type = DS_NRT_TASK;
 					}
-				}
-#endif
-#endif
+#else	/* Apply this without autonomous type detection */
 new_type = DS_NRT_TASK;
+per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_FIXED_M;
+goto DS_TASK_TYPE_DETECTION_DONE;
+#endif
 
 DS_TASK_TYPE_DETECTION_DONE:
 
-				/* D) Thread group consideration */
-
-#if 0
-				/* Skip for thread group leader or 
-					if the leader's type has not been determined yet. */
-				if(ds_parameter.next_p->pid != ds_status.tgid[ds_parameter.next_p->pid])
-				{
-					/* If thread group leader's type is different from next_p's */
-					if(new_type != ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]])
-					{
-						/* If thread group leader's type is higher than next_p's */
-						if(new_type > ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]])
-						{
-							/* If thread group leader's type change causer is next_p,
-								decrease the leader's type down to next_p's.
-								Then, reset the leader's type change causer pid. */
-							if(ds_status.tgid_type_change_causer[ds_status.tgid[ds_parameter.next_p->pid]] == 
-								ds_parameter.next_p->pid)
-							{
-								switch(new_type){
-									case DS_HRT_TASK:
-										ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_HRT_TASK;
-										break;
-									case DS_SRT_UI_SERVER_TASK:
-										ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_UI_SERVER_TASK;
-										break;
-									case DS_SRT_UI_CLIENT_TASK:
-										ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_UI_CLIENT_TASK;
-										break;
-									case DS_SRT_KERNEL_THREAD:
-										ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_KERNEL_THREAD;
-										break;
-									case DS_SRT_DAEMON_TASK:
-										ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_DAEMON_TASK;
-										break;
-									case DS_NRT_TASK:
-									default:
-										ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_NRT_TASK;
-										break;
-								}
-								ds_status.tgid_type_changed[ds_status.tgid[ds_parameter.next_p->pid]] = 1;
-								ds_status.tgid_type_change_causer[ds_status.tgid[ds_parameter.next_p->pid]] = 0;
-							}
-							/* If thread group leader's type change causer is 
-								either the leader itself or another task,
-								increase next_p's type up to the leader's.
-								The leader's type change causer pid should be remained. */
-							else
-							{
-								switch(ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]]){
-									case DS_HRT_TASK:
-										new_type = DS_HRT_TASK;
-										break;
-									case DS_SRT_UI_SERVER_TASK:
-										new_type = DS_SRT_UI_SERVER_TASK;
-										break;
-									case DS_SRT_UI_CLIENT_TASK:
-										new_type = DS_SRT_UI_CLIENT_TASK;
-										break;
-									case DS_SRT_KERNEL_THREAD:
-										new_type = DS_SRT_KERNEL_THREAD;
-										break;
-									case DS_SRT_DAEMON_TASK:
-										new_type = DS_SRT_DAEMON_TASK;
-										break;
-									case DS_NRT_TASK:
-									default:
-										new_type = DS_NRT_TASK;
-										break;
-								}
-							}
-						}
-						/* If next_p's type is higher than thread group leader's */
-						else
-						{
-							/* In this case, unconditionally increase the leader's type up to the next_p's */
-							switch(new_type){
-								case DS_HRT_TASK:
-									ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_HRT_TASK;
-									break;
-								case DS_SRT_UI_SERVER_TASK:
-									ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_UI_SERVER_TASK;
-									break;
-								case DS_SRT_UI_CLIENT_TASK:
-									ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_UI_CLIENT_TASK;
-									break;
-								case DS_SRT_KERNEL_THREAD:
-									ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_KERNEL_THREAD;
-									break;
-								case DS_SRT_DAEMON_TASK:
-									ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_SRT_DAEMON_TASK;
-									break;
-								case DS_NRT_TASK:
-								default:
-									ds_status.type[ds_status.tgid[ds_parameter.next_p->pid]] = 
-											DS_NRT_TASK;
-									break;
-							}
-							ds_status.tgid_type_changed[ds_status.tgid[ds_parameter.next_p->pid]] = 1;
-							ds_status.tgid_type_change_causer[ds_status.tgid[ds_parameter.next_p->pid]] = 
-								ds_parameter.next_p->pid;
-						}
-					}
-				}
-#endif
-
-				/* E) Check type change. */
+				/* D) Check type change. */
 				if(old_type != new_type){
-					ds_status.type[ds_parameter.next_p->pid] = new_type;
-					ds_status.type_need_to_be_changed[ds_parameter.next_p->pid] = 1;
+					per_cpu(ds_sys_status, 0).type[next_pid] &= DS_TYPE_N;
+					per_cpu(ds_sys_status, 0).type[next_pid] |= new_type;
+					per_cpu(ds_sys_status, 0).type[next_pid] |= DS_TYPE_2B_CHANGED_M;
 				}
-#if 0
-				else if(ds_status.tgid_type_changed[ds_parameter.next_p->pid] == 1){
-					ds_status.type_need_to_be_changed[ds_parameter.next_p->pid] = 1;
-					ds_status.tgid_type_changed[ds_parameter.next_p->pid] = 0;
-				}
-#endif
 			}
 		}
 	}
@@ -3919,300 +3195,353 @@ DS_TASK_TYPE_DETECTION_DONE:
 /*====================================================================
 	The function which updates the CPU operating point.
 	====================================================================*/
-asmlinkage void ds_update_cpu_op(void){
-
+asmlinkage void ds_update_cpu_op(int ds_cpu)
+{
 	struct device *mpu_dev;	// Moved from cpu-omap.c
 	struct device *l3_dev;	// Moved from cpu-omap.c
 	struct device *iva_dev; // Moved from cpu-omap.c
 
 	unsigned long lc_min_cpu_op_update_interval = 0;
 
-	if(ds_status.flag_run_dvs == 1){
+	if(!cpu_active(ds_cpu)) return;
+	if(!ds_control.flag_run_dvs) return;
+	if(!per_cpu(ds_cpu_status, ds_cpu).flag_update_cpu_op) return;
+	if(per_cpu(ds_cpu_status, ds_cpu).cpu_op_mutex) return;
+	per_cpu(ds_cpu_status, ds_cpu).cpu_op_mutex ++;
 
-		if(ds_status.flag_update_cpu_op == 1){
-
-			if(ds_status.target_cpu_op_index > ds_status.cpu_op_index)
+	if(per_cpu(ds_cpu_status, ds_cpu).target_cpu_op_index > 
+		per_cpu(ds_cpu_status, ds_cpu).current_cpu_op_index)
 				lc_min_cpu_op_update_interval = DS_MIN_CPU_OP_UPDATE_INTERVAL_U;
 			else
 				lc_min_cpu_op_update_interval = DS_MIN_CPU_OP_UPDATE_INTERVAL_D;
 
 			/* If this is the first time */
-			if(ds_status.cpu_op_last_update_sec == 0 && ds_status.cpu_op_last_update_usec == 0){
+	if(per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_sec == 0 && 
+		per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_usec == 0)
+	{
 				goto update_cpu_op;
 			}
 			else{
 				/* If lc_min_cpu_op_update_interval is over since the last update */
-				if(ds_counter.elapsed_sec > ds_status.cpu_op_last_update_sec + 1){
+		if(per_cpu(ds_counter, ds_cpu).elapsed_sec > 
+			per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_sec + 1)
+		{
 					goto update_cpu_op;
 				}
-				else if(ds_counter.elapsed_sec > ds_status.cpu_op_last_update_sec){
-					if(ds_counter.elapsed_usec > ds_status.cpu_op_last_update_usec){
+		else if(per_cpu(ds_counter, ds_cpu).elapsed_sec > 
+			per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_sec)
+		{
+			if(per_cpu(ds_counter, ds_cpu).elapsed_usec > 
+				per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_usec)
+			{
 						goto update_cpu_op;
 					}
-					else if(ds_counter.elapsed_usec + 1000000
-						> ds_status.cpu_op_last_update_usec + lc_min_cpu_op_update_interval){
+			else if(per_cpu(ds_counter, ds_cpu).elapsed_usec + 1000000
+				> per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_usec + 
+				lc_min_cpu_op_update_interval)
+			{
 						goto update_cpu_op;
 					}
-					else
+			else{
 						goto do_not_update;
 				}
+		}
 				else{
-					if(ds_counter.elapsed_usec
-						> ds_status.cpu_op_last_update_usec + lc_min_cpu_op_update_interval){
+			if(per_cpu(ds_counter, ds_cpu).elapsed_usec
+				> per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_usec + 
+				lc_min_cpu_op_update_interval)
+			{
 						goto update_cpu_op;
 					}
-					else
+			else{
 						goto do_not_update;
 				}
 			}
 		}
-		else
-			goto do_not_update;
-	}
 
 update_cpu_op:
-
-	if(ds_status.flag_run_dvs == 1){
-		ds_update_time_counter();
-
-		ds_status.flag_correct_cpu_op_update_path = 1;
-
-		/* A treatment to integrate DSP 800MHz patch into LG-DVFS */
-		if(ds_status.mpu_min_freq_to_lock != 0){
-			if(ds_status.target_cpu_op_index < ds_status.mpu_min_freq_to_lock)
-				ds_status.target_cpu_op_index = ds_status.mpu_min_freq_to_lock;
-			//printk(KERN_WARNING "mpu locked %lu\n", ds_status.mpu_min_freq_to_lock);
-		}
 
 		mpu_dev = omap2_get_mpuss_device();
 		l3_dev = omap2_get_l3_device();
 		iva_dev = omap2_get_iva_device();
 
-		switch(ds_status.target_cpu_op_index){
+		switch(per_cpu(ds_cpu_status, ds_cpu).target_cpu_op_index){
 			case DS_CPU_OP_INDEX_0:
 				omap_pm_cpu_set_freq(1000000000);	// VDD1_OPP4	1GHz
 				omap_device_set_rate(mpu_dev, mpu_dev, 1000000000);
+				if(per_cpu(ds_sys_status, 0).locked_min_iva_freq == 0){
 				omap_device_set_rate(iva_dev, iva_dev, 800000000);
-				/* A treatment to integrate DSP 800MHz patch into LG-DVFS */
-				if(ds_status.l3_min_freq_to_lock == 0){
-					if(ds_status.flag_do_post_early_suspend == 0)
+				}
+				else{
+					omap_device_set_rate(iva_dev, iva_dev, per_cpu(ds_sys_status, 0).locked_min_iva_freq);
+				}
+				if(per_cpu(ds_sys_status, 0).locked_min_l3_freq == 0){
+					if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0)
 						omap_device_set_rate(l3_dev, l3_dev, 200000000);
 					else
 						omap_device_set_rate(l3_dev, l3_dev, 100000000);
 				}
 				else{
-					omap_device_set_rate(l3_dev, l3_dev, ds_status.l3_min_freq_to_lock);
-//printk(KERN_WARNING "l3 locked %lu\n", ds_status.l3_min_freq_to_lock);
+					omap_device_set_rate(l3_dev, l3_dev, per_cpu(ds_sys_status, 0).locked_min_l3_freq);
 				}
-
 				break;
 			case DS_CPU_OP_INDEX_1:
 				omap_pm_cpu_set_freq(800000000);	// VDD1_OPP3	800MHz
 				omap_device_set_rate(mpu_dev, mpu_dev, 800000000);
+				if(per_cpu(ds_sys_status, 0).locked_min_iva_freq == 0){
 				omap_device_set_rate(iva_dev, iva_dev, 660000000);
-				/* A treatment to integrate DSP 800MHz patch into LG-DVFS */
-				if(ds_status.l3_min_freq_to_lock == 0){
-					if(ds_status.flag_do_post_early_suspend == 0)
+				}
+				else{
+					omap_device_set_rate(iva_dev, iva_dev, per_cpu(ds_sys_status, 0).locked_min_iva_freq);
+				}
+				if(per_cpu(ds_sys_status, 0).locked_min_l3_freq == 0){
+					if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0)
 						omap_device_set_rate(l3_dev, l3_dev, 200000000);
 					else
 						omap_device_set_rate(l3_dev, l3_dev, 100000000);
 				}
 				else{
-					omap_device_set_rate(l3_dev, l3_dev, ds_status.l3_min_freq_to_lock);
-//printk(KERN_WARNING "l3 locked %lu\n", ds_status.l3_min_freq_to_lock);
+					omap_device_set_rate(l3_dev, l3_dev, per_cpu(ds_sys_status, 0).locked_min_l3_freq);
 				}
-
 				break;
 			case DS_CPU_OP_INDEX_2:
 				omap_pm_cpu_set_freq(600000000);	// VDD1_OPP2	600MHz
 				omap_device_set_rate(mpu_dev, mpu_dev, 600000000);
+				if(per_cpu(ds_sys_status, 0).locked_min_iva_freq == 0){
 				omap_device_set_rate(iva_dev, iva_dev, 520000000);
-				/* A treatment to integrate DSP 800MHz patch into LG-DVFS */
-				if(ds_status.l3_min_freq_to_lock == 0){
-					if(ds_status.flag_do_post_early_suspend == 0)
+				}
+				else{
+					omap_device_set_rate(iva_dev, iva_dev, per_cpu(ds_sys_status, 0).locked_min_iva_freq);
+				}
+				if(per_cpu(ds_sys_status, 0).locked_min_l3_freq == 0){
+					if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0)
 						omap_device_set_rate(l3_dev, l3_dev, 200000000);
 					else
 						omap_device_set_rate(l3_dev, l3_dev, 100000000);
 				}
 				else{
-					omap_device_set_rate(l3_dev, l3_dev, ds_status.l3_min_freq_to_lock);
-//printk(KERN_WARNING "l3 locked %lu\n", ds_status.l3_min_freq_to_lock);
+					omap_device_set_rate(l3_dev, l3_dev, per_cpu(ds_sys_status, 0).locked_min_l3_freq);
 				}
-
 				break;
 			case DS_CPU_OP_INDEX_3:
 			default:
 				omap_pm_cpu_set_freq(300000000);	// VDD1_OPP1	300MHz
 				omap_device_set_rate(mpu_dev, mpu_dev, 300000000);
+				if(per_cpu(ds_sys_status, 0).locked_min_iva_freq == 0){
 				omap_device_set_rate(iva_dev, iva_dev, 260000000);
-				/* A treatment to integrate DSP 800MHz patch into LG-DVFS */
-				if(ds_status.l3_min_freq_to_lock == 0){
-					if(ds_status.flag_do_post_early_suspend == 0)
+				}
+				else{
+					omap_device_set_rate(iva_dev, iva_dev, per_cpu(ds_sys_status, 0).locked_min_iva_freq);
+				}
+				if(per_cpu(ds_sys_status, 0).locked_min_l3_freq == 0){
+#if 0
+					if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0)
 						omap_device_set_rate(l3_dev, l3_dev, 200000000);
 					else
+#endif
 						omap_device_set_rate(l3_dev, l3_dev, 100000000);
 				}
 				else{
-					omap_device_set_rate(l3_dev, l3_dev, ds_status.l3_min_freq_to_lock);
-//printk(KERN_WARNING "l3 locked %lu\n", ds_status.l3_min_freq_to_lock);
+					omap_device_set_rate(l3_dev, l3_dev, per_cpu(ds_sys_status, 0).locked_min_l3_freq);
 				}
-
 				break;
 		}
 
-		ds_status.flag_correct_cpu_op_update_path = 0;
-		ds_status.cpu_op_index = ds_status.target_cpu_op_index;
-		ds_status.cpu_op_last_update_sec = ds_counter.elapsed_sec;
-		ds_status.cpu_op_last_update_usec = ds_counter.elapsed_usec;
-		ds_status.flag_update_cpu_op = 0;
-	}
+	per_cpu(ds_cpu_status, ds_cpu).current_cpu_op_index = 
+		per_cpu(ds_cpu_status, ds_cpu).target_cpu_op_index;
+
+	per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_sec = 
+		per_cpu(ds_counter, ds_cpu).elapsed_sec;
+	per_cpu(ds_cpu_status, ds_cpu).cpu_op_last_update_usec = 
+		per_cpu(ds_counter, ds_cpu).elapsed_usec;
+
+	per_cpu(ds_cpu_status, ds_cpu).flag_update_cpu_op = 0;
 
 do_not_update:
+
+	per_cpu(ds_cpu_status, ds_cpu).cpu_op_mutex --;
 
 	return;
 }
 EXPORT_SYMBOL(ds_update_cpu_op);
 
 /*====================================================================
-	The main dynamic voltage scaling and
-	performance evaluation kernel function.
+	The functions which up or down the auxiliary cores.
 	====================================================================*/
+#if 0	// Need CONFIG_HOTPLUG_CPU
+void ds_up_aux_cpu(int ds_cpu, int cpu){
 
-/* This function is called at the end of context_swtich().
- */
-void do_dvs_suite(void){
+	if(cpu == 0) return;
 
-	unsigned int lc_target_cpu_op_index = 0;
-
-	/* Update ds_counter and ds_status.cpu_mode.
-	 */
-#if 0
-	ds_update_time_counter();
-	ds_status.cpu_mode = DS_CPU_MODE_DVS_SUITE;
-#endif
-
-#if 0	// WARNING: This code will cause a severe performance degradation!!!
-printk(KERN_WARNING "t%d %5d %5d %16s p%3d s%3d\n", 
-ds_status.type[ds_parameter.next_p->pid],
-ds_parameter.next_p->pid,
-ds_parameter.next_p->tgid,
-ds_parameter.next_p->comm,
-ds_parameter.next_p->prio,
-ds_parameter.next_p->static_prio
-);
-#endif
-
-	/* Trace task type.
-	 */
-	if(ds_status.flag_run_dvs == 1)
-		if(ds_status.type_fixed[ds_parameter.next_p->pid] == 0)
-			ds_detect_task_type();
-
-	/* If ds_status.flag_run_dvs == 1. This is set in binder.c */
-	if(ds_status.flag_run_dvs == 1){
-
-		ds_status.current_dvs_scheme = ds_configuration.dvs_scheme;
-
-		/* Perform the selected Dynamic Voltage Scaling Scheme to adjust CPU_OP.
-		 */
-		switch(ds_configuration.dvs_scheme){
-			case DS_DVS_NO_DVS:
-				lc_target_cpu_op_index = DS_CPU_OP_INDEX_MAX;
-				break;
-			case DS_DVS_MIN:
-				lc_target_cpu_op_index = DS_CPU_OP_INDEX_MIN;
-				break;
-			case DS_DVS_GPSCHEDVS:
-				ds_do_dvs_gpschedvs(&lc_target_cpu_op_index);
-				break;
-			case DS_DVS_MANUAL:
-				lc_target_cpu_op_index = ds_status.cpu_op_index;
-				break;
-		}
-
-		if(lc_target_cpu_op_index != ds_status.cpu_op_index){
-			ds_status.flag_update_cpu_op = 1;
-			ds_status.target_cpu_op_index = lc_target_cpu_op_index;
-		}
-	}
-
-	/* Initialize some instant information fields in ds_status.
-	 */
-
-	/* Update ds_counter.ret_from_system_call_no and ds_status.cpu_mode.
-	 */
-#if 0
-	ds_update_time_counter();
-	if(ds_parameter.entry_type == DS_ENTRY_RET_FROM_SYSTEM_CALL){
-		//ds_counter.ret_from_system_call_no ++;	// Not needed unless we want statistics.
-		/* If current is the idle process, i.e. the swapper.
-			 During the booting time, the PID of 0 is not necessarily for swapper.
-			 So, we check name rather than PID. */
-		if(current->pid == 0){
-			ds_status.cpu_mode = DS_CPU_MODE_IDLE;
-		}
-		else{
-			ds_status.cpu_mode = DS_CPU_MODE_TASK;
-		}
-	}
-	else{
-		ds_status.cpu_mode = DS_CPU_MODE_SCHEDULE;
-	}
-#endif
-
-	/* In provision for calling do_dvs_suite() at ENTRY(ret_from_system_call),
-		 initialize ds_parameter.
-	 */
-	ds_parameter.entry_type = DS_ENTRY_RET_FROM_SYSTEM_CALL;
-	ds_parameter.prev_p = 0;
-	ds_parameter.next_p = 0;
-
-	/* Delay the activation of LG-DVFS
-	 */
-	if(ds_configuration.on_dvs == 1 && ds_status.flag_run_dvs == 0){
-		if(ds_counter.elapsed_sec > DS_INIT_DELAY_SEC){
-			ds_status.flag_run_dvs = 1;
-			printk(KERN_INFO "[LG-DVFS] LG-DVFS was activated.\n");
-		}
-	}
-
-	/* Delay the enforcement of the min. freq. upon early suspend.
-	 */
-	if(ds_status.flag_post_early_suspend == 0){
-		ds_status.flag_do_post_early_suspend = 0;
-	}
-	else if((ds_status.post_early_suspend_sec * 1000000 + 
-			ds_status.post_early_suspend_usec + 
-			DS_POST_EARLY_SUSPEND_TIMEOUT_USEC) >
-			(ds_counter.elapsed_sec * 1000000 + 
-			ds_counter.elapsed_usec))
-	{
-		ds_status.flag_do_post_early_suspend = 0;
-	}
-	else{
-		ds_status.flag_do_post_early_suspend = 1;
+	if(ds_cpu == 0 && !cpu_active(cpu)){
+		cpu_hotplug_driver_lock();
+		cpu_up(cpu);
+		cpu_hotplug_driver_unlock();
 	}
 
 	return;
 }
 
-/* LKM START ***********************/
+void ds_down_aux_cpu(int ds_cpu, int cpu){
+
+	if(cpu == 0) return;
+
+	if(ds_cpu == 0 && cpu_active(cpu)){
+		cpu_hotplug_driver_lock();
+		cpu_down(cpu);
+		cpu_hotplug_driver_unlock();
+	}
+
+	return;
+}
+#endif
+
+/*====================================================================
+	The main dynamic voltage scaling and
+	performance evaluation kernel function.
+	====================================================================*/
+
+/* This function is called at the end of context_swtich()
+ * and update_process_times().
+	 */
+void do_dvs_suite(int ds_cpu){
+
+	unsigned int lc_target_cpu_op_index = 0;
+
+	if(per_cpu(ds_cpu_status, ds_cpu).dvs_suite_mutex != 0) return;
+	per_cpu(ds_cpu_status, ds_cpu).dvs_suite_mutex ++;
+
+	per_cpu(ds_cpu_status, ds_cpu).cpu_mode = DS_CPU_MODE_DVS_SUITE;
+
+	/* dvs_suite has been activated. */
+	if(ds_control.flag_run_dvs == 1)
+	{
+		/* Delayed application of the special treatment upon early suspend */
+		if(ds_cpu == 0){
+			if(per_cpu(ds_sys_status, 0).flag_post_early_suspend == 1){
+				if(per_cpu(ds_sys_status, 0).flag_do_post_early_suspend == 0){
+					if(per_cpu(ds_sys_status, 0).do_post_early_suspend_sec <
+						per_cpu(ds_counter, ds_cpu).elapsed_sec)
+					{
+						per_cpu(ds_sys_status, 0).flag_do_post_early_suspend = 1;
+					}
+		}
+		}
+	}
+
+		/* Detect task type, set task priority, and determine cpu frequency */
+		if(ds_parameter.entry_type == DS_ENTRY_SWITCH_TO)
+		{
+			if((per_cpu(ds_sys_status, 0).type[ds_parameter.next_p->pid] & 
+				DS_TYPE_FIXED_M) == 0)
+			{
+				ds_detect_task_type(ds_cpu);
+			}
+		}
+		else{	// DS_ENTRY_TIMER_IRQ
+
+			/* Check if consecutive touches have been ended - Begin */
+			if(ds_cpu == 0){
+				if(per_cpu(ds_sys_status, 0).flag_consecutive_touches == 1){
+					if((per_cpu(ds_counter, ds_cpu).elapsed_sec - 
+						per_cpu(ds_sys_status, 0).new_touch_sec) * 1000000 +
+						(per_cpu(ds_counter, ds_cpu).elapsed_usec - 
+						per_cpu(ds_sys_status, 0).new_touch_usec) > DS_CONT_TOUCH_THRESHOLD_USEC)
+					{
+						per_cpu(ds_sys_status, 0).flag_consecutive_touches = 0;
+						per_cpu(ds_sys_status, 0).flag_long_consecutive_touches = 0;
+		}
+		}
+	}
+			/* Check if consecutive touches have been ended - End */
+
+			ds_do_dvs_gpschedvs(ds_cpu, &lc_target_cpu_op_index);
+
+			/* Schedule the actual CPU frequency and voltage changes. */
+			if(lc_target_cpu_op_index != per_cpu(ds_cpu_status, ds_cpu).current_cpu_op_index)
+			{
+				per_cpu(ds_cpu_status, ds_cpu).flag_update_cpu_op = 1;
+				per_cpu(ds_cpu_status, ds_cpu).target_cpu_op_index = lc_target_cpu_op_index;
+			}
+
+			/* Control the auxiliary cores - Begin */
+#if 0
+			if(ds_cpu == 0){
+				if(per_cpu(ds_sys_status, 0).flag_long_consecutive_touches == 1)
+					ds_down_aux_cpu(ds_cpu, 1);
+	}
+#endif
+			/* Control the auxiliary cores - End */
+		}
+	}
+
+	/* dvs_suite has not been activated yet. */
+	else{
+
+		/* Delayed activation of LG-DVFS */
+		if(ds_cpu == 0){
+			if(per_cpu(ds_counter, ds_cpu).elapsed_sec > DS_INIT_DELAY_SEC){
+				ds_control.flag_run_dvs = 1;
+				printk(KERN_INFO "[LG-DVFS] LG-DVFS starts running.\n");
+		}
+	}
+	}
+
+	if(ds_parameter.entry_type == DS_ENTRY_TIMER_IRQ)
+	{
+		if(current->pid == 0)
+			per_cpu(ds_cpu_status, ds_cpu).cpu_mode = DS_CPU_MODE_IDLE;
+		else
+			per_cpu(ds_cpu_status, ds_cpu).cpu_mode = DS_CPU_MODE_TASK;
+	}
+	else{	// DS_ENTRY_SWITCH_TO
+		per_cpu(ds_cpu_status, ds_cpu).cpu_mode = DS_CPU_MODE_SCHEDULE;
+	}
+
+	per_cpu(ds_cpu_status, ds_cpu).dvs_suite_mutex --;
+
+	return;
+}
+
+void do_dvs_suite_timer(struct work_struct *work){
+
+	int ds_cpu = smp_processor_id();
+
+	ds_update_cpu_op(ds_cpu);
+
+	return;
+}
+
+inline void dvs_suite_timer_init(void){
+
+	INIT_WORK(&dvs_suite_work, do_dvs_suite_timer);
+
+	return;
+}
+
+inline void dvs_suite_timer_exit(void){
+
+	cancel_work_sync(&dvs_suite_work);
+
+	return;
+}
+
 static int __init lg_dvfs_init(void)
 {
-	printk(KERN_INFO "LG-DVFS init\n");
+	printk(KERN_WARNING "lg_dvfs_init\n");
+
 	return 0;
 }
 
 static void __exit lg_dvfs_exit(void)
 {
-	printk(KERN_INFO "LG-DVFS exit\n");
+	printk(KERN_WARNING "lg_dvfs_exit\n");
 }
+
+MODULE_AUTHOR(DRIVER_AUTHOR);
+MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_SUPPORTED_DEVICE("cpu");
+//MODULE_LICENSE("GPL");
 
 module_init(lg_dvfs_init);
 module_exit(lg_dvfs_exit);
-
-//MODULE_LICENSE("GPL");
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESC);
-//MODULE_SUPPORTED_DEVICE("cpu");
-/* LKM END *************************/

@@ -501,8 +501,9 @@ static unsigned int wm9093_read_reg(struct i2c_client *client, unsigned char reg
 #endif
 }
 
-static int wm9093_write_reg(struct i2c_client *client, u8 reg, int val)
+static void wm9093_write_reg(struct i2c_client *client, u8 reg, int val)
 {
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
 #if 1	// dajin.kim temp code
 	int ret;
 
@@ -513,9 +514,11 @@ static int wm9093_write_reg(struct i2c_client *client, u8 reg, int val)
 	if (ret < 0)
 		dev_err(&client->dev, "%s: err %d\n", __func__, ret);			
 
-	return ret;
+//	return ret;
+        return ;
 
 #else	// original code
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
 	int err;
 
 	struct i2c_msg	msg;
@@ -535,7 +538,7 @@ static int wm9093_write_reg(struct i2c_client *client, u8 reg, int val)
 		dev_err(&client->dev, "i2c write error\n");
 	}
 
-	return err;
+	return;
 #endif
 }
 
@@ -543,7 +546,7 @@ void wm_delay_msec(int msec)
 {
     unsigned long start;
 	start = jiffies;
-	while (time_before(jiffies, start + (msec * HZ) / 1000)) {
+	while (time_before(jiffies, start+(msec*HZ)/1000)) {
         udelay(10);
 	}
 }
@@ -551,22 +554,23 @@ void wm_delay_msec(int msec)
 void wm9093_write_table(wm9093_reg_type* table)
 {
     int i;
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
 	int result =0;
-
-	for (i = 0; table[i].irc != WM9093_END_SEQ; i++) {
-		if (table[i].irc == WM9093_DELAY) {
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
+	for (i=0; table[i].irc!= WM9093_END_SEQ; i++) {
+		if(table[i].irc == WM9093_DELAY){
 			wm_delay_msec(table[i].data);
-		} else {
+		}
+		else {
 			if (wm9093_i2c_dev != NULL)
-				result= wm9093_write_reg(wm9093_i2c_dev->client, table[i].address, table[i].data);
+				wm9093_write_reg(wm9093_i2c_dev->client, 
+						 table[i].address, 
+						 table[i].data);
 			else
 				printk(KERN_ERR "wm9093 i2c_dev is null");
 	    }
-
-		if (result < 0) break;
 	}
 }
-
 int pre_voice_curmode = 0x00;	//audio mode
 
 #if 1	//junyeop.kim@lge.com, call initial noise workaround
@@ -597,24 +601,24 @@ int wm9093_get_curmode(void)
     return (int)wm9093_amp_dev->wm9093_mode;
 }
 
-//int boot_cnt =0;
+int boot_cnt =0;
 void wm9093_configure_path(wm9093_mode_enum mode)
 {
 	printk("[LUCKYJUN77] wm9093_configure_path : %d\n", mode);
 
-	if (wm9093_amp_dev->wm9093_mode == mode)
+	if(wm9093_amp_dev->wm9093_mode == mode)
 		return;
-
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
 #if 0
-//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
+	//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
 	if(wm9093_call_status == 1)
 	{
 		printk("[LUCKYJUN77] wm9093_control_status : %d\n", wm9093_call_status);
 		return;
 	}
-//20100705 junyeop.kim@lge.com, amp control on/off[END_LGE]
+	//20100705 junyeop.kim@lge.com, amp control on/off[END_LGE]
 #endif
-	
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
 #if 0
 	if(mode == OFF_MODE){
 		if(wm9093_amp_dev->wm9093_pstatus > 0 )
@@ -625,11 +629,12 @@ void wm9093_configure_path(wm9093_mode_enum mode)
 	}
 #endif
 
-// 20100812 junyeop.kim@lge.com, reduce the pop noise when changing devices[START_LGE]
-	if (wm9093_amp_dev->wm9093_mode != OFF_MODE && mode != OFF_MODE) 	
+	// 20100812 junyeop.kim@lge.com, reduce the pop noise when changing devices[START_LGE]
+	if(wm9093_amp_dev->wm9093_mode != OFF_MODE && mode != OFF_MODE) 	
             wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
-// 20100812 junyeop.kim@lge.com, reduce the pop noise when changing devices[END_LGE]
-	switch (mode) {
+	// 20100812 junyeop.kim@lge.com, reduce the pop noise when changing devices[END_LGE]
+
+	switch(mode){
 #if 0    
         case OFF_MODE : if(wm9093_amp_dev->wm9093_pstatus == 0){
 			                wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
@@ -637,36 +642,34 @@ void wm9093_configure_path(wm9093_mode_enum mode)
         	            }
 						break;
 #else
-	case OFF_MODE:
+		case OFF_MODE : 
 		wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
 						wm9093_amp_dev->wm9093_mode = OFF_MODE;
-	//	wm_delay_msec(100);	//20110712.jungsoo1221.lee - when Call Answer, too Slow	// 20100601 junyeop.kim@lge.com, remove the pop noise in the shut down[START_LGE]
+			wm_delay_msec(100);		// 20100601 junyeop.kim@lge.com, remove the pop noise in the shut down[START_LGE]						
 						break;
+
 #endif						
-	case HEADSET_AUDIO_MODE:
+		case HEADSET_AUDIO_MODE : 
 		wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_tab[0]);
 						    wm9093_amp_dev->wm9093_mode = HEADSET_AUDIO_MODE;
 							break;
-	case SPEAKER_AUDIO_MODE:
-#if 0
-		if (boot_cnt < 10)
+		case SPEAKER_AUDIO_MODE :
+			if(boot_cnt < 10)
 								boot_cnt++;
-		if ((get_headset_type() != 0) && (boot_cnt < 4)) {
+			if((get_headset_type() != 0) && (boot_cnt < 4)){
 								wm9093_write_table((wm9093_reg_type*)&wm9093_test_tab[0]);
 								printk(KERN_INFO "@@WM9093@@ BOOT SOUND HEADSETv\n");
-		} else {
-#endif
-		{
+			}
+			else{
 			                    wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_tab[0]);
 							}
 	                        wm9093_amp_dev->wm9093_mode = SPEAKER_AUDIO_MODE;
 							break;
-
-	case SPEAKER_HEADSET_DUAL_AUDIO_MODE:
+		case SPEAKER_HEADSET_DUAL_AUDIO_MODE : 
 		wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_hp_tab[0]);
 						 wm9093_amp_dev->wm9093_mode = SPEAKER_HEADSET_DUAL_AUDIO_MODE;
 			             break;
-#if 1//20110324 jisun.kwon :TD89115 we don't need to use 'delay'//jungsoo1221.lee - P970 Merge             
+#if 1//20110324 jisun.kwon :TD89115 we don't need to use 'delay'			             
 	    case RECEIVER_CALL_MODE : wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = RECEIVER_CALL_MODE;
 						   break;
@@ -677,7 +680,7 @@ void wm9093_configure_path(wm9093_mode_enum mode)
 						   wm9093_amp_dev->wm9093_mode = HEADSET_CALL_MODE;
 						   break;
 #else
-	case RECEIVER_CALL_MODE: 
+		case RECEIVER_CALL_MODE : 
 		if (pre_voice_curmode == 0 && voice_get_curmode() != 0x00 && wm9093_call_status != 0) {	//first call setting 
 			printk("[LUCKYJUN77] RECEIVER_CALL_MODE first call setting\n");
 			wm9093_amp_dev->wm9093_mode = RECEIVER_CALL_MODE;	
@@ -688,8 +691,7 @@ void wm9093_configure_path(wm9093_mode_enum mode)
 			wm9093_amp_dev->wm9093_mode = RECEIVER_CALL_MODE;
 		}
 		break;
-
-	case SPEAKER_CALL_MODE: 
+		case SPEAKER_CALL_MODE :
 		if (pre_voice_curmode == 0 && voice_get_curmode() != 0x00 && wm9093_call_status != 0) {	//first call setting
 			printk("[LUCKYJUN77] SPEAKER_CALL_MODE first call setting\n");						   
 			wm9093_amp_dev->wm9093_mode = SPEAKER_CALL_MODE;	
@@ -700,8 +702,7 @@ void wm9093_configure_path(wm9093_mode_enum mode)
 			wm9093_amp_dev->wm9093_mode = SPEAKER_CALL_MODE;
 		}
 		break;
-
-	case HEADSET_CALL_MODE: 
+		case HEADSET_CALL_MODE : 
 		if (pre_voice_curmode == 0 && voice_get_curmode() != 0x00 && wm9093_call_status != 0) {	//first call setting
 			printk("[LUCKYJUN77] HEADSET_CALL_MODE first call setting\n");
 			wm9093_amp_dev->wm9093_mode = HEADSET_CALL_MODE;	
@@ -713,36 +714,37 @@ void wm9093_configure_path(wm9093_mode_enum mode)
 		}		
 		break;
 #endif						   
-	case RECEIVER_VOIP_MODE:
+		case RECEIVER_VOIP_MODE : 
 		wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_voip_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = RECEIVER_VOIP_MODE;
 						   break;
-
-	case SPEAKER_VOIP_MODE:
+		case SPEAKER_VOIP_MODE : 
 		wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_voip_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = SPEAKER_VOIP_MODE;
 						   break;
-
-	case HEADSET_VOIP_MODE:
+		case HEADSET_VOIP_MODE : 
 		wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_voip_tab[0]);
 						   wm9093_amp_dev->wm9093_mode = HEADSET_VOIP_MODE;
 						   break;
 		//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START]
-	case SPEAKER_FMR_MODE:
+
+		case SPEAKER_FMR_MODE : 
+//LGSI_VS910_FroyoToGB_FM Volume_sundaram.rajendran@lge.com_09Aug2011_START
 			  	           wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMout_tab[0]);
 		wm_delay_msec(50);
 		wm9093_fmradio_volume(s_volume);			  
 			               wm9093_amp_dev->wm9093_mode = SPEAKER_FMR_MODE;
 							break;								 
 								 
-	case HEADSET_FMR_MODE:
+		case HEADSET_FMR_MODE : 
 			               wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMhp_tab[0]);
 		wm_delay_msec(50);
 		wm9093_fmradio_volume(s_volume); 
 		                   wm9093_amp_dev->wm9093_mode = HEADSET_FMR_MODE;
 							break;				   
 	      //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 				   
-	default:
+//LGSI_VS910_FroyoToGB_FM Volume_sundaram.rajendran@lge.com_09Aug2011_END
+		default :
 			     break;
     }
 	pre_voice_curmode = voice_get_curmode();
@@ -759,9 +761,9 @@ void wm9093_fmradio_volume(wm9093_fmvolume_enum volume)
 {      
  s_volume = volume;
 	s_modes = volume;//20101225 inbang.park@lge.com Wake lock for FM radio
-		 	
 	if (wm9093_i2c_dev != NULL) {
-		switch (volume) {
+		switch(volume) {
+//LGSI_VS910_FroyoToGB_FM Volume_sundaram.rajendran@lge.com_09Aug2011_START
 		case LEVEL_15: SET_FM_VOL(0x12C, 0x134); break;
 		case LEVEL_14: SET_FM_VOL(0x129, 0x132); break;
 		case LEVEL_13: SET_FM_VOL(0x126, 0x130); break;
@@ -779,44 +781,60 @@ void wm9093_fmradio_volume(wm9093_fmvolume_enum volume)
 		case LEVEL_1 : SET_FM_VOL(0x102, 0x118); break;
 		case LEVEL_OFF:SET_FM_VOL(0x140, 0x140); break;
 		case LEVEL_reset: break;
+//LGSI_VS910_FroyoToGB_FM Volume_sundaram.rajendran@lge.com_09Aug2011_END
            }
- 		printk(KERN_INFO "FMvolume_%d\n", volume);
-	} else {
-	    printk(KERN_ERR "wm9093 i2c_dev is null");
 	}
+	else
+		printk(KERN_ERR "wm9093 i2c_dev is null");
 }
-//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
 
+//20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
 int wm9093_ext_suspend()
 {
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
 	if (wm9093_amp_dev->wm9093_mode != 0)
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
 	wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
 	return 0;
 }
 
 int wm9093_ext_resume()
 {
-	switch (wm9093_amp_dev->wm9093_mode) {
-	case OFF_MODE: //wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
+	switch(wm9093_amp_dev->wm9093_mode){
+		case OFF_MODE : 
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
+			//wm9093_write_table((wm9093_reg_type*)&wm9093_pwroff_tab[0]);
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
 						break;
-	case HEADSET_AUDIO_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_tab[0]);
+		case HEADSET_AUDIO_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_tab[0]);
 						    	break;
-	case SPEAKER_AUDIO_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_tab[0]);
+		case SPEAKER_AUDIO_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_tab[0]);
 	                        	break;
-	case SPEAKER_HEADSET_DUAL_AUDIO_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_hp_tab[0]);
+		case SPEAKER_HEADSET_DUAL_AUDIO_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_hp_tab[0]);
 						 		             break;
-	case RECEIVER_CALL_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
+		case RECEIVER_CALL_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_tab[0]);
 						   		   break;
-	case SPEAKER_CALL_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_call_tab[0]);
+		case SPEAKER_CALL_MODE :
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_call_tab[0]);
 						   		   break;
-	case HEADSET_CALL_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_hp_tab[0]);
+		case HEADSET_CALL_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_hp_tab[0]);
 						   		   break;
-	case RECEIVER_VOIP_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_voip_tab[0]);
+		case RECEIVER_VOIP_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in3_to_out_voip_tab[0]);
 								break;
-	case SPEAKER_VOIP_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_voip_tab[0]);
+		case SPEAKER_VOIP_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in2_to_out_voip_tab[0]);
 								break;
-	case HEADSET_VOIP_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_voip_tab[0]);
+		case HEADSET_VOIP_MODE : 
+			wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_hp_voip_tab[0]);
 								break;
+			
+//LGSI_VS910_FroyoToGB_FM Volume_sundaram.rajendran@lge.com_09Aug2011_START
 	     //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START]
 	case SPEAKER_FMR_MODE: wm9093_write_table((wm9093_reg_type*)&wm9093_in1_to_FMout_tab[0]);
 		wm_delay_msec(50); 
@@ -827,7 +845,7 @@ int wm9093_ext_resume()
 		wm9093_fmradio_volume(s_volume); 		  
 								break;		
 	      //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
-		
+//LGSI_VS910_FroyoToGB_FM Volume_sundaram.rajendran@lge.com_09Aug2011_END
 		default :
 			     break;
     }
@@ -835,7 +853,7 @@ int wm9093_ext_resume()
 	return 0;
 }
 
-//20101222 inbang.park@lge.com Wake lock for  FM Radio [START] - jungsoo1221.lee - P970 Merge
+//20101222 inbang.park@lge.com Wake lock for  FM Radio [START]
 void fmradio_configure_path(wm9093_fmvolume_enum mode)
 {
 	printk("[inbangpark] :fmradio_configure_path %d\n",mode);
@@ -850,13 +868,10 @@ void fmradio_configure_path(wm9093_fmvolume_enum mode)
 		break;
 	}
 }
-//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
-//20101222 inbang.park@lge.com Wake lock for  FM Radio [START] //jungsoo1221.lee - P970 Merge
 int fmradio_get_curmode()
 {
 	return cur_fmradio_mode;
 }
-//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
 EXPORT_SYMBOL(wm9093_get_curmode);
 EXPORT_SYMBOL(wm9093_configure_path);
 EXPORT_SYMBOL(wm9093_ext_suspend);
@@ -864,10 +879,8 @@ EXPORT_SYMBOL(wm9093_ext_resume);
 //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [START] 
 EXPORT_SYMBOL(wm9093_fmradio_volume);
 //20101205 inbang.park@lge.com Add STREAM  for  FM Radio [END] 
-//20101222 inbang.park@lge.com Wake lock for  FM Radio [START]
 EXPORT_SYMBOL(fmradio_configure_path);
 EXPORT_SYMBOL(fmradio_get_curmode);
-//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
 
 ssize_t wm9093_show_level(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -876,47 +889,60 @@ ssize_t wm9093_show_level(struct device *dev, struct device_attribute *attr, cha
 
 	wm9093_dev = dev_get_drvdata(dev);
 
-	r += sprintf(buf + r, "wm9093 mode is : %d\n", wm9093_dev->wm9093_dev->wm9093_mode);
+	r += sprintf(buf+r, "wm9093 mode is : %d\n",wm9093_dev->wm9093_dev->wm9093_mode);
 
 	return r;
 
 }
 
-ssize_t wm9093_store_level(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+ssize_t wm9093_store_level(struct device *dev, 
+			   struct device_attribute *attr, 
+			   const char *buf, 
+			   size_t count)
 {
     int level;
 
 	level = simple_strtoul(buf, NULL, 10);
 
-	switch (level) {
+	switch(level) {
 		//turn off
-	case 0: wm9093_configure_path(OFF_MODE);
+		case 0 : 
+			wm9093_configure_path(OFF_MODE);
 			    break;
 		//set spk mode
-	case 1: wm9093_configure_path(SPEAKER_AUDIO_MODE);
+		case 1 : 
+			wm9093_configure_path(SPEAKER_AUDIO_MODE);
 			    break;
 		//set headset mode
-	case 2: wm9093_configure_path(HEADSET_AUDIO_MODE);
+		case 2 : 
+			wm9093_configure_path(HEADSET_AUDIO_MODE);
 			    break;
 		//set bypass mode
-	case 3: wm9093_configure_path(RECEIVER_CALL_MODE);
+		case 3 : 
+			wm9093_configure_path(RECEIVER_CALL_MODE);
 			    break;
 		//set dual mode
-	case 4: wm9093_configure_path(SPEAKER_HEADSET_DUAL_AUDIO_MODE);
+		case 4 : 
+			wm9093_configure_path(SPEAKER_HEADSET_DUAL_AUDIO_MODE);
 			    break;
-	case 5: wm9093_configure_path(SPEAKER_CALL_MODE);
+		case 5 :
+			wm9093_configure_path(SPEAKER_CALL_MODE);
 			    break;
-	case 6: wm9093_configure_path(HEADSET_CALL_MODE);
+		case 6 :
+			wm9093_configure_path(HEADSET_CALL_MODE);
 			    break;
-	default:
+		default :
 			    break;
 	}
+
 	return count;
 }
 
 DEVICE_ATTR(wm9093_path, 0664, wm9093_show_level, wm9093_store_level);
 
-static ssize_t wm9093_reg_show(struct device *dev, struct device_attribute *attr, char *buf)
+static ssize_t wm9093_reg_show(struct device *dev, 
+			       struct device_attribute *attr, 
+			       char *buf)
 {
     int r =0;
 	int r_data;
@@ -1020,7 +1046,10 @@ static ssize_t wm9093_reg_show(struct device *dev, struct device_attribute *attr
 	return r;
 }
 
-ssize_t wm9093_reg_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+ssize_t wm9093_reg_store(struct device *dev, 
+			 struct device_attribute *attr, 
+			 const char *buf, 
+			 size_t count)
 {
     int reg, data;
 	char *r, *d;
@@ -1046,23 +1075,30 @@ ssize_t wm9093_reg_store(struct device *dev, struct device_attribute *attr, cons
 #if 1	// 20100429 junyeop.kim@lge.com [START_LGE]
 static DEVICE_ATTR(wm9093_data, 0644, wm9093_reg_show, wm9093_reg_store);
 #else
-static DEVICE_ATTR(wm9093_data, 0666, wm9093_reg_show, wm9093_reg_store);
+static DEVICE_ATTR(wm9093_data, 0664, wm9093_reg_show, wm9093_reg_store);
 #endif	// 20100426 junyeop.kim@lge.com [END_LGE]
 
-//20101209 junyeop.kim@lge.com, reduce the outgoing call noise (0 : incoming call, 1 :other case) [START_LGE]
-ssize_t wm9093_show_status(struct device *dev, struct device_attribute *attr, char *buf)
+//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
+ssize_t wm9093_show_status(struct device *dev, 
+			   struct device_attribute *attr, 
+			   char *buf)
 {
+
     struct wm9093_i2c_device *wm9093_dev;
 	int r = 0;
 
 	wm9093_dev = dev_get_drvdata(dev);
-
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
 	r += sprintf(buf + r, "wm9093 status is : %d\n", wm9093_call_status);
-
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
 	return r;
+
 }
 
-ssize_t wm9093_store_status(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+ssize_t wm9093_store_status(struct device *dev, 
+			    struct device_attribute *attr, 
+			    const char *buf, 
+			    size_t count)
 {
     int status;
 
@@ -1071,14 +1107,18 @@ ssize_t wm9093_store_status(struct device *dev, struct device_attribute *attr, c
 	printk("[LUCKYJUN77] status: %d\n", status);
 
 	if (status == 0 || status == 1) {
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
 		wm9093_call_status = status;
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
 	}
 
 	return count;
 }
 
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_START
 DEVICE_ATTR(wm9093_status, 0664, wm9093_show_status, wm9093_store_status);	
-//20101209 junyeop.kim@lge.com, reduce the outgoing call noise (0 : incoming call, 1 :other case) [END_LGE]
+//LGSI_VS910_FroyoToGB_Audio_Cal shidhar.ms@lge.com_29Jul2011_END
+//20100705 junyeop.kim@lge.com, amp control on/off[END_LGE]
 
 static void wm9093_init(struct i2c_client *client)
 {
@@ -1100,7 +1140,7 @@ static int __init wm9093_probe(struct i2c_client *client, const struct i2c_devic
 	wm9093_i2c_dev->client = client;
 	wm9093_i2c_dev->wm9093_dev = wm9093_amp_dev;
 
-//junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
+	//junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
     struct device *wm9093_dev = &client->dev;
     wm9093_reg = regulator_get(wm9093_dev,"vpll2");
     if (wm9093_reg == NULL) {
@@ -1108,7 +1148,7 @@ static int __init wm9093_probe(struct i2c_client *client, const struct i2c_devic
 	}
 
     regulator_enable(wm9093_reg);
-//junyeop.kim@lge.com, codec power enable for vpll2 [END_LGE]
+	//junyeop.kim@lge.com, codec power enable for vpll2 [END_LGE]
 
 	i2c_set_clientdata(client, wm9093_i2c_dev);
 
@@ -1129,7 +1169,9 @@ static int wm9093_remove(struct i2c_client *client)
 	i2c_set_clientdata(client, NULL);
     device_remove_file(&client->dev, &dev_attr_wm9093_path);
 	device_remove_file(&client->dev, &dev_attr_wm9093_data);
-	device_remove_file(&client->dev, &dev_attr_wm9093_status);		//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
+
+	//20100705 junyeop.kim@lge.com, amp control on/off[START_LGE]
+	device_remove_file(&client->dev, &dev_attr_wm9093_status);
 
 	kfree(wm9093_amp_dev);
 	kfree(wm9093_i2c_dev);
@@ -1139,21 +1181,23 @@ static int wm9093_remove(struct i2c_client *client)
 //junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
 static int wm9093_suspend(struct i2c_client *client, pm_message_t mesg)
 {
-//For_Resume_Speed	printk("[LUCKYJUN77]wm9093_suspend\n");
+	printk("[LUCKYJUN77]wm9093_suspend\n");
 	if (wm9093_amp_dev->wm9093_mode == OFF_MODE) {	//junyeop.kim@lge.com
-		printk("%s : WM9093 Sleep State \n", __func__);
     regulator_disable(wm9093_reg);	
-	} else {
-		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0xee, VPLL2_DEV_GRP );   //junyeop.kim@lge.com, 20100826 change vpll2 power grp [START_LGE]
-		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x35 );  
-		printk("%s : WM9093 Wake State \n",__func__);
 	}
+	else {
+		//junyeop.kim@lge.com, 20100826 change vpll2 power grp [START_LGE]
+		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0xee, VPLL2_DEV_GRP );   
+		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x35 );  
+	}
+
 	return 0;
+
 }
 
 static int wm9093_resume(struct i2c_client *client)
 {
-//For_Resume_Speed	printk("[LUCKYJUN77]wm9093_resume\n");
+	printk("[LUCKYJUN77]wm9093_resume\n");
 	if(wm9093_amp_dev->wm9093_mode == OFF_MODE)	//junyeop.kim@lge.com, test
     regulator_enable(wm9093_reg);		
 
@@ -1177,10 +1221,10 @@ static const struct i2c_device_id wm9093_ids[] = {
 static struct i2c_driver wm9093_i2c_driver = {
 	.probe = wm9093_probe,
 	.remove = wm9093_remove,
-//junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
+	//junyeop.kim@lge.com, codec power enable for vpll2 [START_LGE]
 	.suspend	= wm9093_suspend,
 	.resume		= wm9093_resume,
-//junyeop.kim@lge.com, codec power enable for vpll2 [END_LGE]
+	//junyeop.kim@lge.com, codec power enable for vpll2 [END_LGE]
 	.id_table	= wm9093_ids,
 	.driver = {
 		.name = WM9093_I2C_NAME,

@@ -244,11 +244,6 @@ void tcp_select_initial_window(int __space, __u32 mss,
 			*rcv_wnd = init_cwnd * mss;
 	}
 
-//#ifdef LG_DATA_SPRINT_TCP_PARAMETER_OPTIMIZE
-	(*rcv_wscale) = 0;
-	*rcv_wnd = 1024 * 45;
-//#endif
-
 	/* Set the clamp no higher than max representable value */
 	(*window_clamp) = min(65535U << (*rcv_wscale), *window_clamp);
 }
@@ -2541,11 +2536,6 @@ static void tcp_connect_init(struct sock *sk)
 	if (tp->af_specific->md5_lookup(sk, sk) != NULL)
 		tp->tcp_header_len += TCPOLEN_MD5SIG_ALIGNED;
 #endif
-
-//#ifdef LG_DATA_SPRINT_TCP_PARAMETER_OPTIMIZE
-//CONFIG_LGE_TCP_MTU_1472 2010.07.20 [ih.jang@lge.com] LGTN-670-Gware-20997
-//	tp->rx_opt.user_mss = 1432; //adjust_mss=1432[MTU=1472]	// cooper.jeong@lge.com  setting to android\system\core\rootdir\etc\init.gprs-pppd
-//#endif
 
 	/* If user gave his TCP_MAXSEG, record it to clamp */
 	if (tp->rx_opt.user_mss)

@@ -65,7 +65,7 @@
 #include <sdiovar.h>
 
 /* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
-//extern volatile bool dhd_mmc_suspend;
+extern volatile bool dhd_mmc_suspend;
 /* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
 
 #ifndef DHDSDIO_MEM_DUMP_FNAME
@@ -4372,9 +4372,11 @@ dhdsdio_isr(void *arg)
 	DHD_TRACE(("%s: Enter\n", __FUNCTION__));
 
 /* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
-//#if defined(CONFIG_LGE_BCM432X_PATCH)
-//	dhd_mmc_suspend = FALSE;
-//#endif
+#if defined(CONFIG_LGE_BCM432X_PATCH)
+/*Akhil-Wifi Reset during Unlock-8 Sep 2011 -Start*/
+	//akhil commented dhd_mmc_suspend = FALSE;
+/*Akhil-Wifi Reset during Unlock-8 Sep 2011 -End*/
+#endif
 /* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-01, <bug fix for lcd lock > */
 
 	if (!bus) {
@@ -5869,9 +5871,8 @@ dhd_bus_devreset(dhd_pub_t *dhdp, uint8 flag)
 #endif /* !defined(IGNORE_ETH0_DOWN) */
 			/* save country settinng if was pre-setup with priv ioctl */
 			dhd_os_proto_block(dhdp);
-/*
 			dhd_wl_ioctl_cmd(bus->dhd, WLC_GET_COUNTRY,
-				bus->dhd->country_code, sizeof(bus->dhd->country_code), FALSE, 0);*/
+				bus->dhd->country_code, sizeof(bus->dhd->country_code), FALSE, 0);
 			dhd_os_proto_unblock(dhdp);
 			/* Expect app to have torn down any connection before calling */
 			/* Stop the bus, disable F2 */

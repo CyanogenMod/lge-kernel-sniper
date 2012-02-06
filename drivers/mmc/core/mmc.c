@@ -21,7 +21,9 @@
 #include "bus.h"
 #include "mmc_ops.h"
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com for eMMC v4.41 support*/
 #define CONFIG_EMMC_V4_41_SUPPORT
+/*LGE_CHANGE_E sunggyun.yu@lge.com for eMMC v4.41 support*/
 
 static const unsigned int tran_exp[] = {
 	10000,		100000,		1000000,	10000000,
@@ -116,11 +118,13 @@ static int mmc_decode_cid(struct mmc_card *card)
 static int mmc_decode_csd(struct mmc_card *card)
 {
 	struct mmc_csd *csd = &card->csd;
+/*LGE_CHANGE_S sunggyun.yu@lge.com for eMMC v4.41 support*/
 #ifdef CONFIG_EMMC_V4_41_SUPPORT
 	unsigned int e, m;
 #else
 	unsigned int e, m, csd_struct;
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for eMMC v4.41 support*/
 	u32 *resp = card->raw_csd;
 
 	/*
@@ -128,6 +132,7 @@ static int mmc_decode_csd(struct mmc_card *card)
 	 * v1.2 has extra information in bits 15, 11 and 10.
 	 * also support the for eMMC v4.4 & v4.41. LGE_CHANGE sunggyun.yu@lge.com for eMMC v4.41 support
 	 */
+/*LGE_CHANGE_S sunggyun.yu@lge.com for eMMC v4.41 support*/
 #ifdef CONFIG_EMMC_V4_41_SUPPORT
 	csd->structure = UNSTUFF_BITS(resp, 126, 2);
 	if (csd->structure == 0) {
@@ -135,12 +140,15 @@ static int mmc_decode_csd(struct mmc_card *card)
 	csd_struct = UNSTUFF_BITS(resp, 126, 2);
 	if (csd_struct > 3) {
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for eMMC v4.41 support*/
 		printk(KERN_ERR "%s: unrecognised CSD structure version %d\n",
+/*LGE_CHANGE_S sunggyun.yu@lge.com for eMMC v4.41 support*/
 #ifdef CONFIG_EMMC_V4_41_SUPPORT
 			mmc_hostname(card->host), csd->structure);
 #else
 			mmc_hostname(card->host), csd_struct);
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for eMMC v4.41 support*/
 		return -EINVAL;
 	}
 
@@ -223,6 +231,7 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 		goto out;
 	}
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com for eMMC v4.41 support*/
 #ifdef CONFIG_EMMC_V4_41_SUPPORT
 	/* Version is coded in the CSD_STRUCTURE byte in the EXT_CSD register */
 	if (card->csd.structure == 3) {
@@ -236,9 +245,11 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 		}
 	}
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for eMMC v4.41 support*/
 
 	card->ext_csd.rev = ext_csd[EXT_CSD_REV];
 	if (card->ext_csd.rev > 5) {
+/*LGE_CHANGE_S sunggyun.yu@lge.com for eMMC v4.41 support*/
 #ifdef CONFIG_EMMC_V4_41_SUPPORT
 		printk(KERN_ERR "%s: unrecognised EXT_CSD revision %d\n",
 			mmc_hostname(card->host), card->ext_csd.rev);
@@ -247,6 +258,7 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 			"version %d\n", mmc_hostname(card->host),
 			card->ext_csd.rev);
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for eMMC v4.41 support*/
 		err = -EINVAL;
 		goto out;
 	}
@@ -257,12 +269,14 @@ static int mmc_read_ext_csd(struct mmc_card *card)
 			ext_csd[EXT_CSD_SEC_CNT + 1] << 8 |
 			ext_csd[EXT_CSD_SEC_CNT + 2] << 16 |
 			ext_csd[EXT_CSD_SEC_CNT + 3] << 24;
+/*LGE_CHANGE_S sunggyun.yu@lge.com for 2G MMC*/
 #if 1
 		/* Cards with density > 2GiB are sector addressed */
 		if (card->ext_csd.sectors > (2u * 1024 * 1024 * 1024) / 512)
 #else
 		if (card->ext_csd.sectors)
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for 2G MMC*/
 			mmc_card_set_blockaddr(card);
 	}
 
@@ -361,9 +375,11 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	struct mmc_card *card;
 	int err, ddr = 0;
 	u32 cid[4];
+/*LGE_CHANGE_S sunggyun.yu@lge.com Sandisk eMMC patch*/
 #if 1
 	u32 rocr; /* Add to select card access mode */
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com Sandisk eMMC patch*/
 	unsigned int max_dtr;
 
 	BUG_ON(!host);
@@ -378,11 +394,13 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	mmc_go_idle(host);
 
 	/* The extra bit indicates that we support high capacity */
+/*LGE_CHANGE_S sunggyun.yu@lge.com Sandisk eMMC patch*/
 #if 1
 	err = mmc_send_op_cond(host, ocr | (1 << 30), &rocr); /* Add to select card access mode */
 #else
 	err = mmc_send_op_cond(host, ocr | (1 << 30), NULL);
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com Sandisk eMMC patch*/
 	if (err)
 		goto err;
 
@@ -471,12 +489,14 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 		if (err)
 			goto free_card;
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com Sandisk eMMC patch*/
 #if 1
 		/* Add to select card access mode */
 		if (rocr & MMC_ACCESS_MODE)	/* If higher than 2GB */
 			mmc_card_set_blockaddr(card);
 		/* Add to select card access mode */
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com Sandisk eMMC patch*/
 	}
 
 	/*
@@ -519,12 +539,16 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	if (mmc_card_highspeed(card)) {
 		if ((card->ext_csd.card_type & EXT_CSD_CARD_TYPE_DDR_1_8V)
 			&& (host->caps & (MMC_CAP_1_8V_DDR)))
+// prime@sdcmicro.com Borrowed from 2.6.37 to eliminate duplicated definitions [START]
 //				ddr = 1;
 				ddr = MMC_1_8V_DDR_MODE;
+// prime@sdcmicro.com Borrowed from 2.6.37 to eliminate duplicated definitions [END]
 		else if ((card->ext_csd.card_type & EXT_CSD_CARD_TYPE_DDR_1_2V)
 			&& (host->caps & (MMC_CAP_1_2V_DDR)))
+// prime@sdcmicro.com Borrowed from 2.6.37 to eliminate duplicated definitions [START]
 //				ddr = 1;
 				ddr = MMC_1_2V_DDR_MODE;
+// prime@sdcmicro.com Borrowed from 2.6.37 to eliminate duplicated definitions [END]
 	}
 
 	/*
@@ -560,6 +584,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			       1 << bus_width, ddr);
 			err = 0;
 		} else {
+// prime@sdcmicro.com Fix the bug with setting the ddr mode even if ddr is 0 [START]
 #if 0
 			mmc_card_set_ddr_mode(card);
 #else
@@ -568,6 +593,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			else
 				ddr = MMC_SDR_MODE;
 #endif
+// prime@sdcmicro.com Fix the bug with setting the ddr mode even if ddr is 0 [END]
 			mmc_set_bus_width_ddr(card->host, bus_width, ddr);
 		}
 	}
@@ -575,9 +601,11 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 	if (!oldcard)
 		host->card = card;
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com Sandisk eMMC patch*/
 #if 1
 	mdelay(10); /* wait 10ms */
 #endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com Sandisk eMMC patch*/
 
 	return 0;
 

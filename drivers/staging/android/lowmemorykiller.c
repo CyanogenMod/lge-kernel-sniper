@@ -43,14 +43,16 @@ static int lowmem_adj[6] = {
 	6,
 	12,
 };
-static int lowmem_adj_size = 4;
+//static int lowmem_adj_size = 4;
+static int lowmem_adj_size = 6;//[LGSI] Changing Size from 4 to 6 refer int.rc for the size.
 static size_t lowmem_minfree[6] = {
 	3 * 512,	/* 6MB */
 	2 * 1024,	/* 8MB */
 	4 * 1024,	/* 16MB */
 	16 * 1024,	/* 64MB */
 };
-static int lowmem_minfree_size = 4;
+//static int lowmem_minfree_size = 4;
+static int lowmem_minfree_size = 6;//[LGSI] Changing Size from 4 to 6 refer int.rc for the size.
 
 static struct task_struct *lowmem_deathpending;
 static unsigned long lowmem_deathpending_timeout;

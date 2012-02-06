@@ -446,27 +446,38 @@ config APANIC_PLABEL
 	 If your platform uses a different flash partition label for storing
  	 crashdumps, enter it here.
 
+# LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
 config GP2AP_PROXIMITY
 	bool "GP2AP_PROXIMITY driver"
 	default y
 	---help---
 	 If you say yes here you get support for the 
 	 Sharp GP2AP Proximity Driver.
+# LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
 
-
-
-config TSPDRV
+# prime@sdcmicro.com Merge from 2.6.32 [START]
+	config TSPDRV
 	bool "Immersion Corporation Vibrator Driver(TSPDRV)"
 	default y
 	---help---
 	 TouchSense Kernel Module(Immersion Corporation)
+# prime@sdcmicro.com Merge from 2.6.32 [END]
 
+#LGE_TELECA_RIL_RECOVERY_CP_RESET_6  -START
+#20110505, ravi.holal@teleca.com, RIL RECOVERY
+#Description: Enable modem watcher
+config LGE_MODEM_WATCHER
+	bool "LGE Modem Watcher"
+	depends on MACH_LGE
+#LGE_TELECA_RIL_RECOVERY_CP_RESET_6  -END	
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
 source "drivers/misc/ti-st/Kconfig"
+# LGE_CHANGE_S, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
 source "drivers/misc/mpu3050/Kconfig"
+# LGE_CHANGE_E, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
 
 endif # MISC_DEVICES

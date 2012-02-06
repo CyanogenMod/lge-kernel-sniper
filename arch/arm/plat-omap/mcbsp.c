@@ -35,6 +35,10 @@
 
 struct omap_mcbsp **mcbsp_ptr;
 int omap_mcbsp_count, omap_mcbsp_cache_size;
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
+#include <mach/wm9093.h>
+extern int fmradio_get_curmode();
+/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
 
 void omap_mcbsp_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
 {
@@ -71,6 +75,12 @@ int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache)
 	}
 }
 EXPORT_SYMBOL(omap_mcbsp_read);
+
+#define OMAP_MCBSP_READ(base, reg) \
+			omap_mcbsp_read(base, OMAP_MCBSP_REG_##reg,0)
+#define OMAP_MCBSP_WRITE(base, reg, val) \
+			omap_mcbsp_write(base, OMAP_MCBSP_REG_##reg, val)
+
 
 #ifdef CONFIG_ARCH_OMAP3
 static void omap_mcbsp_st_write(struct omap_mcbsp *mcbsp, u16 reg, u32 val)
@@ -158,12 +168,13 @@ static irqreturn_t omap_mcbsp_tx_irq_handler(int irq, void *dev_id)
 
 	irqst_spcr2 = MCBSP_READ(mcbsp_tx, SPCR2);
 	dev_dbg(mcbsp_tx->dev, "TX IRQ callback : 0x%x\n", irqst_spcr2);
-
+ /*LGP970_CSR:OMAPS00251960_Frame Sync Error_Start*/
 	if (irqst_spcr2 & XSYNC_ERR) {
 		dev_err(mcbsp_tx->dev, "TX Frame Sync Error! : 0x%x\n",
 			irqst_spcr2);
 		/* Writing zero to XSYNC_ERR clears the IRQ */
-		MCBSP_WRITE(mcbsp_tx, SPCR2, MCBSP_READ_CACHE(mcbsp_tx, SPCR2));
+   OMAP_MCBSP_WRITE(mcbsp_tx, SPCR2,irqst_spcr2 & ~(XSYNC_ERR));
+ /*LGP970_CSR:OMAPS00251960_Frame Sync Error_End*/
 	} else {
 		complete(&mcbsp_tx->tx_irq_completion);
 	}
@@ -178,12 +189,13 @@ static irqreturn_t omap_mcbsp_rx_irq_handler(int irq, void *dev_id)
 
 	irqst_spcr1 = MCBSP_READ(mcbsp_rx, SPCR1);
 	dev_dbg(mcbsp_rx->dev, "RX IRQ callback : 0x%x\n", irqst_spcr1);
-
+ /*LGP970_CSR:OMAPS00251960_Frame Sync Error_Start*/
 	if (irqst_spcr1 & RSYNC_ERR) {
 		dev_err(mcbsp_rx->dev, "RX Frame Sync Error! : 0x%x\n",
 			irqst_spcr1);
 		/* Writing zero to RSYNC_ERR clears the IRQ */
-		MCBSP_WRITE(mcbsp_rx, SPCR1, MCBSP_READ_CACHE(mcbsp_rx, SPCR1));
+    OMAP_MCBSP_WRITE(mcbsp_rx, SPCR1,irqst_spcr1 & ~(RSYNC_ERR));
+ /*LGP970_CSR:OMAPS00251960_Frame Sync Error_End*/
 	} else {
 		complete(&mcbsp_rx->tx_irq_completion);
 	}
@@ -228,6 +240,10 @@ static void omap_mcbsp_rx_dma_callback(int lch, u16 ch_status, void *data)
 void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg *config)
 {
 	struct omap_mcbsp *mcbsp;
+	void __iomem *io_base;
+	/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
+	int wm9093_mode;
+	/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
 
 	if (!omap_mcbsp_check_valid_id(id)) {
 		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
@@ -237,6 +253,44 @@ void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg *config)
 
 	dev_dbg(mcbsp->dev, "Configuring McBSP%d  phys_base: 0x%08lx\n",
 			mcbsp->id, mcbsp->phys_base);
+
+//TEST	CLIFF
+#if 1 /* jiwon.seo@lge.com 20101114 : mp3 long play patch */
+	/*
+	 * Re-do SYSC settings here. Today McBSP doesn't have OFF mode handling
+	 * It expects client's to take care of this, which is not the right way
+	 * to do. SYSC reg's are generic reg and client needn't know about the
+	 * underlying power settings done by McBSP.
+	 * Audio HAL used to re-start the whole process after suspend/resume
+	 * which used to work as McBSP where getting set again in request() call.
+	 * However, the new Audio HAL doesn't trigger the whole process if
+	 * suspend/resume has hit.  However, it does call config() whenever
+	 * a new streaming is started. And setting the SYSC regtrs here helps.
+	 *
+	 * Other client's of McBSP should as well use config to set the registers
+	 * else they might hit the same issue of sysc context lost over OFF.
+	 *
+	 * REVISIT: The right way to fix; let the McBSP handle context save/restore
+	 * of the common regesters like SYSC based on CORE context id and with LDM
+	 * suspend/resume hooks.
+	 */
+	/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
+	//if (cpu_is_omap34xx()) {
+	wm9093_mode = wm9093_get_curmode();
+	if (cpu_is_omap34xx() &&
+	    (wm9093_mode == SPEAKER_FMR_MODE || wm9093_mode == HEADSET_FMR_MODE))
+	{
+		u16 w;
+
+//LGSI_VS910_FroyoToGB_FM radio crash shidhar.ms@lge.com_24Aug2011_START 
+		w = OMAP_MCBSP_READ(mcbsp, SYSCON);
+		w &= ~(ENAWAKEUP | SIDLEMODE(0x03) | CLOCKACTIVITY(0x03));
+		w |= (ENAWAKEUP | SIDLEMODE(0x02) | CLOCKACTIVITY(0x02));
+		OMAP_MCBSP_WRITE(mcbsp, SYSCON, w);
+//LGSI_VS910_FroyoToGB_FM radio crash shidhar.ms@lge.com_24Aug2011_END
+	}
+	/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
+#endif
 
 	/* We write the given config */
 	MCBSP_WRITE(mcbsp, SPCR2, config->spcr2);
@@ -679,17 +733,29 @@ EXPORT_SYMBOL(omap_mcbsp_get_dma_op_mode);
 
 static inline void omap34xx_mcbsp_request(struct omap_mcbsp *mcbsp)
 {
+	int idle_mode;
+
 	/*
 	 * Enable wakup behavior, smart idle and all wakeups
 	 * REVISIT: some wakeups may be unnecessary
 	 */
 	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+		/*
+		 * OMAP3 Errata i649:  Do not allow McBSP2 when in slave mode
+		 * to idle to prevent frame corruption.
+		 */
+		if ((omap_rev() <= OMAP3630_REV_ES1_2) &&
+			(mcbsp->id == 2) &&
+			(mcbsp->interface_mode == OMAP_MCBSP_SLAVE))
+			idle_mode = HWMOD_IDLEMODE_NO;
+		else
+			idle_mode = HWMOD_IDLEMODE_SMART;
+
 
 		if (mcbsp->dma_op_mode == MCBSP_DMA_MODE_THRESHOLD) {
 			MCBSP_WRITE(mcbsp, WAKEUPEN, XRDYEN | RRDYEN);
 			omap_hwmod_enable_wakeup(mcbsp->oh[0]);
-			omap_hwmod_set_slave_idlemode(mcbsp->oh[0],
-						HWMOD_IDLEMODE_SMART);
+			omap_hwmod_set_slave_idlemode(mcbsp->oh[0], idle_mode);
 		} else {
 			omap_hwmod_disable_wakeup(mcbsp->oh[0]);
 // INFORTEC patch 2011.03.30
@@ -763,6 +829,9 @@ int omap_mcbsp_request(unsigned int id)
 {
 	struct omap_mcbsp *mcbsp;
 	int err;
+	/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
+	int wm9093_mode;
+	/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
 
 	if (!omap_mcbsp_check_valid_id(id)) {
 		printk(KERN_ERR "%s: Invalid id (%d)\n", __func__, id + 1);
@@ -790,7 +859,26 @@ int omap_mcbsp_request(unsigned int id)
 
 	/* Do procedure specific to omap34xx arch, if applicable */
 	omap34xx_mcbsp_request(mcbsp);
+//TEST CLIFF
+#if 1 /* jiwon.seo@lge.com 20101114 : mp3 long play patch */
+	/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
+	//if (cpu_is_omap34xx()) {
+	wm9093_mode = wm9093_get_curmode();
+	if (cpu_is_omap34xx() &&
+	    (wm9093_mode == SPEAKER_FMR_MODE || wm9093_mode == HEADSET_FMR_MODE))
+	{
+		u16 w;
 
+		w = OMAP_MCBSP_READ(mcbsp->io_base, SYSCON);
+		w &= ~(ENAWAKEUP | SIDLEMODE(0x03) | CLOCKACTIVITY(0x03));
+		w |= (ENAWAKEUP | SIDLEMODE(0x02) | CLOCKACTIVITY(0x02));
+		OMAP_MCBSP_WRITE(mcbsp->io_base, SYSCON, w);
+
+		OMAP_MCBSP_WRITE(mcbsp->io_base, WAKEUPEN, WAKEUPEN_ALL);
+	}
+	/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-01-17, McBSP disturbs to sleep when FM Radio is on */
+#endif
+//TEST CLIFF
 	/*
 	 * Make sure that transmitter, receiver and sample-rate generator are
 	 * not running before activating IRQs.

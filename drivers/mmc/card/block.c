@@ -478,14 +478,6 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 #endif
 		}
 
-		// LGE_CHANGE [dojip.kim@lge.com] 2010-08-29,
-		// don't redo I/O when nomedium error
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-		if (brq.cmd.error == -ENOMEDIUM) {
-			goto cmd_err;
-		}
-#endif
-
 		if (brq.cmd.error || brq.stop.error || brq.data.error) {
 			if (rq_data_dir(req) == READ) {
 				/*
@@ -539,17 +531,8 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	mmc_release_host(card->host);
 
 	spin_lock_irq(&md->lock);
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-	while (ret) {
-		// LGE_CHANGE [dojip.kim@lge.com] 2010-08-29,
-		// supressed the error message
-		req->cmd_flags |= REQ_QUIET;
-		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
-	}
-#else
 	while (ret)
 		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
-#endif
 	spin_unlock_irq(&md->lock);
 
 	return 0;

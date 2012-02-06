@@ -27,10 +27,6 @@
 #include <plat/cpu.h>
 #include <plat/clock.h>
 
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-#include <linux/dvs_suite.h>
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
-
 #include "cm-regbits-34xx.h"
 #include "prm.h"
 #include "omap3-opp.h"
@@ -143,29 +139,12 @@ static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
 #ifdef CONFIG_CPU_FREQ
 	struct cpufreq_freqs freqs_notify;
 
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	freqs_notify.old = cur_rate / 1000;
 	freqs_notify.new = rate / 1000;
 	freqs_notify.cpu = 0;
 
 	/* Send pre notification to CPUFreq */
-	//cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
-
-	if(ds_status.flag_run_dvs == 0){
-		freqs_notify.old = cur_rate / 1000;
-		freqs_notify.new = rate / 1000;
-		freqs_notify.cpu = 0;
-		cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
-	}
-	else{	// LG-DVFS is runnig.
-		if(ds_status.flag_correct_cpu_op_update_path == 0){	// Called by cpufreq.
-			freqs_notify.old = ds_status.cpu_op_index / 1000;
-			freqs_notify.new = ds_status.target_cpu_op_index / 1000;
-			freqs_notify.cpu = 0;
 	cpufreq_notify_transition(&freqs_notify, CPUFREQ_PRECHANGE);
-		}
-	}
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 	ret = clk_set_rate(dpll1_clk, rate);
 	if (ret) {
@@ -175,19 +154,8 @@ static int omap3_mpu_set_rate(struct device *dev, unsigned long rate)
 	}
 
 #ifdef CONFIG_CPU_FREQ
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 	/* Send a post notification to CPUFreq */
-	//cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
-
-	if(ds_status.flag_run_dvs == 0){
 	cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
-	}
-	else{	// LG-DVFS is runnig.
-		if(ds_status.flag_correct_cpu_op_update_path == 0){	// Called by cpufreq.
-			cpufreq_notify_transition(&freqs_notify, CPUFREQ_POSTCHANGE);
-		}
-	}
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 #endif
 
 #ifndef CONFIG_CPU_FREQ

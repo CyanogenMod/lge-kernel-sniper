@@ -9,89 +9,78 @@
  ****************************************************************************************/
 
 #include <linux/dvs_suite.h>
+#include <linux/module.h>	// For EXPORT_PER_CPU_SYMBOL()
 
 /****************************************************************************************
  * Variables and data structures
  ****************************************************************************************/
 
-struct timeval ds_timeval;
+struct workqueue_struct *dvs_suite_wq;
+struct work_struct dvs_suite_work;
 
-DS_CONF ds_configuration;
-DS_STAT ds_status;
-DS_COUNT ds_counter;
+/*
+ * Unique data structures
+ */
+
+DS_CTRL ds_control;
 DS_PARAM ds_parameter;
 
-/* Variables for AIDVS */
-DS_AIDVS_STAT_STRUCT ds_aidvs_status;
+DEFINE_PER_CPU(struct dvs_suite_system_status, ds_sys_status);
+EXPORT_PER_CPU_SYMBOL(ds_sys_status);
 
-/* Variables for GPScheDVS */
-DS_GPSCHEDVS_STAT_STRUCT ds_gpschedvs_status;
+/*
+ * Per-core data structures
+ */
+
+DEFINE_PER_CPU(struct dvs_suite_cpu_status, ds_cpu_status);
+EXPORT_PER_CPU_SYMBOL(ds_cpu_status);
+
+DEFINE_PER_CPU(struct dvs_suite_counter, ds_counter);
+EXPORT_PER_CPU_SYMBOL(ds_counter);
+
+DEFINE_PER_CPU(DS_AIDVS_STAT_STRUCT, ds_aidvs_status);
+EXPORT_PER_CPU_SYMBOL(ds_aidvs_status);
 
 /****************************************************************************************
  * Function definitions
  ****************************************************************************************/
 
-asmlinkage void ld_update_cpu_op(void){
-	ds_update_cpu_op();
-	return;
-}
+void do_dvs_suite_timer(struct work_struct *work);
 
-int ld_initialize_dvs_suite(int cpu_mode){
-	ds_initialize_dvs_suite(cpu_mode);
+int ld_initialize_ds_control(void){
+	ds_initialize_ds_control();
 	return(0);
 }
 
-int ld_update_time_counter(void){
-	ds_update_time_counter();
+int ld_initialize_ds_sys_status(void){
+	ds_initialize_ds_sys_status();
 	return(0);
 }
 
-int ld_update_priority_normal(struct task_struct *p){
-	ds_update_priority_normal(p);
+int ld_initialize_ds_cpu_status(int cpu_mode){
+	ds_initialize_ds_cpu_status(0, cpu_mode);
+	//ds_initialize_ds_cpu_status(1, cpu_mode);	// Single core
 	return(0);
 }
 
-void ld_do_dvs_suite(void){
-	do_dvs_suite();
-	return;
+int ld_initialize_ds_counter(void){
+	ds_initialize_ds_counter(0, 0);
+	//ds_initialize_ds_counter(1, occasion);	// Single core
+	return(0);
 }
 
-/*====================================================================
-	The functions involved with U(20,12) fixed point format arithmetic.
-	====================================================================*/
+int ld_initialize_aidvs(void){
+	ds_initialize_aidvs(0, 0);
+	//ds_initialize_aidvs(1);	// Single core
+	return(0);
+}
 
-/* The unsigned multiplication function for U(20,12) format
-	 fixed point fractional numbers.
-	 Multiplicand and multiplier should be converted to
-	 U(20,12) format fixed point number by << 12 before using the function.
-	 Keep in mind that the calculation result should not exceed
-	 0xffffffff or 1048575.999755859375, the maximum value U(20,12) can represent.
-	 Otherwise, this function will cause segmentation error.
- */
-void ds_fpmul12(
-unsigned long multiplicand,
-unsigned long multiplier,
-unsigned long *multiplied)
-{
+int ld_update_priority_normal(int ds_cpu, struct task_struct *p){
+	ds_update_priority_normal(ds_cpu, p);
+	return(0);
+}
 
-/* umull	r4, r3, %1, %2		%1 = multiplicand, %2 = multiplier, 
- * 					r3 = higher 32 bits, r4 = lower 32 bits.
- * mov		r4, r4, lsr #12		Logical right shift r4 by 12 bits
- * mov		r3, r3, lsl #20		Logical left shift r3 by 20 bits
- * orr		%0, r3, r4		Logical OR r3 and r4 and save it to *multimpied.
- */
-
-//	printk(KERN_INFO "0x%lx * 0x%lx = ", multiplicand, multiplier);
-
-	__asm__ __volatile__("umull	r4, r3, %1, %2\n\t"
-					 "mov	r4, r4, lsr #12\n\t"
-					 "mov	r3, r3, lsl #20\n\t"
-					 "orr	%0, r3, r4"
-											 : "=r" (*multiplied)
-											 : "r" (multiplicand), "r" (multiplier)
-					 : "r4", "r3");
-
-//	printk(KERN_INFO "0x%lx\n", *multiplied);
-
+void ld_do_dvs_suite(int ds_cpu){
+	do_dvs_suite(ds_cpu);
 	return;
 }

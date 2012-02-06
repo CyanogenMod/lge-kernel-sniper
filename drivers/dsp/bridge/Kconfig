@@ -13,10 +13,7 @@ menuconfig MPU_BRIDGE
 
 config BRIDGE_DVFS
 	bool "Enable Bridge Dynamic Voltage and Frequency Scaling (DVFS)"
-# prime@sdcmicro.com OMAP_PM_SRF is obsolete [START]
 	depends on MPU_BRIDGE && OMAP_PM && CPU_FREQ
-#	depends on MPU_BRIDGE && CPU_FREQ
-# prime@sdcmicro.com OMAP_PM_SRF is obsolete [END]
 	default n
 	help
 	  DVFS allows DSP Bridge to initiate the operating point change to

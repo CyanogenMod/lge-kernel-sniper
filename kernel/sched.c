@@ -79,14 +79,13 @@
 
 #include "sched_cpupri.h"
 
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-#include <asm/current.h>	/* For current macro */
+#ifdef CONFIG_LGE_DVFS
+#include <asm/current.h>
 #include <linux/dvs_suite.h>
-#include <linux/kernel.h>   /* For printk */
-#include <linux/list.h>	 /* For struct list_head */
-#include <linux/sched.h>	/* For struct task_struct */
-#include <linux/slab.h>	 /* For kmalloc and kfree */
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#include <linux/kernel.h>
+#include <linux/list.h>
+#include <linux/sched.h>
+#endif	// CONFIG_LGE_DVFS
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
@@ -2773,6 +2772,9 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next)
 {
 	struct mm_struct *mm, *oldmm;
+#ifdef CONFIG_LGE_DVFS
+	int ds_cpu = smp_processor_id();
+#endif	// CONFIG_LGE_DVFS
 
 	prepare_task_switch(rq, prev, next);
 	trace_sched_switch(prev, next);
@@ -2806,14 +2808,15 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
 #endif
 
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_configuration.on_dvs == 1){
+#ifdef CONFIG_LGE_DVFS
+	if(ds_control.on_dvs == 1)
+	{
 		ds_parameter.entry_type = DS_ENTRY_SWITCH_TO;
 		ds_parameter.prev_p = prev;
 		ds_parameter.next_p = next;
-		ld_do_dvs_suite();
+		ld_do_dvs_suite(ds_cpu);
 	}
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif	// CONFIG_LGE_DVFS
 
 	/* Here we just switch the register state and the stack. */
 	switch_to(prev, next, prev);
@@ -3431,6 +3434,22 @@ void scheduler_tick(void)
 	struct rq *rq = cpu_rq(cpu);
 	struct task_struct *curr = rq->curr;
 
+#ifdef CONFIG_LGE_DVFS
+	if(ds_control.on_dvs == 1){
+		ds_update_time_counter(cpu);
+		ds_parameter.entry_type = DS_ENTRY_TIMER_IRQ;
+		ds_parameter.prev_p = current;
+		ds_parameter.next_p = current;
+		do_dvs_suite(cpu);
+		if(ds_control.flag_run_dvs == 1){
+			if(per_cpu(ds_cpu_status, cpu).target_cpu_op_index != 
+				per_cpu(ds_cpu_status, cpu).current_cpu_op_index)
+			{
+				queue_work_on(cpu, dvs_suite_wq, &dvs_suite_work);
+			}
+		}
+	}
+#endif	// CONFIG_LGE_DVFS
 	sched_clock_tick();
 
 	raw_spin_lock(&rq->lock);
@@ -3600,18 +3619,14 @@ asmlinkage void __sched schedule(void)
 	unsigned long *switch_count;
 	struct rq *rq;
 	int cpu;
+#ifdef CONFIG_LGE_DVFS
+	int ds_cpu = smp_processor_id();
 
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	//struct sched_param lc_sched_param;
-
-#if 0
-	if(ds_configuration.on_dvs == 1){
-		//ds_counter.schedule_no ++;	// Not needed unless we want statistics.
-		ld_update_time_counter();
-		ds_status.cpu_mode = DS_CPU_MODE_SCHEDULE;
+	if(ds_control.on_dvs == 1)
+	{
+		per_cpu(ds_cpu_status, ds_cpu).cpu_mode = DS_CPU_MODE_SCHEDULE;
 	}
-#endif
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif	// CONFIG_LGE_DVFS
 
 need_resched:
 	preempt_disable();
@@ -3678,37 +3693,15 @@ need_resched_nonpreemptible:
 	if (need_resched())
 		goto need_resched;
 
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_configuration.on_dvs == 1){
-		ld_update_time_counter();
-
+#ifdef CONFIG_LGE_DVFS
+	if(ds_control.on_dvs == 1)
+	{
 		if(next->pid == 0)
-			ds_status.cpu_mode = DS_CPU_MODE_IDLE;
+			per_cpu(ds_cpu_status, ds_cpu).cpu_mode = DS_CPU_MODE_IDLE;
 		else
-			ds_status.cpu_mode = DS_CPU_MODE_TASK;
-
-#if 0   // WARNING: This code will cause a severe performance degradation!!!
-if(next->pid == 0)
-printk(KERN_WARNING "%d %5d %16s %3d\n",
-ds_status.type[prev->pid],
-prev->pid,
-prev->comm,
-//prev->prio,
-prev->static_prio
-);
-#endif
-#if 0   // WARNING: This code will cause a severe performance degradation!!!
-if(prev->pid == 0)
-printk(KERN_WARNING "%d %5d %16s %3d\n",
-ds_status.type[next->pid],
-next->pid,
-next->comm,
-//next->prio,
-next->static_prio
-);
-#endif
+			per_cpu(ds_cpu_status, ds_cpu).cpu_mode = DS_CPU_MODE_TASK;
 	}
-/* 20110328 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
+#endif	// CONFIG_LGE_DVFS
 }
 EXPORT_SYMBOL(schedule);
 
@@ -4058,6 +4051,12 @@ EXPORT_SYMBOL(wait_for_completion);
 unsigned long __sched
 wait_for_completion_timeout(struct completion *x, unsigned long timeout)
 {
+//here unsigned long to signed long conversion may result in negative number, so clipping timeout at LONG_MAX prakash.pathak@ti.com
+	if (timeout >= LONG_MAX)
+         {
+                 timeout = LONG_MAX;
+         }
+
 	return wait_for_common(x, timeout, TASK_UNINTERRUPTIBLE);
 }
 EXPORT_SYMBOL(wait_for_completion_timeout);
@@ -4277,19 +4276,9 @@ void set_user_nice(struct task_struct *p, long nice)
 	int old_prio, delta, on_rq;
 	unsigned long flags;
 	struct rq *rq;
-#if 0
-	long nice_refined;
-#endif
 
 	if (TASK_NICE(p) == nice || nice < -20 || nice > 19)
 		return;
-#if 0
-	if(p->static_prio < 120){
-		nice_refined = nice - (120 - p->static_prio);
-		if(nice_refined < -20) nice_refined = -20;
-		nice = nice_refined;
-	}
-#endif
 	/*
 	 * We have to be careful, if called from sys_setpriority(),
 	 * the task might be in the middle of scheduling on another CPU.
@@ -7743,16 +7732,6 @@ void __init sched_init(void)
 	perf_event_init();
 
 	scheduler_running = 1;
-
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	ds_configuration.sched_scheme = DS_SCHED_GPSCHED;
-	ds_configuration.dvs_scheme = DS_DVS_GPSCHEDVS;
-	ds_configuration.gpschedvs_strategy = 0;
-	ds_configuration.aidvs_interval_window_size = DS_AIDVS_INTERVALS_IN_AN_WINDOW;
-	ds_configuration.aidvs_speedup_threshold = DS_AIDVS_SPEEDUP_THRESHOLD;
-	ds_configuration.aidvs_speedup_interval = DS_AIDVS_SPEEDUP_INTERVAL;
-	ld_initialize_dvs_suite(DS_CPU_MODE_TASK);
-/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 }
 
 #ifdef CONFIG_DEBUG_SPINLOCK_SLEEP

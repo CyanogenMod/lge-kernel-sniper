@@ -290,6 +290,84 @@ int omap_mux_init_signal(const char *muxname, int val)
 	return -ENODEV;
 }
 
+int omap3_mux_config(char *group)
+{
+	printk(KERN_ERR "set mux for group mode = %s\n", group);
+	if (strcmp(group, "OMAP_MCBSP2_SLAVE") == 0) {
+		omap_mux_init_signal("mcbsp2_fsx.mcbsp2_fsx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp2_clkx.mcbsp2_clkx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp2_dr.mcbsp2_dr",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp2_dx.mcbsp2_dx",
+						OMAP_PIN_OUTPUT);
+		return 0;
+	} else if (strcmp(group, "OMAP_MCBSP3_SLAVE") == 0) {
+		omap_mux_init_signal("mcbsp3_fsx.mcbsp3_fsx",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_clkx.mcbsp3_clkx",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_dr.mcbsp3_dr",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_dx.mcbsp3_dx",
+						OMAP_PIN_OUTPUT);
+		return 0;
+	} else if (strcmp(group, "OMAP_MCBSP3_MASTER") == 0) {
+		omap_mux_init_signal("mcbsp_clks.mcbsp_clks",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_fsx.mcbsp3_fsx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("mcbsp3_clkx.mcbsp3_clkx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("mcbsp3_dr.mcbsp3_dr",
+						OMAP_PIN_INPUT_PULLDOWN);
+		omap_mux_init_signal("mcbsp3_dx.mcbsp3_dx",
+						OMAP_PIN_OUTPUT);
+		return 0;
+	} else if (strcmp(group, "OMAP_MCBSP3_TRISTATE") == 0) {
+		omap_mux_init_signal("mcbsp3_fsx.safe_mode",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_clkx.safe_mode",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_dr.safe_mode",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp3_dx.safe_mode",
+						OMAP_PIN_INPUT);
+		return 0;
+	} else if (strcmp(group, "OMAP_MCBSP4_MASTER") == 0) {
+		omap_mux_init_signal("mcbsp_clks.mcbsp_clks",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("mcbsp4_fsx.mcbsp4_fsx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("gpmc_ncs4.mcbsp4_clkx",
+						OMAP_PIN_OUTPUT);
+		omap_mux_init_signal("gpmc_ncs5.mcbsp4_dr",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs6.mcbsp4_dx",
+						OMAP_PIN_OUTPUT);
+		return 0;
+	} else if (strcmp(group, "OMAP_MCBSP4_SLAVE") == 0) {
+		omap_mux_init_signal("mcbsp4_fsx.mcbsp4_fsx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs4.mcbsp4_clkx",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs5.mcbsp4_dr",
+						OMAP_PIN_INPUT);
+		omap_mux_init_signal("gpmc_ncs6.mcbsp4_dx",
+						OMAP_PIN_OUTPUT);
+		return 0;
+/*LGSI_LGP970_TD#112577_Call Error_Shilpa_27Oct2011_Start*/		
+	// hwlee test
+	} else if (strcmp(group, "OMAP_GPIO_43") == 0) {
+		omap_mux_init_signal("gpio_43",
+						OMAP_INPUT_EN | OMAP_OFF_EN | OMAP_OFFOUT_EN | OMAP_PIN_OFF_WAKEUPENABLE);	
+		return 0;
+/*LGSI_LGP970_TD#112577_Call Error_Shilpa_27Oct2011_End*/		
+	}
+	return -ENODEV;
+}
+
 #ifdef CONFIG_DEBUG_FS
 
 #define OMAP_MUX_MAX_NR_FLAGS	10
@@ -503,7 +581,7 @@ static void __init omap_mux_dbg_create_entry(
 		struct omap_mux *m = &e->mux;
 		m->partition = partition;
 
-		(void)debugfs_create_file(m->muxnames[0], S_IWUGO, mux_dbg_dir,
+		(void)debugfs_create_file(m->muxnames[0], S_IWGRP | S_IWUSR, mux_dbg_dir,
 					  m, &omap_mux_dbg_signal_fops);
 	}
 }

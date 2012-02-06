@@ -44,6 +44,20 @@ obj-$(CONFIG_TWL6040_VIB)	+= twl6040-vib.o
 obj-$(CONFIG_CDC_TCXO)		+= cdc_tcxo.o
 obj-y				+= ti-st/
 obj-$(CONFIG_SENSORS_LIS331DLH)	+= lis331dlh.o
+# LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
 obj-$(CONFIG_GP2AP_PROXIMITY) += gp2ap_proximity.o
+# LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
+# LGE_CHANGE_S, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
+#LGE_TELECA_RIL_RECOVERY_CP_RESET_6  -START
+#20110505, ravi.holal@teleca.com, RIL RECOVERY
+#Description: Enable modem watcher
+# LGE_CHANGE [jugwan.eom@lge.com] 2011-04-25, Modem Watcher
+obj-$(CONFIG_LGE_MODEM_WATCHER)	+= modem_watcher.o
+#LGE_TELECA_RIL_RECOVERY_CP_RESET_6  -END
+
+
 obj-$(CONFIG_MPU_SENSORS_MPU3050)   += mpu3050/
+# LGE_CHANGE_E, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
+# prime@sdcmicro.com Merge from 2.6.32 [START]
 obj-$(CONFIG_TSPDRV)		+= tspdrv/
+# prime@sdcmicro.com Merge from 2.6.32 [END]

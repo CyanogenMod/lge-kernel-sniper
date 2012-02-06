@@ -1380,6 +1380,7 @@ static void __init hub_tdmb_spi_init(void)
 #endif
 // LGE_DOM_UPDATE_E hayun.kim 2010/06/14 }
 
+extern void __init subpm_lp8720_init(void);
 
 #if 1
 extern void __init max17043_init(void);
@@ -1408,6 +1409,7 @@ void __init hub_peripherals_init(void)
 
 	hub_mmc1_gpio_init();
 	omap_i2c_init();
+	subpm_lp8720_init();
 	platform_add_devices(hub_devices, ARRAY_SIZE(hub_devices));
 
 	hub_synaptics_dev_init();
@@ -1439,6 +1441,9 @@ void __init hub_peripherals_init(void)
 #ifdef CONFIG_SPI_TDMB
 	hub_tdmb_spi_init();
 #endif
+/*LGSI_LGP970_TD#112577_Call Error_Shilpa_27Oct2011_Start*/
+	omap3_mux_config("OMAP_GPIO_43"); // hwlee for test
+/*LGSI_LGP970_TD#112577_Call Error_Shilpa_27Oct2011_End*/
 
 }
 

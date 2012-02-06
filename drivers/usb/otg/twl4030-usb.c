@@ -247,6 +247,44 @@
 #define PMBR1				0x0D
 #define GPIO_USB_4PIN_ULPI_2430C	(3 << 0)
 
+void check_usb_reg(void); // by TI Prakash
+struct twl4030_usb *t2_transceiver;
+//20101006 taehwan.kim@lge.com To  detect USB or charger on VBUS irq [START_LGE]
+int get_muic_mode();
+//20101006 taehwan.kim@lge.com To  detect USB or charger on VBUS irq [END_LGE]
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+void vbus_irq_muic_handler(int state);
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
+// LGE_CHANGE wake lock for usb connection
+struct wlock {
+	int wake_lock_on;
+	int usb_connected;
+	struct wake_lock wake_lock;
+};
+static struct wlock the_wlock;
+static struct wlock the_wlock2;
+// LGE_CHANGE wake lock for usb connection
+
+static void twl4030_gadget_connect_or_disconnect(struct twl4030_usb*);
+
+// LGE_CHANGE work queue
+static struct delayed_work twl4030_usb_wq;
+static struct delayed_work twl4030_usb_wq2;
+// LGE_CHANGE work queue
+
+// LGE_CHANGE_S [daewung.kim@lge.com] 2010-12-29, USB interrupt failure at suspend state
+extern int suspend_resume_statecheck;
+// LGE_CHANGE_E [daewung.kim@lge.com] 2010-12-29, USB interrupt failure at suspend state
+int muic_mode_final = 0; // LGE_Change
+struct twl4030_usb	*my_twl; // LGE_Change
+
+enum linkstat {
+	USB_LINK_UNKNOWN = 0,
+	USB_LINK_NONE,
+	USB_LINK_VBUS,
+	USB_LINK_ID,
+};
+
 #if defined(CONFIG_MACH_LGE_OMAP3)
 extern void musb_link_force_active(int enable);
 #endif // defined(CONFIG_MACH_LGE_OMAP3)
@@ -273,6 +311,9 @@ struct twl4030_usb {
 	u8			asleep;
 	bool			irq_enabled;
 };
+
+// LGE_UPDATE jaejoong.kim 
+//static struct wake_lock usb_lock;
 
 #if 0 /* mbk_wake mbk_temp */ 
 // LGE_CHANGE wake lock for usb connection
@@ -440,6 +481,40 @@ static void twl4030_usb_set_mode(struct twl4030_usb *twl, int mode)
 	};
 }
 
+void check_usb_reg(void)
+{
+	
+	struct twl4030_usb *twl = t2_transceiver;
+        u32 l;
+	int val = twl4030_usb_read(twl, FUNC_CTRL);
+	printk (KERN_INFO "VVVV CHECK REG\n");
+	printk (KERN_ERR "====^^==== check_usb_reg + : FUNC_CTRL=%x \n",val);
+
+                        if(val!=0x40 && val!=0x45)
+                        {
+                                printk (KERN_ERR "====^^==== check_usb_reg 1 \n");
+				printk(KERN_INFO "VVVV PANIC FUNC_CTRL val =%x \n",val);
+			val = 0x40;
+                        WARN_ON(twl4030_usb_write_verify(twl,FUNC_CTRL,(u8)val) < 0);
+#if 0
+				l= omap_readl(0x480021a6);
+                                  l&=~(1<<0);
+                                  l|=(1<<2);
+                                omap_writel(l, 0x480021a6);
+                                                
+                                msleep(1);
+
+                                 l= omap_readl(0x480021a6);
+                                l&=~(1<<2);
+                                 l|=(1<<0);
+                                omap_writel(l, 0x480021a6);
+#endif
+                       }        
+
+}
+
+EXPORT_SYMBOL(check_usb_reg);
+
 static void twl4030_i2c_access(struct twl4030_usb *twl, int on)
 {
 	unsigned long timeout;
@@ -532,6 +607,9 @@ static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
 		return;
 	}
 
+	if (twl->otg.link_save_context)
+		twl->otg.link_save_context(&twl->otg);
+
 	twl4030_phy_power(twl, 0);
 	twl->asleep = 1;
 }
@@ -539,9 +617,10 @@ static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
 static void twl4030_phy_resume(struct twl4030_usb *twl)
 {
 	int status; // LGE CHANGE jjun.lee, Current Optimization by Prakash TI
-	if (!twl->asleep) {
+// LGE_CHANGE_S kenneth.kang, remove the annotation for fixing CP USB over current issue.
+	if (!twl->asleep)
 		return;
-	}
+// LGE_CHANGE_E kenneth.kang
 	
 	// LGE CHANGE jjun.lee, Current Optimization by Prakash TI
 	/* To check the LINK status before resume..
@@ -558,6 +637,9 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
 	if (twl->usb_mode == T2_USB_MODE_ULPI)
 		twl4030_i2c_access(twl, 0);
 	twl->asleep = 0;
+
+	if (twl->otg.link_restore_context)
+			twl->otg.link_restore_context(&twl->otg);
 }
 
 static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
@@ -636,6 +718,18 @@ static ssize_t twl4030_usb_vbus_show(struct device *dev,
 }
 static DEVICE_ATTR(vbus, 0444, twl4030_usb_vbus_show, NULL);
 
+// LGE_CHANGE
+static void twl4030_gadget_connect_or_disconnect(struct twl4030_usb *twl)
+{
+	struct usb_gadget * g = twl ? twl->otg.gadget : 0;
+	if (!g) { return; }
+	if (USB_LINK_VBUS == twl->linkstat || USB_LINK_ID == twl->linkstat) {
+		usb_gadget_vbus_connect(g);
+	} else {
+		usb_gadget_vbus_disconnect(g);
+	}
+}
+
 #ifdef CONFIG_LGE_OMAP3_EXT_PWR
 extern void set_external_power_detect(u8 ta_on);
 extern void set_charging_current(void);
@@ -648,15 +742,134 @@ static void twl_usb_ext_pwr_work(struct work_struct *data)
 	return ;
 }
 
+#if 0 /* mbk_temp */ 
+#define REG_PWR_ISR1		0x00
+#define REG_PWR_IMR1		0x01
+#define REG_PWR_EDR1		0x05
+#define REG_PWR_SIH_CTRL	0x007
+int lge_twl4030charger_presence_evt(int vbus)
+{
+	int ret = 0;
+	u8 pwr_isr1 = 0;
+	u8 pwr_imr1 = 0;
+	u8 pwr_edr1 = 0;
+	u8 pwr_sih_ctrl = 0;
+
+	ret = twl_i2c_read_u8(TWL4030_MODULE_INT, &pwr_isr1,
+		REG_PWR_ISR1);
+	printk("[charging_msg] %s: PWR_ISR1 0x%x\n", __FUNCTION__, pwr_isr1);
+
+	ret = twl_i2c_read_u8(TWL4030_MODULE_INT, &pwr_imr1,
+		REG_PWR_IMR1);
+	printk("[charging_msg] %s: PWR_IMR1 0x%x\n", __FUNCTION__, pwr_imr1);
+
+	ret = twl_i2c_read_u8(TWL4030_MODULE_INT, &pwr_edr1,
+		REG_PWR_EDR1);
+	printk("[charging_msg] %s: PWR_EDR1 0x%x\n", __FUNCTION__, pwr_edr1);
+
+	ret = twl_i2c_read_u8(TWL4030_MODULE_INT, &pwr_edr1,
+		REG_PWR_SIH_CTRL);
+	printk("[charging_msg] %s: PWR_SIH_CTRL 0x%x\n", __FUNCTION__, pwr_sih_ctrl);
+
+	return 0;
+}
 #endif 
+#endif 
+
+#if 0 /* mbk_wake mbk_temp */ 
+// LGE_CHANGE work queue &  wake lock for usb connection
+//static void twl4030_usb_wq_func(struct delayed_work *twl4030_usb_wq){
+static void twl4030_usb_wq_func(struct work_struct *twl4030_usb_wq){
+	wake_unlock(&the_wlock.wake_lock);
+	the_wlock.wake_lock_on=0;
+	printk(KERN_WARNING "[twl4030-usb] wake_lock_on=0 (unlocked) \n");
+}
+// LGE_CHANGE work queue &  wake lock for usb connection
+#endif 
+
+// LGE_CHANGE work queue &  wake lock for usb connection
+static void twl4030_usb_wq_func(struct delayed_work *twl4030_usb_wq){
+	if(0==the_wlock.usb_connected)
+	{
+		wake_unlock(&the_wlock.wake_lock);	
+		the_wlock.wake_lock_on = 0;
+		printk(KERN_WARNING "[twl4030-usb] wake_lock_on=0 (unlocked) \n");
+	}
+}
+
+static void twl4030_usb_wq_func2(struct delayed_work *twl4030_usb_wq2)
+{
+	wake_unlock(&the_wlock2.wake_lock);
+	printk(KERN_WARNING "[twl4030-usb] 22 wake_lock_on=0 (unlocked) \n");
+}
+// LGE_CHANGE work queue &  wake lock for usb connection
 
 
 static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 {
 	struct twl4030_usb *twl = _twl;
 	int status;
+	//20101006 taehwan.kim@lge.com To  detect USB or charger on VBUS irq[START_LGE]
+    	int i=0, muic_mode_temp = 0;
 
+	// LGE_CHANGE_S [daewung.kim@lge.com] 2010-12-29, USB interrupt failure at suspend state
+    	wake_lock(&the_wlock2.wake_lock);	
+    	cancel_delayed_work(&twl4030_usb_wq2);    
+    	schedule_delayed_work(&twl4030_usb_wq2, msecs_to_jiffies(10000));	 // to delay unlock wake_lock	
+    	printk(KERN_WARNING "[twl4030-usb] 22 wake_lock_on=1 (locked)\n");
+	printk(KERN_WARNING "twl4030_usb_irq: suspend_resume_statecheck: %d\n", suspend_resume_statecheck);
+
+	if (1 != suspend_resume_statecheck) 
+	{
+    		msleep(1000); 
+		//late_usbirq = 1;
+		//return IRQ_HANDLED;
+    	}
+
+	if(1 != suspend_resume_statecheck)
+	{ 
+		for(i=1;i<6;i++)
+		{
+			msleep(200);
+        		if(1 == suspend_resume_statecheck)
+				break;
+		}
+
+	} 
+	// LGE_CHANGE_E [daewung.kim@lge.com] 2010-12-29, USB interrupt failure at suspend state
+
+    	muic_mode_final = get_muic_mode();
+	//20101006 taehwan.kim@lge.com To  detect USB or charger on VBUS irq[END_LGE]
+#ifdef CONFIG_LOCKDEP
+	/* WORKAROUND for lockdep forcing IRQF_DISABLED on us, which
+	 * we don't want and can't tolerate.  Although it might be
+	 * friendlier not to borrow this thread context...
+	 */
+	local_irq_enable();
+#endif
+	msleep(200);
+	for(i=0;i<9;i++)
+	{
+		muic_mode_temp = get_muic_mode();
+		if (muic_mode_final != muic_mode_temp)
+		{
+			muic_mode_final = muic_mode_temp;
+			break;
+		}
+		msleep(100);
+	}
+	if ( 0== muic_mode_final ) { //If unknown
+		printk(KERN_WARNING "[twl4030-usb] muic mode unknown ----^^---- muic_mode: %d \n", muic_mode_final);
+		return IRQ_HANDLED;
+	}	
+	if ( 2== muic_mode_final || 3== muic_mode_final  || 4== muic_mode_final  || 5== muic_mode_final ) { //If TA
+		printk(KERN_WARNING "[twl4030-usb] TA detected ----^^---- muic_mode: %d \n", muic_mode_final);
+		return IRQ_HANDLED;
+	}
 	status = twl4030_usb_linkstat(twl);
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+    	vbus_irq_muic_handler(status); //20110123 taehwan.kim@lge.com To support illegal charger (ex any charger)
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
 	if (status >= 0) {
 		/* FIXME add a set_power() method so that B-devices can
 		 * configure the charger appropriately.  It's not always
@@ -669,17 +882,46 @@ static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 		 * USB_LINK_VBUS state.  musb_hdrc won't care until it
 		 * starts to handle softconnect right.
 		 */
+// LGE_UPDATE_S 20110401 [jaejoong.kim@lge.com] check muic status 
+		// if not AP_USB and not CP_USB
+		if( (8 != muic_mode_final) && (9 != muic_mode_final) )
+		{
+			status = USB_EVENT_NONE;
+			printk(KERN_WARNING "[twl4030-usb] USB_LINK_NONE (not AP_USB or CP_USB) ----^^---- muic_mode: %d \n", muic_mode_final);								
+		}
+// LGE_UPDATE_S 20110401 [jaejoong.kim@lge.com] check muic status 
+       //20101006 taehwan.kim@lge.com To  detect USB or charger on VBUS irq[START_LGE]
+		//LGE_Change
+		twl4030_gadget_connect_or_disconnect(twl); 
+		//LGE_Change
+
 		if (status == USB_EVENT_NONE)
 		{
-
 #if defined(CONFIG_MACH_LGE_OMAP3)
 			musb_link_force_active(0);
 #endif // defined(CONFIG_MACH_LGE_OMAP3)
-
 			twl4030_phy_suspend(twl, 0);
+			the_wlock.usb_connected = 0;
+			if(1==the_wlock.wake_lock_on) 
+			{
+				schedule_delayed_work(&twl4030_usb_wq, msecs_to_jiffies(8000));	
+				/* 500 msec */ // to delay unlock wake_lock
+			} 
 		}
 		else // usb connnect
 		{
+			// LGE_CHANGE wake lock for usb connection
+			if(8==muic_mode_final)
+			{
+				the_wlock.usb_connected = 1;		
+				cancel_delayed_work(&twl4030_usb_wq);
+			
+				if(0==the_wlock.wake_lock_on)
+				{
+					wake_lock(&the_wlock.wake_lock);
+					the_wlock.wake_lock_on=1;
+					printk(KERN_WARNING "[twl4030-usb] wake_lock_on=1 (locked)\n");
+				}
 
 #if defined(CONFIG_MACH_LGE_OMAP3)
 			musb_link_force_active(1);
@@ -723,9 +965,19 @@ static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 #endif
 	}
 #endif 
+	}
 	sysfs_notify(&twl->dev->kobj, NULL, "vbus");
 	return IRQ_HANDLED;
 }
+
+/* LGE_CHANGE_START 2011-03-27 kenneth.kang@lge.com USB IRQ request to prevent USB Driver missing when DUT sleeped */
+int twl4030_usb_irq_exported()
+{
+	struct twl4030_usb *twl = my_twl;
+	twl4030_usb_irq(twl->irq, twl);
+	return 0;
+}
+/* LGE_CHANGE_END 2011-03-27 kenneth.kang@lge.com */
 
 static int twl4030_set_suspend(struct otg_transceiver *x, int suspend)
 {
@@ -751,6 +1003,8 @@ static int twl4030_set_peripheral(struct otg_transceiver *x,
 	twl->otg.gadget = gadget;
 	if (!gadget)
 		twl->otg.state = OTG_STATE_UNDEFINED;
+
+	twl4030_gadget_connect_or_disconnect(twl); // LGE_CHANGE
 
 	return 0;
 }
@@ -780,14 +1034,19 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	INIT_WORK(&set_ext_pwr_twl_usb_work, twl_usb_ext_pwr_work);
 #endif 
 
-#if 0 /* mbk_wake mbk_temp */ 
+#if 1 /* mbk_wake mbk_temp */ 
 	// LGE_CHANGE wake lock for usb connection
 	wake_lock_init(&the_wlock.wake_lock, WAKE_LOCK_SUSPEND, "twl4030_usb_connection");
 	the_wlock.wake_lock_on=0;
+	the_wlock.usb_connected=0;
+	wake_lock_init(&the_wlock2.wake_lock, WAKE_LOCK_SUSPEND, "twl4030_usb_connection2");
+	the_wlock2.wake_lock_on=0;
+	the_wlock2.usb_connected=0;
 	// LGE_CHANGE wake lock for usb connection
 
 	// LGE_CHANGE work queue
 	INIT_DELAYED_WORK(&twl4030_usb_wq, twl4030_usb_wq_func);
+	INIT_DELAYED_WORK(&twl4030_usb_wq2, twl4030_usb_wq_func2);	
 	// LGE_CHANGE work queue
 #endif
 
@@ -799,6 +1058,10 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	twl = kzalloc(sizeof *twl, GFP_KERNEL);
 	if (!twl)
 		return -ENOMEM;
+
+
+
+	t2_transceiver = twl;
 
 	twl->dev		= &pdev->dev;
 	twl->irq		= platform_get_irq(pdev, 0);
@@ -845,7 +1108,8 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 		kfree(twl);
 		return status;
 	}
-
+// LGE_UPDATE_S jaejoong.kim
+//	wake_lock_init(&usb_lock, WAKE_LOCK_SUSPEND, "musb_wake_lock");
 	//regulator_enable(twl->usb3v1);
 	/* The IRQ handler just handles changes from the previous states
 	 * of the ID and VBUS pins ... in probe() we must initialize that
@@ -856,6 +1120,10 @@ static int __devinit twl4030_usb_probe(struct platform_device *pdev)
 	 * because of scheduling delays.
 	 */
 	twl4030_usb_irq(twl->irq, twl);
+	// LGE_CHANGE_S [daewung.kim@lge.com] 2010-12-29, USB interrupt failure at suspend state
+	my_twl=twl; // LGE_CHANGE
+	// LGE_CHANGE_S [daewung.kim@lge.com] 2010-12-29, USB interrupt failure at suspend state
+
 	//if (twl4030_usb_linkstat(twl) == USB_EVENT_NONE) {
 	//	regulator_disable(twl->usb3v1);
 	//}
@@ -895,12 +1163,15 @@ static int __exit twl4030_usb_remove(struct platform_device *pdev)
 #if 0	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
 	regulator_put(twl->usb3v1);
 #endif
+// LGE_UPDATE_S jaejoong.kim
+//	wake_lock_destroy(&usb_lock);
 
 	kfree(twl);
 
-#if 0 /* mbk_wake mbk_temp */ 
+#if 1 /* mbk_wake mbk_temp */ 
 	// LGE_CHANGE wake lock for usb connection
 	wake_lock_destroy(&the_wlock.wake_lock);
+	wake_lock_destroy(&the_wlock2.wake_lock);
 	// LGE_CHANGE wake lock for usb connection
 #endif
 

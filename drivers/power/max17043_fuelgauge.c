@@ -23,19 +23,18 @@
 #include <linux/slab.h>
 #include <mach/gpio.h>
 
-
+// LGP970 (B-project) AP - Fuel gauge Version
 #if defined(CONFIG_MACH_LGE_HUB) || defined(CONFIG_MACH_LGE_SNIPER)
-#define GAUGE_INT	(175)
-#define RCOMP_BL44JN	(0xB8)	
-#define MONITOR_LEVEL	(2)
+#define GAUGE_INT	175
+#define RCOMP_BL44JN	(0xB8)	/* Default Value for LGP970 Battery */
 #if defined(CONFIG_HUB_CHARGING_IC)
 #include "../hub/hub_charging_ic.h"
 #endif
 #if defined(CONFIG_HUB_MUIC)
 #include "../hub/hub_muic.h"
 #endif
-extern void charger_state_update_by_other(void);	
-#endif 
+extern void charger_state_update_by_other(void);	// from twl4030_bci_battery.c
+#endif /* CONFIG_MACH_LGE_HUB || CONFIG_MACH_LGE_SNIPER */
 
 #ifdef CONFIG_LGE_OMAP3_EXT_PWR
 extern int get_external_power_status(void);
@@ -61,9 +60,9 @@ extern int get_external_power_status(void);
 #define MAX17043_CMD_MSB	0xFE
 #define MAX17043_CMD_LSB	0xFF
 
-#define MAX17043_WORK_DELAY	(10 * HZ)	
-#define MAX17043_BATTERY_FULL	95		
-#define MAX17043_TOLERANCE	20		
+#define MAX17043_WORK_DELAY	(10 * HZ)	// 10s
+#define MAX17043_BATTERY_FULL	97		// Tuning Value
+#define MAX17043_TOLERANCE	20		// Tuning Value
 
 struct max17043_chip {
 	struct i2c_client		*client;
@@ -71,26 +70,30 @@ struct max17043_chip {
 	struct work_struct		alert_work;
 	struct power_supply		battery;
 
-	
-	int vcell;				
-	int soc;				
-	int version;			
-	int config;				
+	/* Max17043 Registers.(Raw Data) */
+	int vcell;				// VCELL Register vaule
+	int soc;				// SOC Register value
+	int version;			// Max17043 Chip version
+	int config;				// RCOMP, Sleep, ALRT, ATHD
 
-	
-	int voltage;			
-	int capacity;			
-	max17043_status status;	
+	/* Interface with Android */
+	int voltage;			// Battery Voltage   (Calculated from vcell)
+	int capacity;			// Battery Capacity  (Calculated from soc)
+	max17043_status status;	// State Of max17043
 };
 
-
+/*
+ * Voltage Calibration Data
+ *   voltage = (capacity * gradient) + intercept
+ *   voltage must be in +-15%
+ */
 struct max17043_calibration_data {
-	int voltage;	
-	int capacity;	
-	int gradient;	
-	int intercept;	
+	int voltage;	/* voltage in mA */
+	int capacity;	/* capacity in % */
+	int gradient;	/* gradient * 1000 */
+	int intercept;	/* intercept * 1000 */
 };
-
+// 180mA Load for Battery
 static struct max17043_calibration_data without_charger[] = {
 	{3953,		81,		9,		3242},
 	{3800,		58,		7,		3403},
@@ -98,9 +101,9 @@ static struct max17043_calibration_data without_charger[] = {
 	{3695,		20,		2,		3650},
 	{3601,		4,		6,		3574},
 	{3300,		0,		55,		3548},
-	{ -1, -1, -1, -1},	
+	{ -1, -1, -1, -1},	// End of Data
 };
-
+// 770mA Charging Battery
 static struct max17043_calibration_data with_charger[] = {
 	{3865,		2,		66,		3709},
 	{3956,		19,		5,		3851},
@@ -108,12 +111,11 @@ static struct max17043_calibration_data with_charger[] = {
 	{4088,		61,		5,		3813},
 	{4158,		71,		7,		3689},
 	{4200,		100,		2,		4042},
-	{ -1, -1, -1, -1},	
+	{ -1, -1, -1, -1},	// End of Data
 };
 
 static struct max17043_chip* reference = NULL;
-int need_to_quickstart = 0;
-EXPORT_SYMBOL(need_to_quickstart);
+static int need_to_quickstart = 0;
 
 static int max17043_write_reg(struct i2c_client *client, int reg, u16 value)
 {
@@ -248,7 +250,7 @@ static int max17043_need_quickstart(int charging)
 	if(reference == NULL)
 		return 0;
 
-	
+	// Get Current Data
 	vol = reference->voltage;
 	level = reference->soc >> 8;
 	if(level > 100)
@@ -256,7 +258,7 @@ static int max17043_need_quickstart(int charging)
 	else if(level < 0)
 		level = 0;
 	
-	
+	// choose data to use
 	if(charging) {
 		data = with_charger;
 		while(data[i].voltage != -1) {
@@ -273,23 +275,23 @@ static int max17043_need_quickstart(int charging)
 		}
 	}
 
-	
+	// absense of data
 	if(data[i].voltage == -1) {
 		if(charging) {
 			if(level == 100)
 				return 0;
-			else 
+			else /* Votlage > 4200 but Capacity is not 100% */
 				return 1;
 		}
 		else {
 			if(level == 0)
 				return 0;
-			else 
+			else /* Voltage < 3300 but Capacity is not 0% */
 				return 1;
 		}
 	}
 	
-	
+	// calculate diff
 	expected = (vol - data[i].intercept) / data[i].gradient;
 	if(expected > 100)
 		expected = 100;
@@ -297,15 +299,15 @@ static int max17043_need_quickstart(int charging)
 		expected = 0;
 	diff = expected - level;
 
-	
+	// judge
 	if(diff < -MAX17043_TOLERANCE || diff > MAX17043_TOLERANCE) {
-		
+		//printk(KERN_DEBUG "[BATTERY] real : %d%% , expected : %d%%\n", level, expected);
 		need_to_quickstart += 1;
 	} else {
 		need_to_quickstart = 0;
 	}
 
-	
+	// Maximum continuous reset time is 2. If reset over 2 times, discard it.
 	if(need_to_quickstart > 2)
 		need_to_quickstart = 0;
 		
@@ -374,12 +376,18 @@ static int max17043_update(struct i2c_client *client)
 	if(ret < 0)
 		return ret;
 	
-	
-	chip->voltage = (chip->vcell * 5) >> 2;	
+	/* convert raw data to usable data */
+	chip->voltage = (chip->vcell * 5) >> 2;	// vcell * 1.25 mV
 	chip->capacity = chip->soc >> 8;
-	
-
-	chip->capacity = (chip->capacity * 100) / MAX17043_BATTERY_FULL;	
+	// adjust full condition...just hack...
+	if(chip->capacity >= 72)
+		chip->capacity++;
+	if(chip->capacity >= 64)
+		chip->capacity++;
+	if(chip->capacity >= 35)
+		chip->capacity++;
+	if(chip->soc & 0x80)	// half up
+		chip->capacity++;
 
 	if(chip->capacity > 100)
 		chip->capacity = 100;
@@ -393,6 +401,7 @@ static int max17043_update(struct i2c_client *client)
 static void max17043_work(struct work_struct *work)
 {
 	struct max17043_chip *chip;
+	int alert_level;
 	int charging = 0;
 
 	chip = container_of(work, struct max17043_chip, work.work);
@@ -412,7 +421,8 @@ static void max17043_work(struct work_struct *work)
 				schedule_delayed_work(&chip->work,  HZ);
 				return;
 			}
-			max17043_set_athd(MONITOR_LEVEL);
+			alert_level = max17043_next_alert_level(chip->capacity);
+			max17043_set_athd(alert_level);
 			max17043_clear_interrupt(chip->client);
 			need_to_quickstart = 0;
 			break;
@@ -421,12 +431,16 @@ static void max17043_work(struct work_struct *work)
 			max17043_update(chip->client);
 			break;
 	}
+	alert_level = max17043_next_alert_level(chip->capacity);
+	max17043_set_athd(alert_level);
 	schedule_delayed_work(&chip->work, MAX17043_WORK_DELAY);
 	charger_state_update_by_other();
 }
 
 static void max17043_alert_work(struct work_struct *work)
 {
+	int alert_level;
+
 	if(reference == NULL)
 		return;
 
@@ -434,9 +448,13 @@ static void max17043_alert_work(struct work_struct *work)
 		cancel_delayed_work_sync(&reference->work);	
 		schedule_delayed_work(&reference->work, MAX17043_WORK_DELAY);
 	}
-	max17043_update(reference->client);
 
 	max17043_read_config(reference->client);
+	
+	max17043_update(reference->client);
+
+	alert_level = max17043_next_alert_level(reference->capacity);
+	max17043_set_athd(alert_level);
 	max17043_clear_interrupt(reference->client);
 
 #if defined(CONFIG_HUB_MUIC)
@@ -447,7 +465,7 @@ static void max17043_alert_work(struct work_struct *work)
 #error
 #endif
 	{
-		
+		printk(KERN_INFO "[Battery] Low Level Alert (%d)\n",reference->capacity);
 		charger_state_update_by_other();
 	}
 }
@@ -460,8 +478,8 @@ static irqreturn_t max17043_interrupt_handler(int irq, void *data)
 	schedule_work(&reference->alert_work);
 	return IRQ_HANDLED;
 }
-#if 0	
-
+#if 0	// B-Project Does not use fuel gauge as a battery driver
+/* sysfs(power_supply) interface : for Android Battery Service [START] */
 static enum power_supply_property max17043_battery_props[] = {
 	POWER_SUPPLY_PROP_VOLTAGE_NOW,
 	POWER_SUPPLY_PROP_CAPACITY,
@@ -485,9 +503,9 @@ static int max17043_get_property(struct power_supply *psy,
 	}
 	return 0;
 }
-
+/* sysfs interface : for Android Battery Service [END] */
 #endif
-
+/* sysfs interface : for AT Commands [START] */
 ssize_t max17043_show_soc(struct device *dev,
 			 struct device_attribute *attr,
 			 char *buf)
@@ -547,39 +565,50 @@ ssize_t max17043_store_status(struct device *dev,
 	}
 	return count;
 }
-DEVICE_ATTR(state, 0644, max17043_show_status, max17043_store_status);
+DEVICE_ATTR(state, 0664, max17043_show_status, max17043_store_status);
+/* sysfs interface : for AT Commands [END] */
 
-
-
+/* SYMBOLS to use outside of this module */
 int max17043_get_capacity(void)
 {
-	if(reference == NULL)	
-		return 100;			
+	if(reference == NULL)	// if fuel gauge is not initialized,
+		return 100;			// return Dummy Value
 	return reference->capacity;
 }
 EXPORT_SYMBOL(max17043_get_capacity);
 int max17043_get_voltage(void)
 {
-	if(reference == NULL)	
-		return 4200;		
+	if(reference == NULL)	// if fuel gauge is not initialized,
+		return 4200;		// return Dummy Value
 	return reference->voltage;
 }
 EXPORT_SYMBOL(max17043_get_voltage);
 int max17043_do_calibrate(void)
 {
+	int need_quickstart = 0;
+	int charging = 0;
+
 	if(reference == NULL)
 		return -1;
 
-#if defined(CONFIG_LGE_OMAP3_EXT_PWR)
+#if defined(CONFIG_HUB_MUIC)
+	if(get_muic_mode() != MUIC_NONE)
+#elif defined(CONFIG_LGE_OMAP3_EXT_PWR)
 	if ( 1 == get_external_power_status() )
+#else
+#error
+#endif
 	{
 		charging = 1;
 	}
 
 
-#endif
-	cancel_delayed_work(&reference->work);	
+	need_quickstart = max17043_need_quickstart(charging);
+
+	if(need_quickstart) {
 		max17043_quickstart(reference->client);
+	}
+	cancel_delayed_work(&reference->work);
 	schedule_delayed_work(&reference->work, HZ);
 
 	return 0;
@@ -589,19 +618,15 @@ int max17043_set_rcomp_by_temperature(int temp)
 {
 	int rcomp;
 	if(reference == NULL)
-		return -1;	
+		return -1;	// MAX17043 not initialized
 
 	rcomp = RCOMP_BL44JN;
 	
+	// RCOMP compensation refer to temperature
 	if(temp < 200)
 		rcomp = rcomp + ((200 - temp) / 2);
 	else if(temp > 200)
 		rcomp = rcomp - ((temp - 200) * 11 / 50);
-
-	if(rcomp < 0x00)
-		rcomp = 0x00;
-	else if(rcomp > 0xff)
-		rcomp = 0xff;
 
 	max17043_set_rcomp(rcomp);
 	return 0;
@@ -612,7 +637,7 @@ int max17043_set_alert_level(int alert_level)
 	return max17043_set_athd(alert_level);
 }
 EXPORT_SYMBOL(max17043_set_alert_level);
-
+/* End SYMBOLS */
 
 static int __devinit max17043_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
@@ -620,6 +645,7 @@ static int __devinit max17043_probe(struct i2c_client *client,
 	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
 	struct max17043_chip *chip;
 	int ret = 0;
+	int alert_level;
 
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_WORD_DATA))
 		return -EIO;
@@ -630,7 +656,7 @@ static int __devinit max17043_probe(struct i2c_client *client,
 
 	ret = gpio_request(GAUGE_INT, "max17043_alert");
 	if (ret < 0) {
-		
+		printk(KERN_DEBUG " [MAX17043] GPIO Request Failed\n");
 		goto err_gpio_request_failed;
 	}
 	gpio_direction_input(GAUGE_INT);
@@ -640,21 +666,21 @@ static int __devinit max17043_probe(struct i2c_client *client,
 			IRQF_TRIGGER_FALLING,
 			"MAX17043_Alert", NULL);
 	if (ret < 0) {
-		
+		printk(KERN_DEBUG " [MAX17043] IRQ Request Failed\n");
 		goto err_request_irq_failed;
 	}
 
 	ret = enable_irq_wake(gpio_to_irq(GAUGE_INT));
 	if (ret < 0) {
-		
+		printk(KERN_DEBUG "[MAX17043] set GAUGE_INT to wakeup source failed.\n");
 		goto err_request_wakeup_irq_failed;
 	}
-	
+	//enable_irq(gpio_to_irq(GAUGE_INT));
 	chip->client = client;
 
 	i2c_set_clientdata(client, chip);
 
-#if 0	
+#if 0	// B-Project Does not use fuel gauge as a battery driver
 	chip->battery.name		= "battery";
 	chip->battery.type		= POWER_SUPPLY_TYPE_BATTERY;
 	chip->battery.get_property	= max17043_get_property;
@@ -668,14 +694,14 @@ static int __devinit max17043_probe(struct i2c_client *client,
 	}
 #endif
 
-	
+	// sysfs path : /sys/devices/platform/i2c_omap.2/i2c-2/2-0036/soc
 	ret = device_create_file(&client->dev, &dev_attr_soc);
 	if (ret < 0) {
 		pr_err("%s:File device creation failed: %d\n", __func__, ret);
 		ret = -ENODEV;
 		goto err_create_file_soc_failed;
 	}
-	
+	// sysfs path : /sys/devices/platform/i2c_omap.2/i2c-2/2-0036/state
 	ret = device_create_file(&client->dev, &dev_attr_state);
 	if (ret < 0) {
 		pr_err("%s:File device creation failed: %d\n", __func__, ret);
@@ -696,26 +722,25 @@ static int __devinit max17043_probe(struct i2c_client *client,
 	max17043_read_version(client);
 	max17043_read_config(client);
 
+	if(need_to_quickstart) {
 	max17043_set_rcomp(RCOMP_BL44JN);
-	max17043_set_athd(MONITOR_LEVEL);
-	max17043_clear_interrupt(client);
-	if(need_to_quickstart == -1) {
 		max17043_quickstart(client);
-		need_to_quickstart = 0;
 		schedule_delayed_work(&chip->work, HZ);
 		return 0;
-	} else {
+	}
 	
 	max17043_update(client);
+	alert_level = max17043_next_alert_level(chip->capacity);
+	max17043_set_athd(alert_level);
+	max17043_clear_interrupt(client);
 	schedule_delayed_work(&chip->work, MAX17043_WORK_DELAY);
-	}
 	
 	return 0;
 
 err_create_file_state_failed:
 	device_remove_file(&client->dev, &dev_attr_soc);
 err_create_file_soc_failed:
-#if 0	
+#if 0	// B-Project. Does not use fuel gauge as a battery driver
 err_power_supply_register_failed:
 	i2c_set_clientdata(client, NULL);
 #endif
@@ -769,7 +794,7 @@ static int max17043_resume(struct i2c_client *client)
 #else
 #define max17043_suspend NULL
 #define max17043_resume NULL
-#endif 
+#endif /* CONFIG_PM */
 
 static const struct i2c_device_id max17043_id[] = {
 	{ "max17043", 0 },
@@ -789,29 +814,27 @@ static struct i2c_driver max17043_i2c_driver = {
 	.id_table	= max17043_id,
 };
 
-
+/* boot argument from boot loader */
 static s32 __init max17043_state(char *str)
 {
 	switch(str[0]) {
-		case 'g':	
-		case 'q':	
+		case 'b':	// battery not connected when booting
+		case 'g':	// fuel gauge value is good
+		case 'q':	// did quikcstart.
 			need_to_quickstart = 0;
 			break;
-		case 'b':	
+		case 'e':	// quickstart needed. but error occured.
 			need_to_quickstart = 1;
 			break;
-		case 'e':	
-			need_to_quickstart = -1;
-			break;
 		default:
-			
+			// can not enter here
 			break;
 	}
 	return 0;
 }
 __setup("fuelgauge=", max17043_state);
 
-#if 1 
+#if 1 // B-Project Rev.D
 void __init max17043_init(void)
 {
 	i2c_add_driver(&max17043_i2c_driver);

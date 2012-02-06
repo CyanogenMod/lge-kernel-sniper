@@ -174,7 +174,8 @@ static void lp8720_init(void)
 {
 	struct lp8720_platform_data *pdata = lp8720_client->dev.platform_data;
 
-	lp8720_write_reg(lp8720_client, LP8720_LDO1_SETTING, LP8720_NO_STARTUP | 0x1F); //3.3v - MMC0
+	//lp8720_write_reg(lp8720_client, LP8720_LDO1_SETTING, LP8720_NO_STARTUP | 0x1d); //3.0v - MMC0 //[LGSI]Saravanan MR Patches
+	lp8720_write_reg(lp8720_client, LP8720_LDO1_SETTING, LP8720_NO_STARTUP | 0x1f);//[LGSI]Saravanan MR Patches
 	lp8720_write_reg(lp8720_client, LP8720_LDO2_SETTING, LP8720_NO_STARTUP | 0x1d); //3.0v - MOTOR
 	lp8720_write_reg(lp8720_client, LP8720_LDO3_SETTING, /*LP8720_STARTUP_DELAY_3TS*/LP8720_NO_STARTUP | 0x17); //2.7v
 	lp8720_write_reg(lp8720_client, LP8720_LDO4_SETTING, LP8720_NO_STARTUP | 0x11); //1.8v
@@ -258,7 +259,13 @@ static struct i2c_driver subpm_lp8720_driver = {
 	},
 };
 
-
+/* <sunggyun.yu@lge.com> for early initialization */
+#if 1////
+void __init subpm_lp8720_init(void)
+{
+	i2c_add_driver(&subpm_lp8720_driver);
+}
+#else
 static int __init subpm_lp8720_init(void)
 {
 	return i2c_add_driver(&subpm_lp8720_driver);
@@ -269,12 +276,9 @@ static void __exit subpm_lp8720_exit(void)
 	i2c_del_driver(&subpm_lp8720_driver);
 }
 
-#ifdef CONFIG_MACH_LGE_OMAP3
-arch_initcall(subpm_lp8720_init);
-#else
 module_init(subpm_lp8720_init);
-#endif
 module_exit(subpm_lp8720_exit);
+#endif////
 
 MODULE_AUTHOR("LG Electronics");
 MODULE_DESCRIPTION("LP8720 Regulator Driver");

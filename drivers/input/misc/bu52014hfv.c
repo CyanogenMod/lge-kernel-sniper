@@ -51,10 +51,14 @@ enum {
 	DESK_DOCK,
 	CAR_DOCK,
 };
+#ifdef LG_MUIC_DESK_CRADLE
+/* LGE_CHANGE_START 2011-03-14 kenneth.kang@lge.com Cradle detected by muic */
+struct bu52014hfv_info *desk_cradle_info = NULL;
+/* LGE_CHANGE_END 2011-03-14 kenneth.kang@lge.com Cradle detected by muic */
+#endif
+#define FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU	 //20101221 seven.kim@lge.com for hole sensor hidden menu
 
-#define FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU 
-
-#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU	 
+#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU		//20101221 seven.kim@lge.com for hole sensor hidden menu
 static atomic_t sensing_hall;
 
 static ssize_t p970_hall_sensing_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -68,7 +72,7 @@ static ssize_t p970_hall_sensing_store(struct device *dev, struct device_attribu
 
 }
 
-static DEVICE_ATTR(sensing, 0666, p970_hall_sensing_show, p970_hall_sensing_store);
+static DEVICE_ATTR(sensing, 0664, p970_hall_sensing_show, p970_hall_sensing_store);
 #endif /*FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU*/
 
 
@@ -91,15 +95,17 @@ static int bu52014hfv_update(struct bu52014hfv_info *info, int gpio, int dock)
 
 	if (state)
 	{
-		#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU 
+		#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU		//20101221 seven.kim@lge.com for hole sensor hidden menu
 		atomic_set( &sensing_hall, 1 );
 		#endif /*FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU*/
-		
-		switch_set_state(&info->sdev, dock);
+		//seshu start
+		//switch_set_state(&info->sdev, dock);
+		switch_set_state(&info->sdev, CAR_DOCK); // 20110327 kenneth.kang@lge.com for prevent hall ic work as Desk Cradle 
+		//seshu end
 	}
 	else
 	{
-		#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU	
+		#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU		//20101221 seven.kim@lge.com for hole sensor hidden menu
 		atomic_set( &sensing_hall, 0 );
 		#endif /*FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU*/
 		
@@ -108,6 +114,16 @@ static int bu52014hfv_update(struct bu52014hfv_info *info, int gpio, int dock)
 
 	return state;
 }
+#ifdef LG_MUIC_DESK_CRADLE
+/* LGE_CHANGE_START 2011-03-14 kenneth.kang@lge.com Cradle detected by muic */
+int bu52014hfv_updated_by_muic(int dock)
+{
+	switch_set_state(&desk_cradle_info->sdev, dock);
+	printk("bu52014hfv_updated_by_muic() : %d\n", dock);
+}
+EXPORT_SYMBOL(bu52014hfv_updated_by_muic);
+/* LGE_CHANGE_END 2011-03-14 kenneth.kang@lge.com Cradle detected by muic */
+#endif
 
 void bu52014hfv_irq_north_work_func(struct work_struct *work)
 {
@@ -154,7 +170,11 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 		       __func__, ret);
 		goto error_kmalloc_failed;
 	}
-
+#ifdef LG_MUIC_DESK_CRADLE	
+/* LGE_CHANGE_START 2011-03-14 kenneth.kang@lge.com Cradle detected by muic */
+	desk_cradle_info = info;
+/* LGE_CHANGE_END 2011-03-14 kenneth.kang@lge.com Cradle detected by muic */
+#endif
 	/* Initialize hall effect driver data */
 	info->gpio_north = pdata->docked_north_gpio;
 	info->gpio_south = pdata->docked_south_gpio;
@@ -163,11 +183,17 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 	info->irq_south = gpio_to_irq(pdata->docked_south_gpio);
 
 	if (pdata->north_is_desk) {
-		info->north_value = DESK_DOCK;
+		//seshu
+		//info->north_value = DESK_DOCK;
+		info->north_value = CAR_DOCK; // N or S act on CAR DOCK
+		//seshu end
 		info->south_value = CAR_DOCK;
 	} else {
 		info->north_value = CAR_DOCK;
-		info->south_value = DESK_DOCK;
+		//seshu start
+		info->south_value = CAR_DOCK; // N or S act on CAR DOCK
+		//info->south_value = DESK_DOCK;
+		//seshu end
 	}
 
 	info->work_queue = create_singlethread_workqueue("bu52014hfv_wq");
@@ -213,7 +239,7 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 	if (!ret)
 		bu52014hfv_update(info, info->gpio_north, info->north_value);
 
-#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU 
+#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU		//20101221 seven.kim@lge.com for hole sensor hidden menu
 	ret = device_create_file(&pdev->dev, &dev_attr_sensing);	
 	if (ret) 
 	{		
@@ -224,7 +250,7 @@ static int __devinit bu52014hfv_probe(struct platform_device *pdev)
 
 	return 0;
 
-#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU
+#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU		//20101221 seven.kim@lge.com for hole sensor hidden menu
 error_devfs_failed:
 	device_remove_file(&pdev->dev, &dev_attr_sensing);	
 #endif /*FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU*/
@@ -244,7 +270,7 @@ static int __devexit bu52014hfv_remove(struct platform_device *pdev)
 {
 	struct bu52014hfv_info *info = platform_get_drvdata(pdev);
 
-#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU
+#ifdef FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU		//20101221 seven.kim@lge.com for hole sensor hidden menu
 	device_remove_file(&pdev->dev, &dev_attr_sensing);
 #endif /*FEATURE_LGE_HOLE_SENSOR_HIDDEN_MENU*/
 

@@ -495,6 +495,7 @@ out:
  */
 static int mmc_sdio_suspend(struct mmc_host *host)
 {
+	/* LGE_CHANGE_S, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
 	#if 0
 	int i, err = 0;
 
@@ -527,12 +528,14 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 
 	return err;
 	#endif
+	/* LGE_CHANGE_E, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
 	
 	return 0;
 }
 
 static int mmc_sdio_resume(struct mmc_host *host)
 {
+	/* LGE_CHANGE_S, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
 	#if 0
 	int i, err = 0;
 
@@ -581,6 +584,7 @@ static int mmc_sdio_resume(struct mmc_host *host)
 
 	return err;
 	#endif
+	/* LGE_CHANGE_E, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
 	
 	return 0;
 }

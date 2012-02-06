@@ -121,13 +121,30 @@ void gh_exit(void)
 void *gh_find(struct gh_t_hash_tab *hash_tab, void *key)
 {
 	struct element *elem;
+	u16 bucket_no;
 
-	elem = hash_tab->buckets[(*hash_tab->hash) (key, hash_tab->max_bucket)];
+    if (!hash_tab)
+	{
+		printk("ERROR: hash_tab is NULL");
+		return NULL;
+	}
 
-	for (; elem; elem = elem->next) {
+	bucket_no = (*hash_tab->hash) (key, hash_tab->max_bucket);
+
+	if((bucket_no < 0) || (bucket_no >  hash_tab->max_bucket))
+		return NULL;
+	else	
+	elem = hash_tab->buckets[bucket_no];
+
+	if(elem !=NULL)
+	{
+	for (; elem; elem = elem->next) 
+	   {
 		if ((*hash_tab->match) (key, elem->data))
 			return elem->data;
 	}
+	}
+  
 
 	return NULL;
 }

@@ -25,7 +25,7 @@
 #define CHG_STATUS_N_OMAP 		15
 
 #ifdef CONFIG_LGE_CHARGE_CONTROL_BATTERY_FET
-#define CHAR_CONTROL 			69
+#define CHAR_CONTROL 			39
 #endif 
 
 typedef enum {
@@ -50,9 +50,6 @@ max8922_status get_charging_ic_status(void);
 
 #ifdef CONFIG_LGE_CHARGE_CONTROL_BATTERY_FET
 extern void lge_battery_fet_onoff(int on);
-#endif 
-#ifdef CONFIG_LGE_OMAP3_EXT_PWR
-extern int get_external_power_status(void);
 #endif 
 
 #endif /* __HUB_CHARGING_IC_H__ */

@@ -320,6 +320,88 @@ static void omap_uart_restore_context(struct omap_uart_state *uart)
 
 	serial_write_reg(uart, UART_OMAP_MDR1, 0x00); /* UART 16x mode */
 }
+//LGSI Saravanan TI Patch 14353
+static inline int _is_per_uart(struct omap_uart_state *uart)
+{
+	if ((omap_rev() <= OMAP3630_REV_ES1_1) &&
+		(uart->num == 2 || uart->num == 3))
+		return 1;
+
+	return 0;
+}
+
+int omap_uart_check_per_uarts_used(void)
+{
+	struct omap_uart_state *uart;
+
+	list_for_each_entry(uart, &uart_list, node) {
+		if (_is_per_uart(uart))
+			return 1;
+	}
+	return 0;
+}
+
+/*
+ * Errata i582 affects PER UARTS..Loop back test is done to
+ * check the UART state when the corner case is encountered
+ */
+static int omap_uart_loopback_test(struct omap_uart_state *uart)
+{
+	u8 loopbk_rhr = 0;
+
+	omap_uart_save_context(uart);
+	serial_write_reg(uart, UART_OMAP_MDR1, 0x7);
+	serial_write_reg(uart, UART_LCR, 0xBF); /* Config B mode */
+	serial_write_reg(uart, UART_DLL, uart->dll);
+	serial_write_reg(uart, UART_DLM, uart->dlh);
+	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
+	/* configure uart3 in UART mode */
+	serial_write_reg(uart, UART_OMAP_MDR1, 0x00); /* UART 16x mode */
+	serial_write_reg(uart, UART_LCR, 0x80);
+	/* Enable internal loop back mode by setting MCR_REG[4].LOOPBACK_EN */
+	serial_write_reg(uart, UART_MCR, 0x10);
+
+	/* write to THR,read RHR and compare */
+	/* Tx output is internally looped back to Rx input in loop back mode */
+	serial_write_reg(uart, UART_LCR_DLAB, 0x00);
+	/* Enables write to THR and read from RHR */
+	serial_write_reg(uart, UART_TX, 0xCC); /* writing data to THR */
+	/* reading data from RHR */
+	loopbk_rhr = (serial_read_reg(uart, UART_RX) & 0xFF);
+	if (loopbk_rhr == 0xCC) {
+		/* compare passes,try comparing with different data */
+		serial_write_reg(uart, UART_TX, 0x69);
+		loopbk_rhr = (serial_read_reg(uart, UART_RX) & 0xFF);
+		if (loopbk_rhr == 0x69) {
+			/* compare passes,reset UART3 and re-configure module */
+			omap_uart_reset(uart);
+			omap_uart_restore_context(uart);
+			return 0;
+		}
+	} else {	/* requires warm reset */
+		return -ENODEV;
+	}
+	return 0;
+}
+
+int omap_uart_per_errata(void)
+{
+	struct omap_uart_state *uart;
+
+	/* For all initialised UART modules that are in PER domain
+	 * do loopback test
+	 */
+	list_for_each_entry(uart, &uart_list, node) {
+		if (_is_per_uart(uart)) {
+			if (omap_uart_loopback_test(uart))
+				return -ENODEV;
+			else
+				return 0;
+		}
+	}
+	return 0;
+}
+//LGSI Saravanan TI Patch 14353
 #else
 static inline void omap_uart_save_context(struct omap_uart_state *uart) {}
 static inline void omap_uart_restore_context(struct omap_uart_state *uart) {}
@@ -518,9 +600,10 @@ void omap_uart_resume_idle(int num)
 		if (num == uart->num) {
 			pdata = uart->pdev->dev.platform_data;
 			omap_uart_enable_clocks(uart);
-			//TESTBT	
-			//omap_uart_disable_rtspullup(uart);
-			if (uart->num != 1)
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_START */
+ 			if(uart->num !=1)
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_END */
+			
 			omap_uart_disable_rtspullup(uart);
 
 			/* Check for IO pad wakeup */
@@ -538,9 +621,10 @@ void omap_uart_resume_idle(int num)
 			if (uart->wk_st && uart->wk_mask)
 				if (__raw_readl(uart->wk_st) & uart->wk_mask)
 					omap_uart_block_sleep(uart);
-			//TESTBT
-			if (uart->num == 1)
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_START */
+       		if(num ==1)
 				omap_uart_block_sleep(uart);
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_END */
 
 			return;
 		}
@@ -698,8 +782,7 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 	omap_uart_smart_idle_enable(uart, 0);
 
 	if (cpu_is_omap34xx()) {
-//2011_01_13 by seunghyun.yi@lge.com for UART4:  uart->num==2  ->  uart->num>=2 
-		u32 mod = (uart->num >= 2) ? OMAP3430_PER_MOD : CORE_MOD;
+		u32 mod = (uart->num == 2) ? OMAP3430_PER_MOD : CORE_MOD;
 		u32 wk_mask = 0;
 		u32 padconf = 0;
 
@@ -711,19 +794,36 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
 			padconf = 0x182;
 			break;
 		case 1:
-			wk_mask = 0;//OMAP3430_ST_UART2_MASK;//TESTBT
+			
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_START */
+			wk_mask = 0;//OMAP3430_ST_UART2_MASK;
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_END */
+
 			padconf = 0x17a;
+			
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_START */
+			padconf = 0;//0x174;
+			uart->wk_en=0;
+			uart->wk_st=0;
+/* TD_112560_112577_112759_Bluetooth request error _Call error _Headset power off error_kuldeep_22SEP2011_END */
+
 			break;
 		case 2:
 			wk_mask = OMAP3430_ST_UART3_MASK;
 			padconf = 0x19e;
 			break;
-//2011_01_13 by seunghyun.yi@lge.com for UART4 [START] : for 0x0d2 => 0x00 UART4 CTS,RTS연결 안되므로 0으로 setting 
+#if 1
+/* sudhir Start */
+/* 2011_01_13 by seunghyun.yi@lge.com for UART4 [START] : for 0x0d2 => 0x00 UART4 CTS,RTS연결 안되므로 0으로 setting */
 		case 3:
 			wk_mask = OMAP3630_ST_UART4_MASK;
-			padconf = 0x0;
+/* sudhir Start */
+			padconf = 0xd2;
+/* sudhir End */
 			break;
-//2011_01_13 by seunghyun.yi@lge.com for UART4 [END]
+/* 2011_01_13 by seunghyun.yi@lge.com for UART4 [END] */
+/* sudhir end */
+#endif
 		}
 		uart->wk_mask = wk_mask;
 		uart->padconf = padconf;

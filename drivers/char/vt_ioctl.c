@@ -125,6 +125,9 @@ void vt_event_post(unsigned int event, unsigned int old, unsigned int new)
 static void vt_event_wait(struct vt_event_wait *vw)
 {
 	unsigned long flags;
+#if 1 //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-08, Fix for a resume deadlock
+	long rc = 0;
+#endif
 	/* Prepare the event */
 	INIT_LIST_HEAD(&vw->list);
 	vw->done = 0;
@@ -133,7 +136,16 @@ static void vt_event_wait(struct vt_event_wait *vw)
 	list_add(&vw->list, &vt_events);
 	spin_unlock_irqrestore(&vt_event_lock, flags);
 	/* Wait for it to pass */
+
+#if 0 //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-08, Fix for a resume deadlock
 	wait_event_interruptible(vt_event_waitqueue, vw->done);
+#else
+	rc = wait_event_interruptible_timeout(vt_event_waitqueue, vw->done, msecs_to_jiffies(500));
+	if (rc == 0) {
+		pr_warning("vt_event_wait timeout\n");
+	}
+#endif
+
 	/* Dequeue it */
 	spin_lock_irqsave(&vt_event_lock, flags);
 	list_del(&vw->list);

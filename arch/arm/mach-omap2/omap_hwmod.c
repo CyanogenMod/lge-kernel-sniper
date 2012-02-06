@@ -1124,6 +1124,9 @@ int _omap_hwmod_idle(struct omap_hwmod *oh)
 
 	if (oh->class->sysc)
 		_sysc_idle(oh);
+/* sudhir Start */
+/*	_del_initiator_dep(oh, mpu_oh); */
+
 
 	/* 
 	 * Customized FIX to deny clearing of sleep dependancy with MPU
@@ -1132,6 +1135,7 @@ int _omap_hwmod_idle(struct omap_hwmod *oh)
 	 */
 	if (strcmp(oh->name,"uart3"))
 	_del_initiator_dep(oh, mpu_oh);
+/* sudhir End */
 
 	_disable_clocks(oh);
 

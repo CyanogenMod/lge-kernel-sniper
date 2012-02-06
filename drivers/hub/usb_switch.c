@@ -112,11 +112,10 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
 
 	sscanf(buf, "%c 0x%x 0x%x", &cmd, &reg, &val);
 
-	printk(KERN_INFO "[MUIC] LGE: MUIC_proc_write %d\n", cmd);
+	printk(KERN_INFO "[MUIC] LGE: MUIC_proc_write \n");
 
 
 	switch(cmd){
-#if 0
 		 case '3':
             muic_CP_USB_set();
             gpio_set_value(RESET_MDM, 0);
@@ -124,25 +123,21 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
             gpio_set_value(RESET_MDM, 1);
             break;
 		/* AP_UART mode*/
-#endif
-#if 0
 		case '6':
 			muic_AP_UART_set();
 			break;
-#endif
 /* LGE_CHANGE_S [kenneth.kang@lge.com] 2011-01-06, CP retain mode and Hidden Menu AP CP Switching Retain */
-		/* AP USB */
+		/* CP_UART mode*/
 		case '7':
 			muic_CP_UART_set();
 			hidden_menu_switching = 7;
 			break;
-#if 0
-		/* CP_UART mode*/
+
+		/* AP_USB mode*/
 		case '8':
 			muic_AP_USB_set();
 			hidden_menu_switching = 8;
 			break;
-#endif
 
 		/* CP_USB mode*/
 		case '9':
@@ -151,9 +146,9 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
 			break;
 /* LGE_CHANGE_E [kenneth.kang@lge.com] 2011-01-06, CP retain mode */
 		default :
-			printk(KERN_INFO "[USB_SWTICH] LGE: Bproj USB Switch invalid command %d\n", cmd);
-		        printk(KERN_INFO "[USB_SWITCH] 7: AP_USB, 9: CP_USB\n");
-		        printk(KERN_INFO "[USB_SWITCH] or \"w address value\"\n");
+			printk(KERN_INFO "[MUIC] LGE: Hub MUIC invalid command\n");
+		        printk(KERN_INFO "[MUIC] 6: AP_UART, 7: CP_UART, 8: AP_USB, 9: CP_USB\n");
+		        printk(KERN_INFO "[MUIC] or \"w address value\"\n");
 			break;
 	}
 	return len;

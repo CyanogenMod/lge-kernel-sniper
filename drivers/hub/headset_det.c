@@ -12,523 +12,8 @@
 #include <linux/workqueue.h>
 #include <mach/hub_headset_det.h>
 #include <linux/input.h>		/* LGE_CHANGE_S [luckyjun77@lge.com] 2009-11-25, hub rev A hook key */    
-#include <linux/wakelock.h>   //20110618 minyoung1.kim@lge.com 
 
 #include <linux/earlysuspend.h>	// 20100603 junyeop.kim@lge.com, headset suspend/resume [START_LGE]
-#ifdef CONFIG_LGE_LAB3_BOARD    //20110201 jungsoo1221.lee  [LGE_US850_HEADSET_START]
-#include <linux/irq.h> //20110201 jungsoo1221.lee  [LGE_US850_HEADSET]
-
-#define DEBUG_H2W
-#ifdef DEBUG_H2W
-#define H2W_DBG(fmt, arg...) printk(KERN_INFO "[H2W] %s " fmt "\n", __FUNCTION__, ## arg)
-#else
-#define H2W_DBG(fmt, arg...) do {} while (0)
-#endif  
-
-static struct workqueue_struct *g_detection_work_queue;
-static void detection_work(struct work_struct *work);
-static DECLARE_WORK(g_detection_work, detection_work);
-static int ip_dev_reg;
-
-headset_type_enum headset_type = HUB_NONE;
-
-extern void hub_headsetdet_bias(int bias);
- //20110618 minyoung1.kim@lge.com  -  call?? sleep ???î°¬À» ??, headset ?Î½? ???? ??Àº ???? ??Á¤. START
-static struct wake_lock headset_det_wake_lock;
-
-static struct delayed_work headset_workq;
-void headset_workq_func(void *data)
-{
-	//printk("%s: Wake Unlock ==========================\n", __func__);
-	if(wake_lock_active(&headset_det_wake_lock)) {
-	//	printk("%s: Wake Unlock Real ==========================\n", __func__);
-		wake_unlock(&headset_det_wake_lock);
-	}
-
-}
-//20110618 minyoung1.kim@lge.com END
-
-struct h2w_info {
-	struct switch_dev sdev;
-	struct input_dev *input;
-
-	int gpio_detect;
-	int gpio_button_detect;
-	int gpio_jpole;
-	int gpio_mic_bias_en;
-	atomic_t btn_state;
-	int ignore_btn;
-
-	unsigned int irq;
-	unsigned int irq_btn;
-	unsigned int irq_jpole;
-
-	struct hrtimer timer;
-	ktime_t debounce_time;
-
-	ktime_t unplug_debounce_time; // add eklee
-
-	struct hrtimer btn_timer;
-	ktime_t btn_debounce_time;
-};
-static struct h2w_info *hi;
-
-// 20100608 junyeop.kim@lge.com, headset event inform for hdmi [END_LGE]
-unsigned int get_headset_type(void)
-{
-   // return (unsigned int)headset_type;
-    return (switch_get_state(&hi->sdev)); 
-}
-
-EXPORT_SYMBOL(get_headset_type);
-
-static ssize_t gpio_h2w_print_name(struct switch_dev *sdev, char *buf)
-{
-	switch (switch_get_state(&hi->sdev)) {
-	case HUB_NONE:
-		return sprintf(buf, "No Device\n");
-	case HUB_HEADSET:
-		return sprintf(buf, "Headset\n");
-	}
-	return -EINVAL;
-}
-
-static void button_pressed(void)
-{
-	H2W_DBG("");
-	
-	atomic_set(&hi->btn_state, 1);
-	input_report_key(hi->input, KEY_MEDIA, 1);
-	input_sync(hi->input);
-#if 0 //È®?? ?Ê¿? testmode?
-	if(if_condition_is_on_key_buffering == 1)
-		lgf_factor_key_test_rsp((u8)KEY_MEDIA);
-#endif 
-}
-
-static void button_released(void)
-{
-	H2W_DBG("");
-	
-	atomic_set(&hi->btn_state, 0);
-	input_report_key(hi->input, KEY_MEDIA, 0);
-	input_sync(hi->input);
-}
-
-static void insert_headset(void)
-{
-	unsigned long irq_flags;
-	int jpole;
-	H2W_DBG("");
-	gpio_set_value(hi->gpio_mic_bias_en, 1);
-	msleep(100);
-
-	hub_headsetdet_bias(1); //micbias3 on
-	msleep(100);
-	
-	jpole = gpio_get_value(hi->gpio_jpole);
-	
-	if(jpole)
-   	{	
-   		hi->ignore_btn = 1;
-		H2W_DBG("insert_headset_no-mic-headset \n");
-		switch_set_state(&hi->sdev, HUB_HEADPHONE);
-//kiwone, 2009.12.24 , to fix bug
-//no mic headset insert->no mic headset eject->4pole headset insert->button key do not work.		
-		/* Enable button irq */
-		local_irq_save(irq_flags);
-		enable_irq(hi->irq_btn);
-        	set_irq_wake(hi->irq_btn, 1);
-		local_irq_restore(irq_flags);
-		hub_headsetdet_bias(0); //micbias3 off
-		
-		hi->debounce_time = ktime_set(0, 20000000);  /* 20 ms */
-		hi->unplug_debounce_time = ktime_set(0, 100000000);  // add eklee 
-   	}
-	else
-	{
-		hi->ignore_btn =0;
-		H2W_DBG("insert_headset_headset \n");
-		switch_set_state(&hi->sdev, HUB_HEADSET);
-		
-		/* Enable button irq */
-		local_irq_save(irq_flags);
-		enable_irq(hi->irq_btn);
-        	set_irq_wake(hi->irq_btn, 1);
-		local_irq_restore(irq_flags);
-		
-		hi->debounce_time = ktime_set(0, 20000000);  /* 20 ms */
-		hi->unplug_debounce_time = ktime_set(0, 100000000);  // add eklee 
-	}
-}
-
-static void remove_headset(void)
-{
-	unsigned long irq_flags;
-
-	H2W_DBG("");
-	
-	input_report_switch(hi->input, SW_HEADPHONE_INSERT, 0);
-	switch_set_state(&hi->sdev, HUB_NONE);
-	input_sync(hi->input);
-
-	/* Disable button */
-	local_irq_save(irq_flags);
-	disable_irq_nosync(hi->irq_btn);
-	set_irq_wake(hi->irq_btn, 0);
-	local_irq_restore(irq_flags);
-
-	if (atomic_read(&hi->btn_state))
-		button_released();
-
-	gpio_set_value(hi->gpio_mic_bias_en, 0);
-	hub_headsetdet_bias(0); //micbias3 off
-	
-//	hi->debounce_time = ktime_set(0, 500000000);  /* VS760 100 ms -> 300ms */
-hi->debounce_time = ktime_set(0, 400000000);  /* VS760 100 ms -> 300ms */ //JSLEE_TEST_MIC
-
-}
-
-static void detection_work(struct work_struct *work)
-{
-	int cable_in1;
-
-	H2W_DBG("");
-
-	if (gpio_get_value(hi->gpio_detect) == 1) {
-		/* Headset not plugged in */
-		if (switch_get_state(&hi->sdev) == HUB_HEADSET
- 			|| switch_get_state(&hi->sdev) == HUB_HEADPHONE
-		)
-			remove_headset();
-
-		H2W_DBG("detection_work-remove_headset \n");
-
-		return;
-	}
-
-	cable_in1 = gpio_get_value(hi->gpio_detect);
-
-	if (cable_in1 == 0) {
-		if (switch_get_state(&hi->sdev) == HUB_NONE)
-			{
-				H2W_DBG("detection_work-insert_headset \n");
-				insert_headset();
-			}
-	} 
-}
-
-static enum hrtimer_restart button_event_timer_func(struct hrtimer *data)
-{
-	H2W_DBG("");
-
-	if (switch_get_state(&hi->sdev) == HUB_HEADSET
-//kiwone, 2009.12.24, to fix bug
-// 4 pole headset eject->button key is detected
-      && (0 == gpio_get_value(hi->gpio_detect))
-	) {
-		if (!gpio_get_value(hi->gpio_button_detect)) {
-			if (hi->ignore_btn)
-				hi->ignore_btn = 0;
-			else if (atomic_read(&hi->btn_state))
-				button_released();
-		} else {
-			if (!hi->ignore_btn && !atomic_read(&hi->btn_state))
-				button_pressed();
-		}
-	}
-
-	return HRTIMER_NORESTART;
-}
-
-static enum hrtimer_restart detect_event_timer_func(struct hrtimer *data)
-{
-	H2W_DBG("");
-
-	queue_work(g_detection_work_queue, &g_detection_work);
-	return HRTIMER_NORESTART;
-}
-
-static irqreturn_t detect_irq_handler(int irq, void *dev_id)
-{
-	int value1, value2;
-	int retry_limit = 10;
-	
-	H2W_DBG("");
-	set_irq_type(hi->irq_btn, IRQF_TRIGGER_HIGH);
-	do {
-		value1 = gpio_get_value(hi->gpio_detect);
-
-		H2W_DBG("eklee -------------- gpio_get_value  value1= %d ", value1);
-
-		
-		set_irq_type(hi->irq, value1 ?
-				IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
-		value2 = gpio_get_value(hi->gpio_detect);
-	} while (value1 != value2 && retry_limit-- > 0);
-
-	H2W_DBG("value2 = %d (%d retries)", value2, (10-retry_limit));
-//20110618 minyoung1.kim@lge.com START
-//	printk("%s: Wake Lock  ======**********====================\n", __func__);
-	if(!wake_lock_active(&headset_det_wake_lock)) {
-//		printk("%s: Wake Lock 1  ======**********====================\n", __func__);
-		wake_lock(&headset_det_wake_lock);
-	}
-
-	cancel_delayed_work(&headset_workq);
-	schedule_delayed_work(&headset_workq, 3*HZ);
-//20110618 minyoung1.kim@lge.com END
-
-	if (switch_get_state(&hi->sdev) == HUB_NONE) {
-		if (switch_get_state(&hi->sdev) == HUB_HEADSET
-			|| switch_get_state(&hi->sdev) == HUB_HEADPHONE
-		)
-			hi->ignore_btn = 1;
-		/* Do the rest of the work in timer context */
-		//hrtimer_start(&hi->timer, hi->debounce_time, HRTIMER_MODE_REL); 
-		hrtimer_start(&hi->timer, hi->debounce_time, HRTIMER_MODE_ABS); 
-		H2W_DBG("detect_irq_handler-no_device \n");
-	}
-	else if(switch_get_state(&hi->sdev) == HUB_HEADSET
-			|| switch_get_state(&hi->sdev) == HUB_HEADPHONE
-	){
-		/* Do the rest of the work in timer context */
-		//hrtimer_start(&hi->timer, hi->debounce_time, HRTIMER_MODE_REL);
-			gpio_set_value(hi->gpio_mic_bias_en, 0);
-		
-	//	hrtimer_start(&hi->timer, hi->unplug_debounce_time, HRTIMER_MODE_REL);
-		hrtimer_start(&hi->timer, hi->unplug_debounce_time, HRTIMER_MODE_ABS);
-		H2W_DBG("detect_irq_handler_headset_no_mic \n");
-	}
-
-	return IRQ_HANDLED;
-}
-
-static irqreturn_t button_irq_handler(int irq, void *dev_id)
-{
-	int value1, value2;
-	int retry_limit = 10;
-
-	H2W_DBG("");
-	do {
-		value1 = gpio_get_value(hi->gpio_button_detect);
-		set_irq_type(hi->irq_btn, value1 ?
-				IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
-		value2 = gpio_get_value(hi->gpio_button_detect);
-	} while (value1 != value2 && retry_limit-- > 0);
-
-	H2W_DBG("value2 = %d (%d retries)", value2, (10-retry_limit));
-
-	hrtimer_start(&hi->btn_timer, hi->btn_debounce_time, HRTIMER_MODE_REL);
-
-	return IRQ_HANDLED;
-}
-
-static int headsetdet_probe(struct platform_device *pdev)
-{
-	int ret = 0;//int ret;
-	
-	struct gpio_h2w_platform_data  *pdata = pdev->dev.platform_data;
-
-	H2W_DBG("H2W: Registering H2W (headset) driver\n");
-	hi = kzalloc(sizeof(struct h2w_info), GFP_KERNEL);
-	
-	if (!hi)
-		return -ENOMEM;
-
-	atomic_set(&hi->btn_state, 0);
-	hi->ignore_btn = 0;
-
-	hi->debounce_time = ktime_set(0, 500000000);   /* VS760 100 ms -> 300ms */
-	hi->btn_debounce_time = ktime_set(0, 100000000); /* 10 ms */
-	hi->unplug_debounce_time = ktime_set(0, 100000000); //add eklee 100 ms 
-
-	hi->gpio_detect = pdata->gpio_detect;    
-	hi->gpio_button_detect = pdata->gpio_button_detect;
-	hi->gpio_jpole = pdata->gpio_jpole;
-	hi->gpio_mic_bias_en = pdata->gpio_mic_bias_en;
-	hi->sdev.name = "h2w";
-	hi->sdev.print_name = gpio_h2w_print_name;
-
-	ret = switch_dev_register(&hi->sdev);
-	if (ret < 0)
-		goto err_switch_dev_register;
-
-      g_detection_work_queue = create_workqueue("detection");
-	if (g_detection_work_queue == NULL) {
-		ret = -ENOMEM;
-		goto err_create_work_queue;
-	}
-
-	ret = gpio_request(hi->gpio_detect, "h2w_detect");
-	if (ret < 0)
-		goto err_request_detect_gpio;
-
-	ret = gpio_request(hi->gpio_button_detect, "h2w_button");
-	if (ret < 0)
-		goto err_request_button_gpio;
-
-	ret = gpio_request(hi->gpio_jpole, "h2w_jpole");
-	if (ret < 0)
-		goto err_request_jpole_gpio;
-
-
-	ret = gpio_request(hi->gpio_mic_bias_en, "h2w_mic_bias_en");
-	if (ret < 0)
-		goto err_request_mic_bias_en_gpio;
-
-
-	ret = gpio_direction_input(hi->gpio_detect);
-	if (ret < 0)
-		goto err_set_detect_gpio;
-
-	ret = gpio_direction_input(hi->gpio_button_detect);
-	if (ret < 0)
-		goto err_set_button_gpio;
-
-	ret = gpio_direction_input(hi->gpio_jpole);
-	if (ret < 0)
-		goto err_set_jpole_gpio;
-
-
-	ret = gpio_direction_output(hi->gpio_mic_bias_en,0);
-	if (ret < 0)
-		goto err_set_mic_bias_en_gpio;
-
-	hi->irq = gpio_to_irq(hi->gpio_detect);
-	if (hi->irq < 0) {
-		ret = hi->irq;
-		goto err_get_h2w_detect_irq_num_failed;
-	}
-
-	hi->irq_btn = gpio_to_irq(hi->gpio_button_detect);
-	if (hi->irq_btn < 0) {
-		ret = hi->irq_btn;
-		goto err_get_button_irq_num_failed;
-	}
-
-	hi->irq_jpole = gpio_to_irq(hi->gpio_jpole);	
-	if (hi->irq_jpole < 0) {
-		ret = hi->irq_jpole;
-		goto err_get_jpole_irq_num_failed;
-	}
-	gpio_set_value(hi->gpio_mic_bias_en, 0);
-
-//20110618 minyoung1.kim@lge.com START
-	wake_lock_init(&headset_det_wake_lock, WAKE_LOCK_SUSPEND, "headset_det");
-	INIT_DELAYED_WORK(&headset_workq, headset_workq_func);
-//20110618 minyoung1.kim@lge.com  END
-
-//	hrtimer_init(&hi->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	hrtimer_init(&hi->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
-
-	hi->timer.function = detect_event_timer_func;
-	hrtimer_init(&hi->btn_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	hi->btn_timer.function = button_event_timer_func;
-
-	ret = request_irq(hi->irq, detect_irq_handler,
-			  IRQF_TRIGGER_LOW, "h2w_detect", NULL); 
-	if (ret < 0)
-		goto err_request_detect_irq;
-
-	/* Disable button until plugged in */
-	set_irq_flags(hi->irq_btn, IRQF_VALID | IRQF_NOAUTOEN);
-	ret = request_irq(hi->irq_btn, button_irq_handler,
-			  IRQF_TRIGGER_HIGH, "h2w_button", NULL);
-	if (ret < 0)
-		goto err_request_h2w_headset_button_irq;
-
-	ret = set_irq_wake(hi->irq, 1);
-	if (ret < 0)
-		goto err_request_input_dev;
-
-	hi->input = input_allocate_device();
-	if (!hi->input) {
-		ret = -ENOMEM;
-		goto err_request_input_dev;
-	}
-
-	hi->input->name = "h2w headset";
-	hi->input->evbit[0] = BIT_MASK(EV_KEY);
-	hi->input->keybit[BIT_WORD(KEY_MEDIA)] = BIT_MASK(KEY_MEDIA);
-
-	ret = input_register_device(hi->input);
-	if (ret < 0)
-		goto err_register_input_dev;
-	ip_dev_reg = 1;
-
-	/* check the inital state of headset */
-	queue_work(g_detection_work_queue, &g_detection_work);
-
-	return 0;
-
-	
-err_register_input_dev:
-	input_free_device(hi->input);
-err_request_input_dev:
-	free_irq(hi->irq_btn, 0);
-err_request_h2w_headset_button_irq:
-	free_irq(hi->irq, 0);
-err_request_detect_irq:
-err_get_button_irq_num_failed:
-err_get_jpole_irq_num_failed:
-err_get_h2w_detect_irq_num_failed:
-err_set_button_gpio:
-err_set_detect_gpio:
-err_set_jpole_gpio: 	
-err_set_mic_bias_en_gpio:
-	gpio_free(hi->gpio_button_detect);
-err_request_button_gpio:
-	gpio_free(hi->gpio_detect);
-
-err_request_mic_bias_en_gpio:
-	gpio_free(hi->gpio_mic_bias_en);
-
-err_request_jpole_gpio:
-	gpio_free(hi->gpio_jpole);
-
-err_request_detect_gpio:
-	destroy_workqueue(g_detection_work_queue);
-err_create_work_queue:
-	switch_dev_unregister(&hi->sdev);
-err_switch_dev_register:
-	printk(KERN_ERR "H2W: Failed to register driver\n");
-
-	return ret;
-	
-}
-
-static int headsetdet_remove(struct platform_device *pdev)
-{
-	H2W_DBG("");
-	if (switch_get_state(&hi->sdev))
-		remove_headset();
-	input_unregister_device(hi->input);
-	gpio_free(hi->gpio_button_detect);
-	gpio_free(hi->gpio_detect);
-	free_irq(hi->irq_btn, 0);
-	free_irq(hi->irq, 0);
-	destroy_workqueue(g_detection_work_queue);
-	switch_dev_unregister(&hi->sdev);
-	wake_lock_destroy(&headset_det_wake_lock);   //20110618 minyoung1.kim@lge.com 
-	ip_dev_reg = 0;
-
-	return 0;
-}
-
-
-static struct platform_driver headsetdet_driver = {
-	.probe		= headsetdet_probe,
-	.remove		= headsetdet_remove,//.remove		= __devexit_p(headsetdet_remove),
-	.driver		= {
-		.name		= "hub_headset",
-		.owner		= THIS_MODULE,
-	},
-};
-
-
-#else  //20110201 jungsoo1221.lee  [LGE_US850_HEADSET_END]
-
 // 20100825 junyeop.kim@lge.com, mic bias LDO control test [START_LGE]
 #if 1
 #include "../mux.h"
@@ -705,18 +190,18 @@ static void type_det_work(struct work_struct *work)
 #else
 static void type_det_work(struct work_struct *work)
 {
-	printk("[LUCKYJUN77] type_det_work : headset_status(%d)\n", headset_status);
+	//printk("[JIWON] type_det_work start\n");
 
 	if(headset_status == 1)
 	{
 	    if(gpio_get_value(headset_sw_data->hook_gpio) == 0) 
 	    {
-			printk("[LUCKYJUN77] type_det_work : HUB_HEADPHONE\n");
+			//printk("[LUCKYJUN77] type_det_work : HUB_HEADPHONE\n");
 			headset_type = HUB_HEADPHONE;
 		}
 		else
 		{
-			printk("[LUCKYJUN77] type_det_work : HUB_HEADSET\n");		
+			//printk("[LUCKYJUN77] type_det_work : HUB_HEADSET\n");		
 			headset_type = HUB_HEADSET;
 	}
 	}
@@ -813,8 +298,11 @@ static void hook_det_work(struct work_struct *work)
 #else
 static void hook_det_work(struct work_struct *work)
 {
-	printk("[LUCKYJUN77] hook_det_work\n");
-
+	//printk("[LUCKYJUN77] hook_det_work\n");
+//[LGSI]Saravanan START TD116383-hook key issue in deep sleep
+/* Dont skip Hook key event eventhough you are in Sleep
+we are not holding any state in get_twl4030_status , making same as froyo*/
+#if 0
 // prime@sdcmicro.com Make the following code be conditional since get_twl4030_status() is included to CONFIG_SND_SOC_TWL4030 feature [START]
 #ifdef CONFIG_SND_SOC_TWL4030
 	if(headset_sw_data->is_suspend == 1 && get_twl4030_status() == 0)
@@ -826,10 +314,11 @@ static void hook_det_work(struct work_struct *work)
 		printk("[LUCKYJUN77] suspend status \n");	
 		return;
 	}
-	
+#endif
+//[LGSI]Saravanan END TD116383-hook key issue in deep sleep
     if(headset_type == HUB_HEADPHONE)	//detect type error case
     {
-    	printk("[LUCKYJUN77] hook_det_work : headphone detect\n");
+    	//printk("[LUCKYJUN77] hook_det_work : headphone detect\n");
 //		schedule_delayed_work(&headset_sw_data->delayed_work,	msecs_to_jiffies(type_detection_tim*3));
 		headset_type = HUB_HEADSET;
 		switch_set_state(&headset_sw_data->sdev, headset_type);
@@ -841,7 +330,7 @@ static void hook_det_work(struct work_struct *work)
 
 	if(hook_status == HOOK_RELEASED){
 		if(gpio_get_value(headset_sw_data->hook_gpio) == 0){ 	//threshold area for hook key glitch
-			printk("[LUCKYJUN77] threshold area for hook key glitch\n");		
+			//printk("[LUCKYJUN77] threshold area for hook key glitch\n");		
 		    hook_status = HOOK_PRESSED; 
 //		    input_report_key(headset_sw_data->ip_dev, KEY_HOOK, 1);
 			schedule_delayed_work(&headset_sw_data->hook_delayed_work,	msecs_to_jiffies(type_detection_tim/8));
@@ -1137,7 +626,7 @@ static int headsetdet_remove(struct platform_device *pdev)
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void headsetdet_early_suspend(struct early_suspend *h)
 {
-	printk("[LUCKYJUN77] headsetdet_early_suspend\n");
+//For_Resume_Speed	printk("[LUCKYJUN77] headsetdet_early_suspend\n");
 //	disable_irq(headset_sw_data->gpio);	
 //	disable_irq(headset_sw_data->hook_irq);
 	headset_sw_data->is_suspend = 1;	//suspend flag
@@ -1145,7 +634,7 @@ static void headsetdet_early_suspend(struct early_suspend *h)
 
 static void headsetdet_late_resume(struct early_suspend *h)
 {
-	printk("[LUCKYJUN77] headsetdet_late_resume\n");
+//For_Resume_Speed	printk("[LUCKYJUN77] headsetdet_late_resume\n");
 
 	headset_det_work(&headset_sw_data->work);
 
@@ -1158,13 +647,13 @@ static void headsetdet_late_resume(struct early_suspend *h)
 
 static int headsetdet_suspend(struct platform_device *pdev, pm_message_t state)
 {
-	printk("[LUCKYJUN77] headsetdet_suspend\n");
+//For_Resume_Speed	printk("[LUCKYJUN77] headsetdet_suspend\n");
 	return 0;
 }
 
 static int headsetdet_resume(struct platform_device *pdev)
 {
-	printk("[LUCKYJUN77] headsetdet_resume\n");
+//For_Resume_Speed	printk("[LUCKYJUN77] headsetdet_resume\n");
 
 #if defined(CONFIG_HUB_AMP_WM9093)
 	unsigned int cur_device = get_wm9093_mode();
@@ -1196,7 +685,7 @@ static struct platform_driver headsetdet_driver = {
 		.owner	= THIS_MODULE,
 	},
 };
-#endif 
+
 static int __init headsetdet_init(void)
 {
 	return platform_driver_register(&headsetdet_driver);

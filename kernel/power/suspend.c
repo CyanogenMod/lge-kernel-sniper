@@ -23,10 +23,12 @@
 #include <linux/slab.h>
 #include <linux/suspend.h>
 
+#if defined(CONFIG_MACH_LGE_OMAP3)
 #include <plat/omap-pm.h>
 #include <plat/omap_device.h>
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
+#endif
 
 #include "power.h"
 
@@ -216,7 +218,9 @@ int suspend_devices_and_enter(suspend_state_t state)
 {
 	int error;
 	gfp_t saved_mask;
+#if defined(CONFIG_MACH_LGE_OMAP3)
 	struct device l3_dev;
+#endif
 
 	if (!suspend_ops)
 		return -ENOSYS;
@@ -238,11 +242,17 @@ int suspend_devices_and_enter(suspend_state_t state)
 	if (suspend_test(TEST_DEVICES))
 		goto Recover_platform;
 
-	//omap_pm_set_min_bus_tput(&l3_dev, OCP_INITIATOR_AGENT, 100 * 1000 * 4);
+#ifndef CONFIG_LGE_DVFS
+	omap_pm_set_min_bus_tput(&l3_dev, OCP_INITIATOR_AGENT, 100 * 1000 * 4);
+#endif	// CONFIG_LGE_DVFS
+
 	suspend_enter(state);
 
-	//omap_pm_set_min_bus_tput(&l3_dev, OCP_INITIATOR_AGENT, 200 * 1000 * 4);
- Resume_devices:
+#ifndef CONFIG_LGE_DVFS
+	omap_pm_set_min_bus_tput(&l3_dev, OCP_INITIATOR_AGENT, 200 * 1000 * 4);
+#endif	// CONFIG_LGE_DVFS
+	
+Resume_devices:
 	suspend_test_start();
 	dpm_resume_end(PMSG_RESUME);
 // LGE_UPDATE_S

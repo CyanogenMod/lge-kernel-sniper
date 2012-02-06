@@ -271,7 +271,8 @@ void omap_intc_save_context(void)
 		for (i = 0; i < INTCPS_NR_IRQS; i++)
 			intc_context[ind].ilr[i] =
 				intc_bank_read_reg(bank, (0x100 + 0x4*i));
-#if 0
+ //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-05, TI WA for IRQ pending issue
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 		for (i = 0; i < INTCPS_NR_MIR_REGS; i++)
 			intc_context[ind].mir[i] =
 				intc_bank_read_reg(&irq_banks[0], INTC_MIR0 +

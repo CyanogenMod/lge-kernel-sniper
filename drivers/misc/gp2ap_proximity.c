@@ -128,7 +128,9 @@ static int hub_read_vo_bit(struct i2c_client *client)
 
 	val = val & 0x01 ? 0 : 1; //0:near, 1:far
 
-	printk("[!]%s() read val = %x\n", __func__, val);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+	//printk("[!]%s() read val = %x\n", __func__, val);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 	//	hub_proxi_write_reg(client, 0x02, 0x20); // test
 
 	return val;
@@ -142,12 +144,16 @@ static void hub_proxi_power_onoff(bool enable)
 	if(enable) {
 		regulator_enable(reg);
 		enabled = true; 
-		printk("[!] %s() - PROXI_LDO_EN enabled\n", __func__);		
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+		//printk("[!] %s() - PROXI_LDO_EN enabled\n", __func__);		
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 	}
 	else {
 		regulator_disable(reg);
 		enabled = false;
-		printk("[!] %s() - PROXI_LDO_EN disabled\n", __func__);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+		//printk("[!] %s() - PROXI_LDO_EN disabled\n", __func__);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 	}
 #endif
 
@@ -176,7 +182,9 @@ static void hub_proxi_i2c_init(struct i2c_client *client)
 
 	for (i = 0; initialize_seq[i].reg != I2C_NO_REG; i++) {
 		hub_proxi_write_reg(client, initialize_seq[i].reg, initialize_seq[i].val);
-		printk("[!] %s() - reg : 0x%x, val : 0x%x\n", __func__, initialize_seq[i].reg, initialize_seq[i].val);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+		//printk("[!] %s() - reg : 0x%x, val : 0x%x\n", __func__, initialize_seq[i].reg, initialize_seq[i].val);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 	}
 }
 
@@ -227,7 +235,9 @@ static void hub_proxi_det_work(struct work_struct *work)
 //	int vo = hub_read_vo_bit(data->client);
 
 	input_report_abs(data->input_dev, ABS_DISTANCE, atomic_read(&proxi_status));
-	printk("%s distance=%d\n", __FUNCTION__, atomic_read(&proxi_status));
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+	//printk("%s distance=%d\n", __FUNCTION__, atomic_read(&proxi_status));
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 	input_sync(data->input_dev);
 }
 
@@ -280,18 +290,16 @@ static ssize_t hub_proxi_onoff_store(struct device *dev,  struct device_attribut
 
 	if(ret)	{
 		hub_proxi_enable(data->client);
-	//	enable_irq(data->client->irq);
-		enable_irq_wake(gpio_to_irq(PROXI_OUT));
+		enable_irq(data->client->irq);
 	}
 	else {
-	//	disable_irq(data->client->irq);
-		disable_irq_wake(gpio_to_irq(PROXI_OUT));
+		disable_irq(data->client->irq);
 		hub_proxi_disable(data->client);		
 	}
 
 	data->wakeup_while_sleep = (bool)ret;
 
-	return 0;
+	return count;
 }
 // 20100827 jh.koo@lge.com [START_LGE]
 int hub_proximity_check(void)
@@ -304,7 +312,9 @@ int hub_proximity_check(void)
 
 	proximity_status = hub_read_vo_bit(hub_proximity_client);
 
-	printk(KERN_DEBUG"[!]%s() - proximity status : %d\n", __func__, proximity_status);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+	//printk(KERN_DEBUG"[!]%s() - proximity status : %d\n", __func__, proximity_status);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 
 	hub_proxi_disable(hub_proximity_client);	
 	alarm_flip = ALARM_FLIP_DEACTIVE;
@@ -417,7 +427,9 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 
 	if (data->use_int_mode) {
 
-		printk(KERN_WARNING"%s() : interrupt mode. START\n", __func__);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+		//printk(KERN_WARNING"%s() : interrupt mode. START\n", __func__);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 
 		if (gpio_request(PROXI_OUT, "proxi interrupt gpio") < 0) {
 			printk("can't get hub proxi irq GPIO\n");
@@ -442,7 +454,9 @@ static int __init hub_proxi_probe(struct i2c_client *client, const struct i2c_de
 			return -ENOSYS;
 		}
 #endif				
-		printk(KERN_WARNING"%s() : interrupt mode. END\n", __func__);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+		//printk(KERN_WARNING"%s() : interrupt mode. END\n", __func__);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 
 		//		ret = request_irq(client->irq, hub_proxi_int_handler, IRQF_DISABLED | IRQF_TRIGGER_FALLING, "proxi_driver", data); 
 	} 
@@ -547,7 +561,9 @@ static int hub_proxi_suspend(struct i2c_client *client, pm_message_t mesg)
 	struct hub_proxi_data *data = i2c_get_clientdata(client);
 
 	if (!enabled) return 0;
-	printk("%s\n", __FUNCTION__);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+	//printk("%s\n", __FUNCTION__);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 	if (atomic_read(&proxi_status)) return 0;
 #if 0
 	if (hrtimer_try_to_cancel(&data->timer) > 0) //timer is active
@@ -567,7 +583,9 @@ static int hub_proxi_resume(struct i2c_client *client)
 {
 	struct hub_proxi_data *data = i2c_get_clientdata(client);
 
-	printk("%s\n", __FUNCTION__);
+/* LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
+	//printk("%s\n", __FUNCTION__);
+/* LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-04-06, Disable Proximity Log */
 	if (!enabled) return 0;
 #if 0
 	if (data->wakeup_while_sleep)

@@ -23,7 +23,14 @@
 #include <linux/log2.h>
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#define CONFIG_LGE_MMC_PATCH_2_6_36
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 #include <linux/wakelock.h>
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+
 
 #include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
@@ -40,7 +47,12 @@
 #include "sdio_ops.h"
 
 static struct workqueue_struct *workqueue;
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 static struct wake_lock mmc_delayed_work_wake_lock;
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 
 /*
  * Enabling software CRCs on the data blocks can be a significant (30%)
@@ -73,7 +85,12 @@ MODULE_PARM_DESC(
 static int mmc_schedule_delayed_work(struct delayed_work *work,
 				     unsigned long delay)
 {
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 	wake_lock(&mmc_delayed_work_wake_lock);
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 	return queue_delayed_work(workqueue, work, delay);
 }
 
@@ -307,11 +324,7 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			 * The limit is really 250 ms, but that is
 			 * insufficient for some crappy cards.
 			 */
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-			limit_us = 500000;
-#else
 			limit_us = 300000;
-#endif
 		else
 			limit_us = 100000;
 
@@ -417,6 +430,12 @@ static int mmc_host_do_disable(struct mmc_host *host, int lazy)
 
 		host->en_dis_recurs = 1;
 		err = host->ops->disable(host, lazy);
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
+		wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 		host->en_dis_recurs = 0;
 
 		if (err < 0) {
@@ -554,12 +573,23 @@ void mmc_host_deeper_disable(struct work_struct *work)
 
 	/* If the host is claimed then we do not want to disable it anymore */
 	if (!mmc_try_claim_host(host))
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+		return;
+#else
 		goto out;
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 	mmc_host_do_disable(host, 1);
 	mmc_do_release_host(host);
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 out:
 	wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 }
 
 /**
@@ -666,11 +696,13 @@ void mmc_set_bus_mode(struct mmc_host *host, unsigned int mode)
 void mmc_set_bus_width_ddr(struct mmc_host *host, unsigned int width, int ddr)
 {
 	host->ios.bus_width = width;
+// prime@sdcmicro.com MMC_DDR_MODE was replaced with MMC_1_8V_DDR_MODE and MMC_1_2V_DDR_MODE since it's duplicated [START]
 #if 0
 	host->ios.ddr = ddr ? MMC_DDR_MODE : MMC_SDR_MODE;
 #else
 	host->ios.ddr = ddr;
 #endif
+// prime@sdcmicro.com MMC_DDR_MODE was replaced with MMC_1_8V_DDR_MODE and MMC_1_2V_DDR_MODE since it's duplicated [END]
 	mmc_set_ios(host);
 }
 
@@ -679,11 +711,13 @@ void mmc_set_bus_width_ddr(struct mmc_host *host, unsigned int width, int ddr)
  */
 void mmc_set_bus_width(struct mmc_host *host, unsigned int width)
 {
+// prime@sdcmicro.com Make sure correct value is used for SDR mode [START]
 #if 0
 	mmc_set_bus_width_ddr(host, width, 0);
 #else
 	mmc_set_bus_width_ddr(host, width, MMC_SDR_MODE);
 #endif
+// prime@sdcmicro.com Make sure correct value is used for SDR mode [END]
 }
 
 /**
@@ -906,11 +940,8 @@ void mmc_set_timing(struct mmc_host *host, unsigned int timing)
  * If a host does all the power sequencing itself, ignore the
  * initial MMC_POWER_UP stage.
  */
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+//static void mmc_power_up(struct mmc_host *host) // Patch Taken From Thunder Froyo
 void mmc_power_up(struct mmc_host *host)
-#else
-static void mmc_power_up(struct mmc_host *host)
-#endif
 {
 	int bit;
 
@@ -933,15 +964,20 @@ static void mmc_power_up(struct mmc_host *host)
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
 
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-	printk("%s: mmc power up\n", mmc_hostname(host));
-#endif
 	/*
 	 * This delay should be sufficient to allow the power supply
 	 * to reach the minimum voltage.
 	 */
+//SD card Voltage stabilization Time optimization
+	if (strcmp(mmc_hostname(host), "mmc1")){
+		//printk("%s: mmc_delay 10\n", mmc_hostname(host));
+		mmc_delay(10);
+	}
+	else{
+		//printk("%s: mmc_delay 20\n", mmc_hostname(host));
 	mmc_delay(20);
-
+	}
+//SD card Voltage stabilization Time optimization
 	host->ios.clock = host->f_min;
 
 	host->ios.power_mode = MMC_POWER_ON;
@@ -951,17 +987,23 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
+	 //SD card Voltage stabilization Time optimization
+	//printk(KERN_ERR "mmc_chk mmc power up2\n");
+	if (strcmp(mmc_hostname(host), "mmc1")){
+		//printk("%s: mmc_delay 10\n", mmc_hostname(host));
+		mmc_delay(10);
+	}
+	else{
+		//printk("%s: mmc_delay 20\n", mmc_hostname(host));
 	mmc_delay(20);
+	}
+	printk(KERN_ERR "mmc_chk mmc power up exit\n");
+	//SD card Voltage stabilization Time optimization
 }
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-EXPORT_SYMBOL(mmc_power_up);
-#endif
+EXPORT_SYMBOL(mmc_power_up); // Patch Taken From Thunder Froyo
 
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
+//static void mmc_power_off(struct mmc_host *host)// Patch Taken From Thunder Froyo
 void mmc_power_off(struct mmc_host *host)
-#else
-static void mmc_power_off(struct mmc_host *host)
-#endif
 {
 	host->ios.clock = 0;
 	host->ios.vdd = 0;
@@ -973,13 +1015,8 @@ static void mmc_power_off(struct mmc_host *host)
 	host->ios.bus_width = MMC_BUS_WIDTH_1;
 	host->ios.timing = MMC_TIMING_LEGACY;
 	mmc_set_ios(host);
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-	printk("%s: mmc power down\n", mmc_hostname(host));
-#endif
 }
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-EXPORT_SYMBOL(mmc_power_off);
-#endif
+EXPORT_SYMBOL(mmc_power_off); // Patch Taken From Thunder Froyo
 
 /*
  * Cleanup when the last reference to the bus operator is dropped.
@@ -1172,11 +1209,16 @@ void mmc_rescan(struct work_struct *work)
 #endif
 		host->bus_ops->detect(host);
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 	/* If the card was removed the bus will be marked
 	 * as dead - extend the wakelock so userspace
 	 * can respond */
 	if (host->bus_dead)
 		extend_wakelock = 1;
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 
 	mmc_bus_put(host);
 
@@ -1215,7 +1257,12 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_sdio(host, ocr))
 			mmc_power_off(host);
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 		extend_wakelock = 1;
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 		goto out;
 	}
 
@@ -1226,7 +1273,12 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_sd(host, ocr))
 			mmc_power_off(host);
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 		extend_wakelock = 1;
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 		goto out;
 	}
 
@@ -1237,7 +1289,12 @@ void mmc_rescan(struct work_struct *work)
 	if (!err) {
 		if (mmc_attach_mmc(host, ocr))
 			mmc_power_off(host);
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 		extend_wakelock = 1;
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 		goto out;
 	}
 
@@ -1245,10 +1302,15 @@ void mmc_rescan(struct work_struct *work)
 	mmc_power_off(host);
 
 out:
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 	if (extend_wakelock)
 		wake_lock_timeout(&mmc_delayed_work_wake_lock, HZ / 2);
 	else
 		wake_unlock(&mmc_delayed_work_wake_lock);
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 
 	if (host->caps & MMC_CAP_NEEDS_POLL)
 		mmc_schedule_delayed_work(&host->detect, HZ);
@@ -1402,19 +1464,9 @@ int mmc_suspend_host(struct mmc_host *host)
 	}
 	mmc_bus_put(host);
 
-// BEGIN : munho.lee@lge.com 2010-12-27
-// MOD: 0013091: SD card stability patch 
-#if 1
-	if (strcmp(mmc_hostname(host), "mmc1")){
-		if (!err)
-			mmc_power_off(host);
-	} else
-		printk("sd card suspend...\n");
-#else
 	if (!err && !(host->pm_flags & MMC_PM_KEEP_POWER))
 		mmc_power_off(host);
-#endif
-// END : munho.lee@lge.com 2010-12-27
+
 	return err;
 }
 
@@ -1543,7 +1595,12 @@ static int __init mmc_init(void)
 {
 	int ret;
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 	wake_lock_init(&mmc_delayed_work_wake_lock, WAKE_LOCK_SUSPEND, "mmc_delayed_work");
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 
 	workqueue = create_singlethread_workqueue("kmmcd");
 	if (!workqueue)
@@ -1579,7 +1636,12 @@ static void __exit mmc_exit(void)
 	mmc_unregister_host_class();
 	mmc_unregister_bus();
 	destroy_workqueue(workqueue);
+/*LGE_CHANGE_S sunggyun.yu@lge.com MMC Patch from 2.6.36*/
+#ifdef CONFIG_LGE_MMC_PATCH_2_6_36
+#else
 	wake_lock_destroy(&mmc_delayed_work_wake_lock);
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com MMC Patch from 2.6.36*/
 }
 
 subsys_initcall(mmc_init);

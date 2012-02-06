@@ -24,7 +24,7 @@
 
 #include "lge_mtc_eta.h"
 
-#define MTC_ETA_DEBUG
+//#define MTC_ETA_DEBUG
 #ifdef MTC_ETA_DEBUG
 #define PDEBUG(fmt, args...) printk("mtc_eta_key: " fmt, ## args)
 #else
@@ -41,13 +41,10 @@ void mtc_eta_add_logging_event(struct mtc_eta_log *log);
 static int eta_key_list[] = {
 	KEY_VOLUMEUP,
 	KEY_VOLUMEDOWN,
-//20110416 yongman.kwon@lge.com [LS855] for logging touch key event [START]
-//these key is supported by touch sensor.
-//	KEY_MENU,
-//	KEY_HOME,
-//	KEY_BACK,
-//	KEY_SEARCH,
-//20110416 yongman.kwon@lge.com [LS855] for logging touch key event [END]
+	KEY_MENU,
+	KEY_HOME,
+	KEY_BACK,
+	KEY_SEARCH,
 	KEY_KPJPCOMMA,//hak.lee@lge.com
 	KEY_POWER,//hak.lee@lge.com
 };

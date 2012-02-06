@@ -236,25 +236,25 @@ struct lcd_ctrl_data {
 
 static struct lcd_ctrl_data normal_to_als_mode[]=
 {
-	{AAT2870_REG18,0x12},	// 3.25 mA
-	{AAT2870_REG19,0x13},	// 4.725 mA
-	{AAT2870_REG20,0x14},	// 5.175 mA
-	{AAT2870_REG21,0x16},	// 5.625 mA
-	{AAT2870_REG22,0x18},	// 5.85 mA
-	{AAT2870_REG23,0x1A},	// 6.075 mA
+	{AAT2870_REG18,0x0E},	// 3.25 mA
+	{AAT2870_REG19,0x15},	// 4.725 mA
+	{AAT2870_REG20,0x17},	// 5.175 mA
+	{AAT2870_REG21,0x19},	// 5.625 mA
+	{AAT2870_REG22,0x1A},	// 5.85 mA
+	{AAT2870_REG23,0x1B},	// 6.075 mA
 	{AAT2870_REG24,0x1D},	// 6.525 mA
-	{AAT2870_REG25,0x1E},	// 7.2  mA
+	{AAT2870_REG25,0x20},	// 7.2  mA
 	{AAT2870_REG26,0x21},	// 7.425 mA
 	{AAT2870_REG27,0x23},	// 7.875 mA
-	{AAT2870_REG28,0x24},	// 8.325 mA
-	{AAT2870_REG29,0x25},	// 8.55 mA
-	{AAT2870_REG30,0x26},	// 8.775 mA
-	{AAT2870_REG31,0x26},	// 9 mA
-	{AAT2870_REG32,0x27},	// 9.225 mA
-	{AAT2870_REG33,0x27},	// 9.45 mA
+	{AAT2870_REG28,0x25},	// 8.325 mA
+	{AAT2870_REG29,0x26},	// 8.55 mA
+	{AAT2870_REG30,0x27},	// 8.775 mA
+	{AAT2870_REG31,0x28},	// 9 mA
+	{AAT2870_REG32,0x29},	// 9.225 mA
+	{AAT2870_REG33,0x2A},	// 9.45 mA
 	{AAT2870_REG14,0x77},
 	{AAT2870_REG15,0x01},
-	{AAT2870_REG16,0x9E},
+	{AAT2870_REG16,0x95},
 	{AAT2870_REG0,0xFF},
 	{I2C_NO_REG, 0x00}  /* End of array */
 
@@ -262,25 +262,25 @@ static struct lcd_ctrl_data normal_to_als_mode[]=
 //changhyun.han@lge.com, 20100119 ,added the optimized brightness mode
 static struct lcd_ctrl_data normal_to_als_optimize_mode[]=
 {
-	{AAT2870_REG18,0x12}, /* ALS current setting  6.525 mA */
-	{AAT2870_REG19,0x13}, /* ALS current setting 10.8   mA */
-	{AAT2870_REG20,0x14}, /* ALS current setting 11.025 mA */
-	{AAT2870_REG21,0x16}, /* ALS current setting 11.7   mA */
-	{AAT2870_REG22,0x18}, /* ALS current setting 12.15  mA */
-	{AAT2870_REG23,0x1A}, /* ALS current setting 13.5   mA */
-	{AAT2870_REG24,0x1D}, /* ALS current setting 13.95  mA */
-	{AAT2870_REG25,0x1E}, /* ALS current setting 14.175 mA */
-	{AAT2870_REG26,0x21}, /* ALS current setting 15.3   mA */
-	{AAT2870_REG27,0x25}, /* ALS current setting 15.525 mA */
-	{AAT2870_REG28,0x28}, /* ALS current setting 15.75  mA */
-	{AAT2870_REG29,0x2C}, /* ALS current setting 15.975 mA */
-	{AAT2870_REG30,0x31}, /* ALS current setting 16.2   mA */
-	{AAT2870_REG31,0x35}, /* ALS current setting 16.425 mA */
-	{AAT2870_REG32,0x44}, /* ALS current setting 16.65  mA */
-	{AAT2870_REG33,0x44}, /* ALS current setting 20.70  mA */
-	{AAT2870_REG14,0x77}, /* old val : 0x67 */
+	{AAT2870_REG18,0x1D}, /* ALS current setting  6.525 mA */
+	{AAT2870_REG19,0x30}, /* ALS current setting 10.8   mA */
+	{AAT2870_REG20,0x31}, /* ALS current setting 11.025 mA */
+	{AAT2870_REG21,0x34}, /* ALS current setting 11.7   mA */
+	{AAT2870_REG22,0x36}, /* ALS current setting 12.15  mA */
+	{AAT2870_REG23,0x3C}, /* ALS current setting 13.5   mA */
+	{AAT2870_REG24,0x3E}, /* ALS current setting 13.95  mA */
+	{AAT2870_REG25,0x3F}, /* ALS current setting 14.175 mA */
+	{AAT2870_REG26,0x44}, /* ALS current setting 15.3   mA */
+	{AAT2870_REG27,0x45}, /* ALS current setting 15.525 mA */
+	{AAT2870_REG28,0x46}, /* ALS current setting 15.75  mA */
+	{AAT2870_REG29,0x47}, /* ALS current setting 15.975 mA */
+	{AAT2870_REG30,0x48}, /* ALS current setting 16.2   mA */
+	{AAT2870_REG31,0x49}, /* ALS current setting 16.425 mA */
+	{AAT2870_REG32,0x4A}, /* ALS current setting 16.65  mA */
+	{AAT2870_REG33,0x5C}, /* ALS current setting 20.70  mA */
+	{AAT2870_REG14,0x67},
 	{AAT2870_REG15,0x01},
-	{AAT2870_REG16,0x9E},
+	{AAT2870_REG16,0x97},
 //	{AAT2870_REG0,0xFF},//2011.5.24 LG_CHANGE lee.hyunji@lge.com TD1396000761: kakao talk popup
 	{I2C_NO_REG, 0x00}  /* End of array */
 };
@@ -289,12 +289,14 @@ static struct lcd_ctrl_data als_to_normal_mode[]=
 {
 	{AAT2870_REG14,0x26},
 	{AAT2870_REG15,0x06},
+//	{AAT2870_REG0,0xFF}, //2011.5.24 LG_CHANGE lee.hyunji@lge.com TD1396000761: kakao talk popup
 	{I2C_NO_REG, 0x00}  /* End of array */
 };
+/* B-Prj LCD Backlight ALS [kyungyoon.kim@lge.com] 2010-11-22 */
 
 static const struct i2c_device_id aat2870_bl_id[] = {
 	{ AAT2870_I2C_BL_NAME, 0 },
-	{ },	
+	{ },	// 20100526 sookyoung.kim@lge.com
 };
 
 static int aat2870_write_reg(struct i2c_client *client, 
@@ -924,13 +926,7 @@ static void aat2870_change_mode(struct i2c_client *client, int mode, int force)
 			mdelay(1);
 		}
 			mdelay(5);
-/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-13, */ 
-#if 0
 		dev->mode=ALS_MODE;//ALS is Powersave mode
-#else 
-		dev->mode= mode;
-#endif 
-/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-13 */
 	}
 	else if (mode == OPTIMIZE_MODE) 
 	{
@@ -940,13 +936,7 @@ static void aat2870_change_mode(struct i2c_client *client, int mode, int force)
 			mdelay(1);
 		}
 			mdelay(5);
-/* LGE_CHANGE_S [LS855:bking.moon@lge.com] 2011-07-13, */ 
-#if 0 /* mbk_temp */ 
 		dev->mode=POWERSAVE_MODE;
-#else 
-		dev->mode= mode;
-#endif 
-/* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-13 */
 		}
 	else {
 		ERR("invalid mode = %d\n", mode);
@@ -1108,7 +1098,7 @@ ssize_t aat2870_store_als_option(struct device *dev,
 		return -EINVAL;
 	}
 
-	aat2870_change_mode(drvdata->client, als_mode,0);
+	aat2870_change_mode(drvdata->client, als_mode,1);
 //	hrtimer_start(&drvdata->als_timer, ktime_set(0,100000000), HRTIMER_MODE_REL); /* 100msec */
 
 	return count;
@@ -1136,68 +1126,6 @@ ssize_t aat2870_show_als_level(struct device *dev,
 	DBG("drvdata->als_level = 0x%x\n", drvdata->als_level);
 
 	return r;
-}
-
-ssize_t aat2870_store_als_level(struct device *dev, 
-			  struct device_attribute *attr, 
-			  const char *buf, 
-			  size_t count)
-{
-	struct aat2870_device *drvdata = NULL;
-	unsigned char temp_val[19];
-	unsigned char set_mode_dummy;
-	unsigned char set_mode;
-	int value = 0;
-	int i = 0;
-
-	if (!count) {
-		return -EINVAL;
-	}
-
-	drvdata = dev_get_drvdata(dev->parent);
-
-	//value = simple_strtoul(buf, NULL, 10);
-	printk("== %s\n", buf);
-	if( sscanf(buf, "%d %d %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x %x",
-			&set_mode_dummy, 
-			&set_mode, 
-			&temp_val[0],
-			&temp_val[1],
-			&temp_val[2],
-			&temp_val[3],
-			&temp_val[4],
-			&temp_val[5],
-			&temp_val[6],
-			&temp_val[7],
-			&temp_val[8],
-			&temp_val[9],
-			&temp_val[10],
-			&temp_val[11],
-			&temp_val[12],
-			&temp_val[13],
-			&temp_val[14],
-			&temp_val[15], 
-			&temp_val[16],
-			&temp_val[17],
-			&temp_val[18] ) != 21 ) {
-		printk("wrong usage....\n");
-	} else {
-		printk(">> dummy %d, mode %d, temp_val %d\n", set_mode_dummy, set_mode, temp_val[0]);
-		if( set_mode == 1 ) {
-			/* Power Save */
-			for(i=0;i<19;i++) {
-				normal_to_als_mode[i].val = temp_val[i];
-				//printk("normal[%d]: %d: <-- %d\n", i, normal_to_als_mode[i].val, temp_val[i]);
-			}
-		} else if ( set_mode == 2 ) {
-			/* Optimized */
-			for(i=0;i<19;i++) {
-				normal_to_als_optimize_mode[i].val = temp_val[i];
-				//printk("opt[%d]: %d: <-- %d\n", i, normal_to_als_optimize_mode[i].val, temp_val[i]);
-			}
-		}
-	}
-	return count;
 }
 
 ssize_t aat2870_store_als_control(struct device *dev, 
@@ -1341,7 +1269,7 @@ ssize_t aat2870_store_onoff_control(struct device *dev,
 
 DEVICE_ATTR(level, 0664, lcd_backlight_show_level, lcd_backlight_store_level);
 DEVICE_ATTR(als, 0644, aat2870_show_als, aat2870_store_als);
-DEVICE_ATTR(als_level, 0644, aat2870_show_als_level, aat2870_store_als_level);
+DEVICE_ATTR(als_level, 0444, aat2870_show_als_level, NULL);
 DEVICE_ATTR(als_control, 0644, aat2870_show_als_control, aat2870_store_als_control);
 DEVICE_ATTR(alsgain_control, 0644, aat2870_show_alsgain_control, aat2870_store_alsgain_control);
 DEVICE_ATTR(onoff, 0644, NULL, aat2870_store_onoff_control);
@@ -1369,7 +1297,7 @@ static int aat2870_remove(struct i2c_client *i2c_dev)
 	device_remove_file(dev->led->dev, &dev_attr_als_control);
 	device_remove_file(dev->led->dev, &dev_attr_alsgain_control);
 	device_remove_file(dev->led->dev, &dev_attr_onoff);
-	device_remove_file(dev->led->dev, &dev_attr_als_option);
+	device_remove_file(dev->led->dev, &dev_attr_als_option);//changhyun.han@lge.com, 20100119, added the optimized brightness mode
 
 	backlight_device_unregister(dev->bl_dev);
 	led_classdev_unregister(dev->led);
@@ -1395,7 +1323,9 @@ static int aat2870_bl_suspend(struct i2c_client *client, pm_message_t state)
 	aat2870_write_reg(client, AAT2870_REG0, 0x00);
 
 	early_bl_timer = 0;
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[START]	
 	dev->bl_resumed=0;
+    //20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
 
 	return 0;
 }
@@ -1406,14 +1336,18 @@ static int aat2870_bl_resume(struct i2c_client *client)
         
 	dev = i2c_get_clientdata(client);
 	DBG("dev->bl_resumed=%d\n",dev->bl_resumed);
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[START]	
 	if (dev->bl_resumed==1)
 		return 0;
+    //20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
 	early_bl_timer = 1;
 
 	DBG("early_bl_timer: %d\n", early_bl_timer);
 	aat2870_backlight_on(client);
 
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[START]
 	dev->bl_resumed=1;
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
 	return 0;
 }
 
@@ -1422,10 +1356,12 @@ void aat2870_resume_for_lcd()
 	struct aat2870_device *dev;
 	dev = i2c_get_clientdata(aat2870_i2c_client);
 
-#if 0 
+#if 0 /* 20110304 seven.kim@lge.com late_resume_lcd */
 	DBG("dev->bl_resumed=%d\n",dev->bl_resumed);
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[START]	
 	if (dev->bl_resumed==1)
 		return;
+    //20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
 	early_bl_timer = 1;
 
 	aat2870_backlight_on(aat2870_i2c_client);
@@ -1433,9 +1369,14 @@ void aat2870_resume_for_lcd()
 	if (system_rev >= 3) //Over REV.C
  	bd2802_resume_for_lcd();
 
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[START]
 	dev->bl_resumed=1;
-#else
-#endif 
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
+#else /* 20110304 seven.kim@lge.com late_resume_lcd */
+	//synaptics_ts_resume(hub_ts_client); //seven changed for late_resume_lcd
+	//aat2870_backlight_on(aat2870_i2c_client); //seven changed for late_resume_lcd
+	//aat2870_bl_resume(aat2870_i2c_client); //20110321 black lcd problem patch
+#endif /* 20110304 seven.kim@lge.com late_resume_lcd */
 }
 EXPORT_SYMBOL(aat2870_resume_for_lcd);
 
@@ -1445,10 +1386,14 @@ static void aat2870_early_suspend(struct early_suspend *h)
 	DBG("\n");
 	dev = container_of(h, struct aat2870_device, early_suspend);
 
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [START] */
 	g_AAT2870_State_Machine = AAT2870_EARLY_SUSPEND_STATE;
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [END] */
 	
 	aat2870_bl_suspend(dev->client, PMSG_SUSPEND);
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[START]
 	dev->bl_resumed=0;
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
 }
 
 
@@ -1458,9 +1403,13 @@ static void aat2870_late_resume(struct early_suspend *h)
 
 	dev = container_of(h, struct aat2870_device, early_suspend);
 	DBG("[aat2870_suspend]aat2870_late_resume \n");
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [START] */
 	g_AAT2870_State_Machine = AAT2870_LATE_RESUME_STATE;
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [END] */
 
+	 /* 20110304 seven.kim@lge.com late_resume_lcd [START] */	
 	 aat2870_bl_resume(dev->client); //20110321 for black lcd display
+ 	 /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
 }
 #endif	/* CONFIG_HAS_EARLYSUSPEND */
 
@@ -1474,7 +1423,9 @@ static int aat2870_suspend(struct i2c_client *client, pm_message_t state)
 	client->dev.power.power_state = state;
 	
 //	dev->mode=0;
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[START]
 	dev->bl_resumed=0;
+	//20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
 	
 #if defined(CONFIG_MACH_LGE_HUB) || defined(CONFIG_MACH_LGE_SNIPER)
 //	DBG("touch disable..\n");
@@ -1482,21 +1433,27 @@ static int aat2870_suspend(struct i2c_client *client, pm_message_t state)
 //	msleep(5);
 #endif
 
+// prime@sdcmicro.com The following calls are made by aat2870_shutdown() which is called by panel-hub.c [START]
         #if 0
 	aat2870_write_reg(client, LDO_ABCD_EN_REG, 0x00);
 	gpio_direction_output(LCD_CP_EN, 0);
 	#endif
 
-#if 0 
+#if 0 /* 20110304 seven.kim@lge.com late_resume_lcd */
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [START] */
 	if (g_AAT2870_State_Machine == AAT2870_RESUME_STATE)
 	{
 		aat2870_write_reg(aat2870_i2c_client, LDO_ABCD_EN_REG, 0x00);
 		mdelay(1);
-		gpio_direction_output(LCD_CP_EN, 0); 
+		/* LGE_UPDATE_S [daewung.kim@lge.com] 20110218, Shutdown aat2870 for saving 0.5mA */
+		gpio_direction_output(LCD_CP_EN, 0); //20110227 seven.kim@lge.com to prevent i2c error
+		/* LGE_UPDATE_E [daewung.kim@lge.com] 20110218, Shutdown aat2870 for saving 0.5mA */
 	}
 
 	g_AAT2870_State_Machine = AAT2870_SUSPEND_STATE;
-#endif 
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [END] */
+#endif /* 20110304 seven.kim@lge.com late_resume_lcd */
+// prime@sdcmicro.com The following calls are made by aat2870_shutdown() which is called by panel-hub.c [END]
 
 	return 0;
 }
@@ -1509,10 +1466,12 @@ static int aat2870_resume(struct i2c_client *client)
 	client->dev.power.power_state = PMSG_ON;
 
 #if defined(CONFIG_MACH_LGE_HUB) || defined(CONFIG_MACH_LGE_SNIPER)
-   #if 0 
+// prime@sdcmicro.com The following calls are made by hub_lcd_initialize() which is called by panel-hub.c [START]
+   #if 0 /* 20110304 seven.kim@lge.com late_resume_lcd */
+	/*20110215 seven.kim@lge.com to adjust touch ldo control [START] */
 	aat2870_write_reg(client, LDO_AB_LEVEL_REG, 0x4A);
 	mdelay(1);
-	#if 0 
+	#if 0 //20110227 seven.kim@lge.com split ldo control to prevent i2c error
 	aat2870_write_reg(client, LDO_CD_LEVEL_REG, 0x4C);
 	mdelay(1);
 	aat2870_write_reg(client, LDO_ABCD_EN_REG, 0x0F);
@@ -1521,10 +1480,14 @@ static int aat2870_resume(struct i2c_client *client)
 	aat2870_write_reg(client, LDO_ABCD_EN_REG, 0x03);
 	mdelay(1);
 	#endif
-   #endif
+	/*20110215 seven.kim@lge.com to adjust touch ldo control [END] */
+   #endif /* 20110304 seven.kim@lge.com late_resume_lcd */	
+// prime@sdcmicro.com The following calls are made by hub_lcd_initialize() which is called by panel-hub.c [END]
 #endif
 
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [START] */
 	g_AAT2870_State_Machine = AAT2870_RESUME_STATE;
+	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [END] */
 	return 0;
 }
 

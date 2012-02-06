@@ -41,9 +41,6 @@
 #include <plat/clock.h>
 #include <plat/mcspi.h>
 
-//20110327 ws.yang@lge.com .. to max of vdd2_opp when dma is tx/rx /* 20110720 dongyu.gwak@lge.com L3 200Mhz from Justin */
-#include <plat/omap-pm.h>
-
 #define OMAP2_MCSPI_MAX_FREQ		48000000
 #define OMAP2_MCSPI_MAX_FIFODEPTH       64
 
@@ -684,12 +681,7 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 	}
 #endif
 
-
-// TODO:[EBS] LGE_UPDATE_S eungbo.shim@lge.com 20110713 For Ril recovery No stop mux tx_looper thread
-
 	if (tx != NULL) {
-            //20110329 ws.yang@lge.com .. to Through-put requirement /* 20110719 dongyu.gwak@lge.com L3 200Mhz from Justin */ 
-	    //omap_pm_set_min_bus_tput(&spi->dev,OCP_INITIATOR_AGENT, 800000);	//omap-pm-srf.c
 
 // LGE_UPDATE_S eungbo.shim@lge.com [EBS] SPI Retry Routine 
 #ifdef LGE_RIL_SPI// KNK_TEST
@@ -697,12 +689,11 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		if (mcspi->mcspi_mode == OMAP2_MCSPI_SLAVE) //For RIL SPI 
 		{
 			int wait_ret ,rt_cnt=0;
-			//do {
+			do {
 				wait_ret = wait_for_completion_timeout(&mcspi_dma->dma_tx_completion,100) ;  /* 20110304 dongyu.gwak@lge.com Retry Scheme */
 				if( wait_ret == 0 )
 				{
-					printk("######### [EBS-SPI] omap2mcspi --> TX DMA Timeout !!\n");
-					#if 1
+
 					volatile unsigned long tmp_dma_read, tmp_dma_read1;
 					tmp_dma_read = omap_readl( 0x480560B8 + (mcspi_dma->dma_tx_channel * 0x60) );	// OMAP_DMA4_CDACi
 					if(tmp_dma_read  == 0)
@@ -724,14 +715,10 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 //#endif
 //					spi->slave_ready(spi, 1);
 //					spi->slave_ready(spi, 0);
-					
-				#endif
-					
-				
 				}
-				//else 
-					//break ;
-			//} while( 0/*(++rt_cnt <= 2)*/ ) ;  /* 20110304 dongyu.gwak@lge.com Don't Retry */
+				else 
+					break ;
+			} while( 0/*(++rt_cnt <= 2)*/ ) ;  /* 20110304 dongyu.gwak@lge.com Don't Retry */
 		}
 		else
 #endif
@@ -752,14 +739,9 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		}
 
 		dma_unmap_single(NULL, xfer->tx_dma, count, DMA_TO_DEVICE);
-
-	     //20110329 ws.yang@lge.com .. Reset Through-put requirement /* 20110719 dongyu.gwak@lge.com L3 200Mhz from Justin */ 
-               //omap_pm_set_min_bus_tput(&spi->dev,OCP_INITIATOR_AGENT, -1);			
 	}
 
 	if (rx != NULL) {
-	//20110329 ws.yang@lge.com .. add to Through-put requirement /* 20110719 dongyu.gwak@lge.com L3 200Mhz from Justin */ 
-	    //omap_pm_set_min_bus_tput(&spi->dev,OCP_INITIATOR_AGENT, 800000);	//omap-pm-srf.c
 
 // LGE_UPDATE_S eungbo.shim@lge.com [EBS] -- For SPI Retry Routine 
 #ifdef LGE_RIL_SPI // KNK_TEST
@@ -767,14 +749,12 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 					if (mcspi->mcspi_mode == OMAP2_MCSPI_SLAVE)
 					{
 						int wait_ret_rx ,rt_cnt_rx=0;
-						//do {
+						do {
 							//wait_ret_rx = wait_for_completion_timeout(&mcspi_dma->dma_rx_completion,1*HZ) ;
-							wait_ret_rx = wait_for_completion_timeout(&mcspi_dma->dma_rx_completion, 100); // 1tick == 8ms, 3000 * 8ms = 24,000ms
-
+							wait_ret_rx = wait_for_completion_timeout(&mcspi_dma->dma_rx_completion, 5000); // 1tick == 8ms, 3000 * 8ms = 24,000ms
 							if( wait_ret_rx == 0 )
 							{
-								printk("##########[EBS] omap2_mcspi RX DMA Timeout !!!\n");
-								#if 1
+			
 								volatile unsigned long tmp_dma_read_rx, tmp_dma_read1_rx;
 								tmp_dma_read_rx = omap_readl( 0x480560B8 + (mcspi_dma->dma_rx_channel * 0x60) );	// OMAP_DMA4_CDACi
 								if(tmp_dma_read_rx	== 0)
@@ -794,21 +774,17 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 			//#ifdef CONFIG_SPI_DEBUG
 								printk(KERN_ERR "[LGE-SPI] SPI Host Req. Retry -----------------[%d] \n",rt_cnt_rx);
 			//#endif
-							//	spi->slave_ready(spi, 1);
-						//		spi->slave_ready(spi, 0);
-								#endif
+								spi->slave_ready(spi, 1);
+								spi->slave_ready(spi, 0);
 							}
-							//else 
-								//break ;
-					//	} while( 0 ) ;
+							else 
+								break ;
+						} while( 1 || (++rt_cnt_rx < 2) ) ;
 					}
 					else
 #endif
 #endif
 //LGE_UPDATE_E eungbo.shim@lge.com [EBS]
-	
-// TODO:[EBS] LGE_UPDATE_E eungbo.shim@lge.com 20110713 For Ril recovery No stop mux tx_looper thread
-
 	
 		wait_for_completion(&mcspi_dma->dma_rx_completion);
 
@@ -867,9 +843,6 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		}
 		} // if (mcspi->fifo_depth == 0) { // check later
 		omap2_mcspi_set_enable(spi, 1);
-	     //20110329 ws.yang@lge.com .. Reset Through-put requirement /* 20110719 dongyu.gwak@lge.com L3 200Mhz from Justin */ 
-	     //omap_pm_set_min_bus_tput(&spi->dev, OCP_INITIATOR_AGENT, -1); 		
-
 // LGE_UPDATES_S eungbo.shim@lge.com [EBS] Move to slave Rdy Code  
 #if 0 // KNK_TEST
 #if 1
@@ -1395,13 +1368,8 @@ static void omap2_mcspi_work(struct work_struct *work)
 
 				m->actual_length += count;
 
-				if (count != t->len)
-				{
+				if (count != t->len) {
 					status = -EIO;
-// TODO:[EBS] LGE_UPDATE_S eungbo.shim@lge.com 20110713 For Ril recovery Debugging printk 					
-					printk("[%s] [omap2_mcspi status = %d, count = %d , m->length = %d\n", __FUNCTION__, status, count, m->actual_length);
-// TODO:[EBS] LGE_UPDATE_E eungbo.shim@lge.com 20110713 For Ril recovery 
-
 					break;
 				}
 			}

@@ -45,6 +45,47 @@
 
 #ifndef CONFIG_DMM_DMA_API
 /* Hack hack code to handle MM buffers */
+
+//saravanan 
+bool validate_phys_memory(struct mm_struct *mm, unsigned long addr)
+{
+	pgd_t *pgd;
+	bool ret = false;
+
+	pgd = pgd_offset(mm, addr);
+
+	do {
+		pmd_t *pmd;
+		pte_t *pte;
+
+		if (pgd_none(*pgd))
+			break;
+
+		if (pgd_bad(*pgd))
+			break;
+
+		pmd = pmd_offset(pgd, addr);
+
+		if (pmd_none(*pmd))
+			break;
+
+		if (pmd_bad(*pmd))
+			break;
+
+		/* We must not map this if we have highmem enabled */
+		if (PageHighMem(pfn_to_page(pmd_val(*pmd) >> PAGE_SHIFT)))
+			break;
+
+		pte = pte_offset_map(pmd, addr);
+		if (pte_val(pte[-PTRS_PER_PTE]) == 0x0)
+			ret = true;
+		pte_unmap(pte);
+	} while (0);
+
+	return ret;
+}
+//saravanan
+
 int temp_user_dma_op(unsigned long start, unsigned long end, int op)
 {
 
@@ -98,6 +139,14 @@ int temp_user_dma_op(unsigned long start, unsigned long end, int op)
 			}
 			if (page) {
 				unsigned long phys;
+				//saravanan
+				/* Validate physical memory before proceeding */
+				if (validate_phys_memory(mm, start)) {
+					up_read(&mm->mmap_sem);
+					printk(KERN_ERR "validate_phys_memory failed\n");
+					return -EFAULT;
+				}
+				//saravanan
 				/*
 				 * This flushes the userspace address - which
 				 * is not what this API was intended to do.

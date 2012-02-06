@@ -148,6 +148,7 @@ int omap_voltage_register_notifier(struct voltagedomain *voltdm,
 		struct notifier_block *nb);
 int omap_voltage_unregister_notifier(struct voltagedomain *voltdm,
 		struct notifier_block *nb);
+void set_dpll3_volt_freq(bool dpll3_restore);
 #else
 static inline void omap_voltage_init_vc(struct omap_volt_vc_data *setup_vc) {}
 static inline  void omap_change_voltscale_method(int voltscale_method) {}

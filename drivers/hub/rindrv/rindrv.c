@@ -768,6 +768,10 @@ static int rin_open(struct tty_struct *tty)
 			sl = netdev_priv(rin_devs[realloc_count]);
 			printk("%s - line : %d, realloc sl->dev = %x\n", __FUNCTION__, __LINE__, sl->dev);
 			realloc_count ++;
+			// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+			err = 0;
+			// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+
 		}
 	}
 	else
@@ -808,7 +812,11 @@ static int rin_open(struct tty_struct *tty)
 	/* Done.  We have linked the TTY line to a channel. */
 	rtnl_unlock();
 	tty->receive_room = 65536;	/* We don't flow control */
-	return sl->dev->base_addr;
+	// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+	//ril_open must return 0, if succeed
+	//return sl->dev->base_addr;
+	return err;
+	// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
 
 err_free_bufs:
 	rin_free_bufs(sl);
@@ -858,7 +866,11 @@ static void rin_close(struct tty_struct *tty)
 	/* First make sure we're connected. */
 	if (!sl || sl->magic != RIN_MAGIC || sl->tty != tty)
 		return;
-
+	// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+	spin_lock(&sl->lock);		
+    if(rin_tx_wq)
+        flush_workqueue(rin_tx_wq);
+	// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
 	tty_ldisc_flush(tty);
 	tty->disc_data = NULL;
 	sl->tty = NULL;
@@ -867,6 +879,9 @@ static void rin_close(struct tty_struct *tty)
 	
 	rindrv_count++;
 	printk("%s - line : %d - rindrv_count = %d\n", __FUNCTION__, __LINE__, rindrv_count);
+	// START:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
+	spin_unlock(&sl->lock);
+	// END:: RIP-11174 [Data] Upon RIL recovery completion, multiple RIN channel should be opened.
 }
 
 /* Perform I/O control on an active RIN channel. */

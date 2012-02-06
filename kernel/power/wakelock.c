@@ -230,9 +230,6 @@ static void print_active_locks(int type)
 	}
 }
 
-#ifdef CONFIG_LGE_OMAP3_POWER_SAVE_DEBUG
-extern int early_suspend_process;
-#endif
 static long has_wake_lock_locked(int type)
 {
 	struct wake_lock *lock, *n;
@@ -240,16 +237,8 @@ static long has_wake_lock_locked(int type)
 
 	BUG_ON(type >= WAKE_LOCK_TYPE_COUNT);
 	list_for_each_entry_safe(lock, n, &active_wake_locks[type], link) {
-#ifdef CONFIG_LGE_OMAP3_POWER_SAVE_DEBUG
-		if( early_suspend_process)
-			printk("%s, lockname %s, lock->flags %d\n", __FUNCTION__, lock->name, lock->flags);
-#endif
 		if (lock->flags & WAKE_LOCK_AUTO_EXPIRE) {
 			long timeout = lock->expires - jiffies;
-#ifdef CONFIG_LGE_OMAP3_POWER_SAVE_DEBUG
-			if( early_suspend_process)
-				printk("%s, timtout %ld\n", __FUNCTION__, timeout);
-#endif
 			if (timeout <= 0)
 				expire_wake_lock(lock);
 			else if (timeout > max_timeout)
@@ -321,9 +310,7 @@ static void expire_wake_locks(unsigned long data)
 	if (debug_mask & DEBUG_EXPIRE)
 		pr_info("expire_wake_locks: done, has_lock %ld\n", has_lock);
 	if (has_lock == 0)
-	{
 		queue_work(suspend_work_queue, &suspend_work);
-	}
 	spin_unlock_irqrestore(&list_lock, irqflags);
 }
 static DEFINE_TIMER(expire_timer, expire_wake_locks, 0, 0);
@@ -475,10 +462,8 @@ static void wake_lock_internal(
 					pr_info("wake_lock: %s, stop expire timer\n",
 						lock->name);
 			if (expire_in == 0)
-			{
 				queue_work(suspend_work_queue, &suspend_work);
 		}
-	}
 	}
 	spin_unlock_irqrestore(&list_lock, irqflags);
 }
@@ -511,10 +496,6 @@ void wake_unlock(struct wake_lock *lock)
 	list_add(&lock->link, &inactive_locks);
 	if (type == WAKE_LOCK_SUSPEND) {
 		long has_lock = has_wake_lock_locked(type);
-#ifdef CONFIG_LGE_OMAP3_POWER_SAVE_DEBUG
-		if( early_suspend_process)
-			printk("%s: type %d, has_lock %ld, debug_mask %d\n", __FUNCTION__, type, has_lock, debug_mask);
-#endif
 		if (has_lock > 0) {
 			if (debug_mask & DEBUG_EXPIRE)
 				pr_info("wake_unlock: %s, start expire timer, "
@@ -529,7 +510,7 @@ void wake_unlock(struct wake_lock *lock)
 				queue_work(suspend_work_queue, &suspend_work);
 		}
 		if (lock == &main_wake_lock) {
-			//if (debug_mask & DEBUG_SUSPEND)
+			if (debug_mask & DEBUG_SUSPEND)
 				print_active_locks(WAKE_LOCK_SUSPEND);
 #ifdef CONFIG_WAKELOCK_STAT
 			update_sleep_wait_stats_locked(0);

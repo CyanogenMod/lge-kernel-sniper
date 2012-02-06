@@ -45,15 +45,17 @@ static void stop_drawing_early_suspend(struct early_suspend *h)
 	spin_unlock_irqrestore(&fb_state_lock, irq_flags);
 
 	wake_up_all(&fb_state_wq);
-#if 1 /*LG_CHANGE_S lee.hyunji@lge.com 20110425 The previous screen visible .*/
+/*[Saravanak.nachimuthu@lge.com] LGSI The previous screen visible so flickering effect is seen START */
+#if 0 /*LG_CHANGE_S lee.hyunji@lge.com 20110425 The previous screen visible .*/
 	ret = wait_event_timeout(fb_state_wq,
 				 fb_state == FB_STATE_STOPPED_DRAWING,
-#if defined(CONFIG_MACH_LGE_OMAP3) /* bking.moon@lge.com, patch from b-froyo cause of lcd lockup */
-				 HZ * 3);
+				 HZ*2);
 #else
+	ret = wait_event_timeout(fb_state_wq,
+				 fb_state == FB_STATE_STOPPED_DRAWING,
 				 HZ);
 #endif
-#endif
+/*[Saravanak.nachimuthu@lge.com] LGSI The previous screen visible so flickering effect is seen END */
 	if (unlikely(fb_state != FB_STATE_STOPPED_DRAWING))
 		pr_warning("stop_drawing_early_suspend: timeout waiting for "
 			   "userspace to stop drawing\n");

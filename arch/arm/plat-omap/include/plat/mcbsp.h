@@ -408,6 +408,10 @@ static struct platform_device omap_mcbsp##port_nr = {	\
 #define RFSREN			0x0002
 #define RSYNCERREN		0x0001
 
+#define WAKEUPEN_ALL		(XEMPTYEOFEN | XRDYEN | XEOFEN | XFSXEN | \
+				 XSYNCERREN | RRDYEN | REOFEN | RFSREN | \
+				 RSYNCERREN)
+
 /* we don't do multichannel for now */
 struct omap_mcbsp_reg_cfg {
 	u16 spcr2;

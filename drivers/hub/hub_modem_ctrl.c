@@ -135,7 +135,12 @@ static ssize_t modem_power_ctrl_store(struct device *dev,
 
 	if (modem_ctrl.power_ctrl != new_power_ctrl) {
 		modem_ctrl.power_ctrl = new_power_ctrl;
+
+		dump_gpio_status(__FUNCTION__, 1);
+		//omap_mux_config("GPIO26_MODEM_POWER_CTRL_GPIO"); // XXX: 20060617 temporarily disabled
+		gpio_set_value(MODEM_POWER_CTRL_GPIO, modem_ctrl.power_ctrl);
 		gpio_direction_output(MODEM_POWER_CTRL_GPIO, modem_ctrl.power_ctrl);
+		dump_gpio_status(__FUNCTION__, 2);
 	}
 	printk("%s: power switch is %d\n", __FUNCTION__, modem_ctrl.power_ctrl);
 
@@ -165,7 +170,12 @@ static ssize_t modem_reset_ctrl_store(struct device *dev,
 
 	if (modem_ctrl.reset_ctrl != new_reset_ctrl) {
 		modem_ctrl.reset_ctrl = new_reset_ctrl;
+
+                dump_gpio_status(__FUNCTION__, 1);
+                //omap_mux_config("GPIO26_MODEM_RESET_CTRL_GPIO"); // XXX: 20060617 temporarily disabled
+		gpio_set_value(MODEM_RESET_CTRL_GPIO, modem_ctrl.reset_ctrl);
 		gpio_direction_output(MODEM_RESET_CTRL_GPIO, modem_ctrl.reset_ctrl);
+                dump_gpio_status(__FUNCTION__, 2);
 	}
 
 	printk("%s: reset switch is %d\n", __FUNCTION__,
@@ -175,19 +185,6 @@ static ssize_t modem_reset_ctrl_store(struct device *dev,
 
 DEVICE_ATTR(reset_ctrl, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP,
 	    modem_reset_ctrl_show, modem_reset_ctrl_store);
-
-void modem_restart(void)
-{
-	gpio_direction_output(MODEM_POWER_CTRL_GPIO, 0);
-	gpio_direction_output(MODEM_RESET_CTRL_GPIO, 0);
-	msleep(900);
-	gpio_direction_output(MODEM_POWER_CTRL_GPIO, 1);
-	msleep(200);
-	gpio_direction_output(MODEM_RESET_CTRL_GPIO, 1);
-	msleep(200);
-	gpio_direction_output(MODEM_RESET_CTRL_GPIO, 0);
-}
-EXPORT_SYMBOL(modem_restart);
 
 static ssize_t modem_uart_path_show(struct device *dev,
 				    struct device_attribute *attr, char *buf)
@@ -243,21 +240,21 @@ static int modem_ctrl_probe(struct platform_device *pdev)
 		ret = -EBUSY;
 		goto err_gpio_request_power_ctrl;
 	}
-	////gpio_direction_output(MODEM_POWER_CTRL_GPIO, 1);
+	gpio_direction_output(MODEM_POWER_CTRL_GPIO, 1);
 	modem_ctrl.power_ctrl = 1;
-
+/* sudhir Start */
 #if 0//DEBUG  //FOTA CP Reset for Retry by seunghyun.yi@lge.com 2011_02_09
-        printk("###** IFX_POWER: Initial Current, %d\n", gpio_get_value(MODEM_POWER_CTRL_GPIO));
+	printk("###** MODEM_POWER_CTRL_GPIO: Initial Current, %d\n", gpio_get_value(MODEM_POWER_CTRL_GPIO));
         mdelay(1000);
 
 	gpio_direction_output(MODEM_POWER_CTRL_GPIO, 0);
         gpio_set_value(MODEM_POWER_CTRL_GPIO, 0);
-        printk("###** IFX_POWER: After Set Low, %d\n", gpio_get_value(MODEM_POWER_CTRL_GPIO));
+	printk("###** MODEM_POWER_CTRL_GPIO: After Set Low, %d\n", gpio_get_value(MODEM_POWER_CTRL_GPIO));
         mdelay(1000);
 
 	gpio_direction_output(MODEM_POWER_CTRL_GPIO, 1);
         gpio_set_value(MODEM_POWER_CTRL_GPIO, 1);
-        printk("###** IFX_POWER: After Set High, %d\n", gpio_get_value(MODEM_POWER_CTRL_GPIO));
+	printk("###** MODEM_POWER_CTRL_GPIO: After Set High, %d\n", gpio_get_value(MODEM_POWER_CTRL_GPIO));
         mdelay(1000);
 #endif /* DEBUG */
 #endif // FEATURE_MODEM_POWER_CTRL
@@ -274,37 +271,38 @@ static int modem_ctrl_probe(struct platform_device *pdev)
         dump_gpio_status(__FUNCTION__, 2);
 #endif
 
-	////gpio_direction_output(MODEM_RESET_CTRL_GPIO, 1);
+	gpio_direction_output(MODEM_RESET_CTRL_GPIO, 1);
 	modem_ctrl.reset_ctrl = 1;
+
 #if 0//DEBUG  //FOTA CP Reset for Retry by seunghyun.yi@lge.com 2011_02_09
+/* sudhir end */
 	dump_gpio_status(__FUNCTION__, 3);
 
-        printk("###** IFX_RESET: Initial Current, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
+	printk("###** MODEM_RESET_CTRL_GPIO: Initial Current, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
 
 	mdelay(1000);
 	gpio_direction_output(MODEM_RESET_CTRL_GPIO, 0);
 	gpio_set_value(MODEM_RESET_CTRL_GPIO, 0);
 	dump_gpio_status(__FUNCTION__, 4);
-        printk("###** IFX_RESET: After Set Low, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
+	printk("###** MODEM_RESET_CTRL_GPIO: After Set Low, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
 
 	mdelay(1000);
 	gpio_direction_output(MODEM_RESET_CTRL_GPIO, 1);
 	gpio_set_value(MODEM_RESET_CTRL_GPIO, 1);
 	dump_gpio_status(__FUNCTION__, 5);
-        printk("###** IFX_RESET: After Set High, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
-/*
+	printk("###** MODEM_RESET_CTRL_GPIO: After Set High, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
+
         mdelay(1000);
         gpio_direction_output(MODEM_RESET_CTRL_GPIO, 0);
         gpio_set_value(MODEM_RESET_CTRL_GPIO, 0);
         dump_gpio_status(__FUNCTION__, 6);
-        printk("###** IFX_RESET: After Set Low, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
+	printk("###** MODEM_RESET_CTRL_GPIO: After Set Low, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
 
         mdelay(1000);
         gpio_direction_output(MODEM_RESET_CTRL_GPIO, 1);
         gpio_set_value(MODEM_RESET_CTRL_GPIO, 1);
         dump_gpio_status(__FUNCTION__, 7);
-        printk("###** IFX_RESET: After Set High, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
-*/        
+	printk("###** MODEM_RESET_CTRL_GPIO: After Set High, %d\n", gpio_get_value(MODEM_RESET_CTRL_GPIO));
 #endif /* DEBUG */
 #endif // FEATURE_MODEM_RESET_CTRL
 

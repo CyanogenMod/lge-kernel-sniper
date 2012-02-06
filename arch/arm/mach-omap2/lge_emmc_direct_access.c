@@ -52,7 +52,7 @@ static ssize_t fboot_store(struct device *dev, struct device_attribute *attr, co
  */
  
 static DEVICE_ATTR(version, 0444, version_show, NULL);
-static DEVICE_ATTR(boot_info, 0666, fboot_show, fboot_store);
+static DEVICE_ATTR(boot_info, 0664, fboot_show, fboot_store);
 
 static int lge_emmc_direct_access_probe(struct platform_device *pdev)
 {

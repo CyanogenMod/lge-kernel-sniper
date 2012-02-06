@@ -326,10 +326,13 @@ static int kxtf9_suspend(void *mlsl_handle,
 			 struct ext_slave_platform_data *pdata)
 {
 	int result;
-
+	/* LGSI_PLT_LGP970_SENSOR_NOT_INITIALIZING_START: 22/08/2011_Seshu */
+	unsigned char data;
+	struct kxtf9_private_data *private_data = pdata->private_data;
+/* LGSI_PLT_LGP970_SENSOR_NOT_INITIALIZING_END: 22/08/2011_Seshu */
+	/* Wake up */
 	result = MLSLSerialWriteSingle(mlsl_handle, pdata->address,
 				KXTF9_CTRL_REG1, 0x00);
-
 	ERROR_CHECK(result);
 
 	return result;

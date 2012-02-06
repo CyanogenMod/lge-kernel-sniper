@@ -18,7 +18,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  */
-#include <linux/gpio.h>
 
 #include <linux/platform_device.h>
 #include <linux/interrupt.h>
@@ -45,13 +44,13 @@ extern int check_battery_present(void);
 #define CHR_IC_SET_DEALY			1500	/* 1500 us */
 
 static struct delayed_work	charging_ic_int_work;
-static max8922_status charging_ic_status = CHARGING_IC_DEACTIVE;
+static max8922_status charging_ic_status = CHARGING_IC_ACTIVE_DEFAULT;
 static struct wake_lock power_off_charging_lock;
-static struct wake_lock eoc_handle_lock;
 
 extern int set_end_of_charge(int complete);	// from twl4030_bci_battery.c
 extern void charger_state_update_by_other(void);	// from twl4030_bci_battery.c
-extern int console_enabled;
+
+
 /* Function Prototype */
 static void hub_charging_ic_intialize(void);
 static irqreturn_t charging_ic_interrupt_handler(int irq, void *data);
@@ -63,11 +62,11 @@ void lge_battery_fet_onoff(int on)
 		on = 0; 
 
 	if(on) {
-		//printk(KERN_INFO "%s, On %d - GPIO LOW \n", __FUNCTION__, on);
+		printk(KERN_INFO "%s, On %d - GPIO LOW \n", __FUNCTION__, on);
 		/* Charging */
 		gpio_set_value(CHAR_CONTROL, 0);
 	} else {
-		//printk(KERN_INFO "%s, On %d - GPIO HIGH \n", __FUNCTION__, on);
+		printk(KERN_INFO "%s, On %d - GPIO HIGH \n", __FUNCTION__, on);
 		/* No Charging */
 		gpio_set_value(CHAR_CONTROL, 1);
 	}
@@ -85,10 +84,10 @@ EXPORT_SYMBOL(get_charging_ic_status);
 void charging_ic_deactive_before_setting(void)
 {
 
-	//printk(KERN_INFO "[charging_msg]%s\n", __FUNCTION__);
+	printk(KERN_INFO "[charging_msg]%s\n", __FUNCTION__);
 	/* If No Battery and Charger IC Deactive, the Device will be power down */
 	if( check_battery_present() == 0 ) {
-		//printk("[charging_msg] %s, Fail... cause No Battery \n",__FUNCTION__);
+		printk("[charging_msg] %s, Fail... cause No Battery \n",__FUNCTION__);
 		return ;
 	}
 
@@ -103,6 +102,15 @@ void charging_ic_active_default(void)
 	if(charging_ic_status == CHARGING_IC_ACTIVE_DEFAULT)
 		return;
 
+	switch(charging_ic_status) {
+		case CHARGING_IC_TA_MODE :
+		case CHARGING_IC_FACTORY_MODE :
+			charging_ic_deactive_before_setting();
+			break;
+		default:
+			break;
+	}
+
 	gpio_set_value(CHG_EN_SET_N_OMAP, 0);
 
 	mdelay(1);
@@ -116,6 +124,9 @@ void charging_ic_set_ta_mode(void)
 {
 	if(charging_ic_status == CHARGING_IC_TA_MODE)
 		return;
+
+	if(charging_ic_status == CHARGING_IC_FACTORY_MODE)
+		charging_ic_deactive_before_setting();
 
 	gpio_set_value(CHG_EN_SET_N_OMAP, 0);
 	udelay(CHR_IC_DELAY);
@@ -132,6 +143,7 @@ EXPORT_SYMBOL(charging_ic_set_ta_mode);
 
 void charging_ic_set_usb_mode()
 {
+	//charging_ic_set_ta_mode();
 	charging_ic_active_default();
 }
 EXPORT_SYMBOL(charging_ic_set_usb_mode);
@@ -155,6 +167,9 @@ void charging_ic_set_factory_mode()
 {
 	if(charging_ic_status == CHARGING_IC_FACTORY_MODE)
 		return;
+
+	if(charging_ic_status == CHARGING_IC_TA_MODE)
+		charging_ic_deactive_before_setting();
 
 	gpio_set_value(CHG_EN_SET_N_OMAP, 0);
 	udelay(CHR_IC_DELAY);
@@ -180,24 +195,20 @@ EXPORT_SYMBOL(charging_ic_set_factory_mode);
 void charging_ic_deactive(void)
 {
 	charging_ic_status = CHARGING_IC_DEACTIVE;
-	
-	gpio_set_value(CHG_EN_SET_N_OMAP, 1);
-	mdelay(1);
-	udelay(500);
+	charging_ic_deactive_before_setting();
+	return ;
 }
 EXPORT_SYMBOL(charging_ic_deactive);
 
 static void charging_ic_work_func(struct work_struct *work)
 {
-	//printk(KERN_INFO "[charging_msg] %s\n", __FUNCTION__);
-	//printk(KERN_INFO "[Battery] Charging IC - EOC\n");
+	printk(KERN_INFO "[charging_msg] %s\n", __FUNCTION__);
 	if(charging_ic_status != CHARGING_IC_DEACTIVE) {
 		set_end_of_charge(1);
+		//charging_ic_deactive();
 		charger_state_update_by_other();
+		printk(KERN_INFO "[Battery] Charging IC - EOC\n");
 	}
-	
-	if(wake_lock_active(&eoc_handle_lock))
-		wake_unlock(&eoc_handle_lock);
 }
 
 static void hub_charging_ic_intialize(void)
@@ -206,12 +217,8 @@ static void hub_charging_ic_intialize(void)
 
 static irqreturn_t charging_ic_interrupt_handler(int irq, void *data)
 {
-	if(charging_ic_status == CHARGING_IC_DEACTIVE)
-		return IRQ_HANDLED;
-	
-	if(!wake_lock_active(&eoc_handle_lock))
-		wake_lock(&eoc_handle_lock);
-
+	printk(KERN_INFO "[charging_msg] %s: charger ic interrupt occured \n", __func__);
+    if (charging_ic_status != CHARGING_IC_DEACTIVE)
     	schedule_delayed_work(&charging_ic_int_work, msecs_to_jiffies(500));
 
 	return IRQ_HANDLED;
@@ -229,7 +236,7 @@ void setting_for_factory_mode_hw_req(void)
 	/* HW요청사항...Battery가 있으면...2A가 아닌 960mA로 충전하도록
 	   Charger IC가 2A로 충전을 계속하게 되면 버티지 못함. */
 	if( check_battery_present() ) {
-		//printk(KERN_INFO "%s, Charger Current Setting TA mode from Factory Mode\n", __FUNCTION__);
+		printk(KERN_INFO "%s, Charger Current Setting TA mode from Factory Mode\n", __FUNCTION__);
 		charging_ic_set_ta_mode();
 	}
 #endif
@@ -272,7 +279,7 @@ void set_charging_current(void)
 				charging_ic_set_ta_mode();
 				break;
 		}
-		//printk("[charging_msg] %s, External Power Type %d \n", __FUNCTION__, get_ext_pwr_type());
+		printk("[charging_msg] %s, External Power Type %d \n", __FUNCTION__, get_ext_pwr_type());
 
 		old_status = current_status;
 	}
@@ -284,7 +291,7 @@ void set_charging_current(void)
 static int external_power_on = 0;
 void set_external_power_detect(int on)
 {
-	//printk("[charging_msg] %s, ext_pwr status %d \n", __FUNCTION__, on);
+	printk("[charging_msg] %s, ext_pwr status %d \n", __FUNCTION__, on);
 
 #if 0
 	if( 0 == on ) {
@@ -322,7 +329,7 @@ ssize_t charging_ic_store_status(struct device *dev,
 	}
 	return count;
 }
-DEVICE_ATTR(charging_state, 0644, charging_ic_show_status, charging_ic_store_status);
+DEVICE_ATTR(charging_state, 0664, charging_ic_show_status, charging_ic_store_status);
 
 ssize_t charging_ic_show_poc(struct device *dev,
 			 struct device_attribute *attr,
@@ -343,23 +350,17 @@ ssize_t charging_ic_store_poc(struct device *dev,
 			  size_t count)
 {
 	if(buf[0] == '0') {
-/* LGE_CHARNGED_S, DCM, 2011-05-29, POWEROFF CHARING: WHEN UNPLUGED, LED BLINKING ISSUE */
-		//if(console_enabled && wake_lock_active(&power_off_charging_lock))
 		if(wake_lock_active(&power_off_charging_lock))
-/* LGE_CHARNGED_E, DCM, 2011-05-29, POWEROFF CHARING: WHEN UNPLUGED, LED BLINKING ISSUE */
 			wake_unlock(&power_off_charging_lock);
 		printk("[Battery] Power Off Charging - End!\n");
 	} else if(buf[0] == '1') {
-/* LGE_CHARNGED_S, DCM, 2011-05-29, POWEROFF CHARING: WHEN UNPLUGED, LED BLINKING ISSUE */
-		//if(console_enabled && !wake_lock_active(&power_off_charging_lock))
 		if(!wake_lock_active(&power_off_charging_lock))
-/* LGE_CHARNGED_E, DCM, 2011-05-29, POWEROFF CHARING: WHEN UNPLUGED, LED BLINKING ISSUE */
 			wake_lock(&power_off_charging_lock);
 		printk("[Battery] Power Off Charging - Start!\n");
 	}
 	return count;
 }
-DEVICE_ATTR(power_off_charging, 0644, charging_ic_show_poc, charging_ic_store_poc);
+DEVICE_ATTR(power_off_charging, 0664, charging_ic_show_poc, charging_ic_store_poc);
 
 static int charging_ic_probe(struct platform_device *dev)
 {
@@ -367,40 +368,36 @@ static int charging_ic_probe(struct platform_device *dev)
 
 	ret = gpio_request(CHG_EN_SET_N_OMAP, "hub charging_ic_en");
 	if (ret < 0) {
-		////printk(KERN_ERR "%s: Failed to request GPIO_%d for "
-	 	//		"charging_ic\n", __func__, CHG_EN_SET_N_OMAP);
+		printk(KERN_ERR "%s: Failed to request GPIO_%d for "
+				"charging_ic\n", __func__, CHG_EN_SET_N_OMAP);
 		return -ENOSYS;
 	}
 	gpio_direction_output(CHG_EN_SET_N_OMAP, 0);
 
 	ret = gpio_request(CHG_STATUS_N_OMAP, "hub charging_ic_status");
 	if (ret < 0) {
-		//printk(KERN_ERR "%s: Failed to request GPIO_%d for "
-		//		"charging_ic_status\n", __func__,
-		//		CHG_STATUS_N_OMAP);
+		printk(KERN_ERR "%s: Failed to request GPIO_%d for "
+				"charging_ic_status\n", __func__,
+				CHG_STATUS_N_OMAP);
 		goto err_gpio_request_failed;
 	}
 	gpio_direction_input(CHG_STATUS_N_OMAP);
 
-	//omap_set_gpio_debounce(CHG_STATUS_N_OMAP, 1);
-	//omap_set_gpio_debounce_time(CHG_STATUS_N_OMAP, 0xa);
-	gpio_set_debounce(CHG_STATUS_N_OMAP, 0xF);
-
 	ret = request_irq(gpio_to_irq(CHG_STATUS_N_OMAP),
 			charging_ic_interrupt_handler,
 			IRQF_TRIGGER_RISING,
-			"end_of_charging", NULL);
+			"Charging_ic_driver", NULL);
 	if (ret < 0) {
-		//printk(KERN_ERR "%s: Failed to request IRQ for "
-		//		"charging_ic_status\n", __func__);
+		printk(KERN_ERR "%s: Failed to request IRQ for "
+				"charging_ic_status\n", __func__);
 		goto err_request_irq_failed;
 	}
-	enable_irq_wake(gpio_to_irq(CHG_STATUS_N_OMAP));
+
 #ifdef CONFIG_LGE_CHARGE_CONTROL_BATTERY_FET
 	ret = gpio_request(CHAR_CONTROL, "hub battery_fet");
 	if (ret < 0) {
-		//printk(KERN_ERR "%s: Failed to request GPIO_%d for "
-		//		"charging_ic\n", __func__, CHAR_CONTROL);
+		printk(KERN_ERR "%s: Failed to request GPIO_%d for "
+				"charging_ic\n", __func__, CHAR_CONTROL);
 		goto err_gpio_request_char_control;
 	}
 	gpio_direction_output(CHAR_CONTROL, 0);
@@ -410,7 +407,8 @@ static int charging_ic_probe(struct platform_device *dev)
 				charging_ic_work_func);
 
 	wake_lock_init(&power_off_charging_lock, WAKE_LOCK_SUSPEND, "Power Off Charging");
-	wake_lock_init(&eoc_handle_lock, WAKE_LOCK_SUSPEND, "Handling End Of Charging");
+	
+	charging_ic_status = CHARGING_IC_DEACTIVE;
 	
 	hub_charging_ic_intialize();
 
@@ -430,12 +428,14 @@ static int charging_ic_probe(struct platform_device *dev)
 		//ret = -ENODEV;
 	}
 
+	enable_irq_wake(gpio_to_irq(CHG_STATUS_N_OMAP)); //20101104 taehwan.kim@lge.com enable charger wakeup
 	return 0;
 
 #ifdef CONFIG_LGE_CHARGE_CONTROL_BATTERY_FET
 	gpio_free(CHAR_CONTROL);
 err_gpio_request_char_control:
 #endif 
+	free_irq(gpio_to_irq(CHG_STATUS_N_OMAP), NULL);
 err_request_irq_failed:
 	gpio_free(CHG_STATUS_N_OMAP);
 err_gpio_request_failed:
@@ -458,8 +458,6 @@ static int charging_ic_remove(struct platform_device *dev)
 
 static int charging_ic_suspend(struct platform_device *dev, pm_message_t state)
 {
-	cancel_delayed_work(&charging_ic_int_work);
-
 	dev->dev.power.power_state = state;
 	return 0;
 }

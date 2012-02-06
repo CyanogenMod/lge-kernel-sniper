@@ -993,8 +993,10 @@ static int __devinit omap_system_dma_probe(struct platform_device *pdev)
 
 static int omap_dma_suspend(struct device *dev)
 {
-#if 0  // kweop
+
+	printk(KERN_DEBUG "%s(%d) : Enter..\n", __func__, __LINE__);
 	pm_runtime_put(&pd->dev);
+#if 0  // kweop
 
 	if (p->dma_context_save)
 		p->dma_context_save();
@@ -1005,14 +1007,16 @@ static int omap_dma_suspend(struct device *dev)
 
 static int omap_dma_resume(struct device *dev)
 {
-#if 0 // kweop
-	/*i
+
+	printk(KERN_DEBUG "%s(%d) : Enter..\n", __func__, __LINE__);
+	/*
 	 * This may not restore sysconfig register if multiple DMA channels
 	 * are in use during suspend.
 	 * Work around: restroing sysconfig manually in machine specific dma
 	 * driver.
 	 */
 	pm_runtime_get_sync(&pd->dev);
+#if 0 // kweop
 
 	if (p->dma_context_restore)
 		p->dma_context_restore();

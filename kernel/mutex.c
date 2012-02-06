@@ -24,8 +24,6 @@
 #include <linux/interrupt.h>
 #include <linux/debug_locks.h>
 
-#include <linux/dvs_suite.h>
-
 /*
  * In the DEBUG case we are using the "NULL fastpath" for mutexes,
  * which forces all calls into the slowpath:
@@ -286,7 +284,6 @@ done:
 void __sched
 mutex_lock_nested(struct mutex *lock, unsigned int subclass)
 {
-    if(ds_staus.flag_mutex_lock_on_clock_state == 0)
 	might_sleep();
 	__mutex_lock_common(lock, TASK_UNINTERRUPTIBLE, subclass, _RET_IP_);
 }

@@ -28,8 +28,6 @@
 #include <plat/powerdomain.h>
 #include <plat/clockdomain.h>
 
-#include <linux/dvs_suite.h>
-
 #ifdef CONFIG_ARCH_OMAP1
 #define MPU_CLK		 "mpu"
 #elif defined(CONFIG_ARCH_OMAP3)
@@ -305,29 +303,6 @@ int omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, long r)
 	static struct device dummy_l3_dev;
 	unsigned long target_level = 0;
 
-#if 1
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_status.flag_run_dvs == 1){
-		/* Make sure the following values consist with those in
-		   kernel/arch/arm/mach-omap2/pm.c */
-		switch(r){
-			case 0:
-				ds_status.l3_min_freq_to_lock = 0;
-				break;
-			case 800000:
-				ds_status.l3_min_freq_to_lock = 200000000;
-				break;
-			case 400000:
-				ds_status.l3_min_freq_to_lock = 100000000;
-				break;
-			default:
-				ds_status.l3_min_freq_to_lock = 0;
-				break;
-		}
-		return 0;
-	}
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
-#endif
 
 	if (!dev || (agent_id != OCP_INITIATOR_AGENT &&
 	    agent_id != OCP_TARGET_AGENT)) {
@@ -573,37 +548,6 @@ void omap_pm_dsp_set_min_opp(u8 opp_id)
 	unsigned int currspeed = clk_get_rate(iva_clk) / 1000;
 	int r = 0;
 
-#if 1
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_status.flag_run_dvs == 1){
-		/* Make sure the following values consist with those in
-		   kernel/arch/arm/mach-omap2/pm.c */
-		switch(opp_id){
-			case 1:
-				ds_status.mpu_min_freq_to_lock = 0;	// Unlocked.
-				ds_status.iva_min_freq_to_lock = 260000000;
-				break;
-			case 2:
-				ds_status.mpu_min_freq_to_lock = 600000000;
-				ds_status.iva_min_freq_to_lock = 520000000;
-				break;
-			case 3:
-				ds_status.mpu_min_freq_to_lock = 800000000;
-				ds_status.iva_min_freq_to_lock = 660000000;
-				break;
-			case 4:
-				ds_status.mpu_min_freq_to_lock = 1000000000;
-				ds_status.iva_min_freq_to_lock = 800000000;
-				break;
-			default:
-				ds_status.mpu_min_freq_to_lock = 1000000000;
-				ds_status.iva_min_freq_to_lock = 800000000;
-				break;
-		}
-		return 0;
-	}
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
-#endif
 
 	if (opp_id <= 0 || opp_id > ft_count + 1 || ft_count == 0) {
 		WARN_ON(1);
@@ -832,32 +776,6 @@ int omap_pm_set_min_mpu_freq(struct device *dev, unsigned long f)
 	static struct device dummy_mpu_dev;
 	unsigned long old_max_level;
 
-#if 1
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
-	if(ds_status.flag_run_dvs == 1){
-		/* Make sure the following values consist with those in
-		   kernel/arch/arm/mach-omap2/pm.c */
-		switch(f){
-			case -1:
-				ds_status.mpu_min_freq_to_lock = 0;	// Unlocked.
-				break;
-			case 600000000:
-				ds_status.mpu_min_freq_to_lock = 600000000;
-				break;
-			case 800000000:
-				ds_status.mpu_min_freq_to_lock = 800000000;
-				break;
-			case 1000000000:
-				ds_status.mpu_min_freq_to_lock = 1000000000;
-				break;
-			default:
-				ds_status.mpu_min_freq_to_lock = 1000000000;
-				break;
-		}
-		return 0;
-	}
-	/* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
-#endif
 
 	if (!dev) {
 		WARN(1, "OMAP PM: %s: invalid parameter(s)", __func__);

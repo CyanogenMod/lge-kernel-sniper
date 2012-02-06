@@ -239,10 +239,8 @@ config CPU_FREQ_GOV_HOTPLUG
 
 	  If in doubt, say N.
 
-endif	# CPU_FREQ
-
 # 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE]
-config LG_DVFS
+config LGE_DVFS
  	tristate "LG-DVFS"
  	help
  	  To compile this driver as a module, choose M here: the
@@ -252,3 +250,5 @@ config LG_DVFS
  
  	  If in doubt, say N.
 # 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE]
+
+endif	# CPU_FREQ

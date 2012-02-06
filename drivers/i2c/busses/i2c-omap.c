@@ -143,7 +143,7 @@ enum {
 #define OMAP_I2C_SCLH_HSSCLH	8
 
 /* I2C System Test Register (OMAP_I2C_SYSTEST): */
-#ifdef DEBUG
+//#ifdef DEBUG
 #define OMAP_I2C_SYSTEST_ST_EN		(1 << 15)	/* System test enable */
 #define OMAP_I2C_SYSTEST_FREE		(1 << 14)	/* Free running mode */
 #define OMAP_I2C_SYSTEST_TMODE_MASK	(3 << 12)	/* Test mode select */
@@ -152,7 +152,7 @@ enum {
 #define OMAP_I2C_SYSTEST_SCL_O		(1 << 2)	/* SCL line drive out */
 #define OMAP_I2C_SYSTEST_SDA_I		(1 << 1)	/* SDA line sense in */
 #define OMAP_I2C_SYSTEST_SDA_O		(1 << 0)	/* SDA line drive out */
-#endif
+//#endif
 
 /* OCP_SYSSTATUS bit definitions */
 #define SYSS_RESETDONE_MASK		(1 << 0)
@@ -567,7 +567,7 @@ static int omap_i2c_xfer_msg(struct i2c_adapter *adap,
 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
 	int r;
 	u16 w;
-	static struct pm_qos_request_list *qos_handle;
+	struct pm_qos_request_list *qos_handle = NULL; //LGSI Saravanan TI Patch 14182
 
 	dev_dbg(dev->dev, "addr: 0x%04x, len: %d, flags: 0x%x, stop: %d\n",
 		msg->addr, msg->len, msg->flags, stop);
@@ -683,6 +683,9 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	struct omap_i2c_dev *dev = i2c_get_adapdata(adap);
 	int i;
 	int r;
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.11.16] - In case a peripheral is holding the DATA bus low, reset the I2C controller
+	u16 val;
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.11.16]- In case a peripheral is holding the DATA bus low, reset the I2C controller
 
 	/*
 	 * hwspinlock is used to time share the I2C module between A9 and Ducati
@@ -695,6 +698,20 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	enable_irq(dev->irq);
 
 	r = omap_i2c_wait_for_bb(dev);
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.11.16] - In case a peripheral is holding the DATA bus low, reset the I2C controller
+	/* If timeout, try to again check after soft reset of I2C block */
+	if (WARN_ON(r == -ETIMEDOUT)) {
+		/* Provide a permanent clock to recover the peripheral */
+		val = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+		val |= (OMAP_I2C_SYSTEST_ST_EN |
+		OMAP_I2C_SYSTEST_FREE |
+		(2 << OMAP_I2C_SYSTEST_TMODE_SHIFT));
+		omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, val);
+		msleep(1);
+		omap_i2c_init(dev);
+		r = omap_i2c_wait_for_bb(dev);
+	}
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.11.16]- In case a peripheral is holding the DATA bus low, reset the I2C controller
 	if (r < 0)
 		goto out;
 

@@ -36,10 +36,12 @@
 #define FBIOPUT_MODEINFO        0x4617
 #define FBIOGET_DISPINFO        0x4618
 #define FBIO_WAITFORVSYNC	_IOW('F', 0x20, __u32)
-#ifdef CONFIG_MACH_LGE_HUB /* for mtc, lab 3 */
-#define FBIOGET_SCREEN_DATA     0x4621 /* 20100709 jugwan.eom@lge.com For OnScreenPhone to get screen data FASTER */
-#define FBIOGET_BL_STATUS       0x4622 /* 20100709 jugwan.eom@lge.com For OnScreenPhone to check backlight status */
-#endif
+/* LGSI_PLT_LGP970_ETA_OSP_START: 23/8/2011_Seshu */
+//ANDY_PORTING OSP [woongchang.kim@lge.com 110331]
+#define FBIOGET_SCREEN_DATA     0x4620 /* 20100709 jugwan.eom@lge.com For OnScreenPhone to get screen data FASTER */
+#define FBIOGET_BL_STATUS       0x4621 /* 20100709 jugwan.eom@lge.com For OnScreenPhone to check backlight status */
+//ANDY_END
+/* LGSI_PLT_LGP970_ETA_OSP_END: 23/8/2011_Seshu */
 
 #define FB_TYPE_PACKED_PIXELS		0	/* Packed Pixels	*/
 #define FB_TYPE_PLANES			1	/* Non interleaved planes */

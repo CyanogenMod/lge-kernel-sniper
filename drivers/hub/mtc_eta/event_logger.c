@@ -176,35 +176,6 @@ static long mtc_eta_log_ioctl(struct file *filp, unsigned int cmd, unsigned long
 			PDEBUG("current log_mask: 0x%x, new log_mask: 0x%x\n",
 					log_mask, lge_mtc_eta_log_mask);
 
-//20110416 yongman.kwon@lge.com [LS855] for logging touch key event [START]
-#if 1
-			if ((log_mask & MTC_ETA_LOG_ID_KEY)
-					^ (lge_mtc_eta_log_mask & MTC_ETA_LOG_ID_KEY)) {
-				PDEBUG("KEY log mask changed: %d\n",
-						log_mask & MTC_ETA_LOG_ID_KEY);
-				if (log_mask & MTC_ETA_LOG_ID_KEY) {
-					hub_start_key_logging();
-					hub_start_touch_logging();
-				} else {
-					hub_stop_key_logging();
-					hub_stop_touch_logging();
-				}
-
-			}
-
-			//touch logging start when MTC request touch log only.
-			if ((log_mask ==0x02)&&((log_mask & MTC_ETA_LOG_ID_TOUCH)
-					^ (lge_mtc_eta_log_mask & MTC_ETA_LOG_ID_TOUCH))) {
-				PDEBUG("TOUCH log mask changed: %d\n",
-						log_mask & MTC_ETA_LOG_ID_TOUCH);
-				if (log_mask & MTC_ETA_LOG_ID_TOUCH) {
-					hub_start_touch_logging();
-				} else {
-					hub_stop_touch_logging();
-				}
-
-			}			
-#else
 			if ((log_mask & MTC_ETA_LOG_ID_KEY)
 					^ (lge_mtc_eta_log_mask & MTC_ETA_LOG_ID_KEY)) {
 				PDEBUG("KEY log mask changed: %d\n",
@@ -228,8 +199,6 @@ static long mtc_eta_log_ioctl(struct file *filp, unsigned int cmd, unsigned long
 				}
 
 			}
-#endif
-//20110416 yongman.kwon@lge.com [LS855] for logging touch key event [END]
 
 			lge_mtc_eta_log_mask = log_mask;
 			if (!lge_mtc_eta_log_mask) {

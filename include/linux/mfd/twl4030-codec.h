@@ -272,6 +272,19 @@ typedef enum {
 	TWL4030_SPEAKER_CALL_MODE,
 	TWL4030_RECEIVER_CALL_MODE,
 	TWL4030_HEADPHONE_CALL_MODE
+//LGSI_VS910_FroyoToGB_VT Call shidhar.ms@lge.com_14Jul2011_START
+
+#if 1//20110126 jisun.kwon vt_bt_audiopath
+	,TWL4030_VT_BT_CALL_MODE
+	,TWL4030_VT_HEADSET_CALL_MODE
+	,TWL4030_VT_SPEAKER_CALL_MODE
+	,TWL4030_VT_RECEIVER_CALL_MODE
+	,TWL4030_VT_HEADPHONE_CALL_MODE
+	,TWL4030_VT_CALL_END_MODE
+	,TWL4030_VOIP_CALL_END_MODE
+#endif 
+//LGSI_VS910_FroyoToGB_VT Call shidhar.ms@lge.com_14Jul2011_END
+
 }voice_mode_enum;
 
 typedef enum
@@ -291,10 +304,6 @@ typedef struct
 int voice_get_curmode(void);
 void voice_configure_path(voice_mode_enum mode);
 void twl4030_set_mic_switch(int mic); //jongik2.kim 20101220 add mic2 control
-#if defined (CONFIG_LGE_LAB3_BOARD) //[LG_FW_AUDIO_TTY] - jungsoo1221.lee
-void twl4030_set_tty_mode(int mode); 
-#endif 
-
 // 20100426 junyeop.kim@lge.com Add the mic mute [START_LGE]
 typedef enum {
 	TWL4030_OFF_MIC_MODE,

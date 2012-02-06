@@ -858,24 +858,24 @@ static int __init pm_dbg_init(void)
 
 		}
 
-	(void) debugfs_create_file("enable_off_mode", S_IRUGO | S_IWUGO, d,
+	(void) debugfs_create_file("enable_off_mode", S_IWGRP | S_IWUSR | S_IRUGO, d,
 				   &enable_off_mode, &pm_dbg_option_fops);
-	(void) debugfs_create_file("sleep_while_idle", S_IRUGO | S_IWUGO, d,
+	(void) debugfs_create_file("sleep_while_idle", S_IWGRP | S_IWUSR | S_IRUGO, d,
 				   &sleep_while_idle, &pm_dbg_option_fops);
-	(void) debugfs_create_file("wakeup_timer_seconds", S_IRUGO | S_IWUGO, d,
+	(void) debugfs_create_file("wakeup_timer_seconds", S_IWGRP | S_IWUSR | S_IRUGO, d,
 				   &wakeup_timer_seconds, &pm_dbg_option_fops);
 	(void) debugfs_create_file("wakeup_timer_milliseconds",
-			S_IRUGO | S_IWUGO, d, &wakeup_timer_milliseconds,
+			S_IWGRP | S_IWUSR | S_IRUGO, d, &wakeup_timer_milliseconds,
 			&pm_dbg_option_fops);
-	(void) debugfs_create_file("enable_sr_vp_debug",  S_IRUGO | S_IWUGO, d,
+	(void) debugfs_create_file("enable_sr_vp_debug",  S_IWGRP | S_IWUSR | S_IRUGO, d,
 				   &enable_sr_vp_debug, &pm_dbg_option_fops);
 
 	if (cpu_is_omap44xx()) {
 		omap4_pmd_clks_init();
-		debugfs_create_file("pmd_clks_enable", S_IRUGO|S_IWUGO, d,
+		debugfs_create_file("pmd_clks_enable", S_IWGRP | S_IWUSR | S_IRUGO, d,
 				&pmd_clks_enable, &pm_debug_pmd_clks_fops);
 
-		debugfs_create_file("dpll_cascade_enable", S_IRUGO|S_IWUGO, d,
+		debugfs_create_file("dpll_cascade_enable", S_IWGRP | S_IWUSR | S_IRUGO, d,
 				&dpll_cascade_global_state,
 				&pm_debug_dpll_cascading_fops);
 	}

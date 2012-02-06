@@ -426,6 +426,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
 		return -EINVAL;
 	}
 
+// prime@sdcmicro.com Modified to match with VMMC suppliers defined in board-hub-peripherals.c [START]
 #ifdef CONFIG_MACH_LGE_HUB
 	reg = regulator_get(host->dev,
 					(host->id == OMAP_MMC1_DEVID) ? "vmmc1" :
@@ -433,6 +434,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
 #else
 	reg = regulator_get(host->dev, "vmmc");
 #endif
+// prime@sdcmicro.com Modified to match with VMMC suppliers defined in board-hub-peripherals.c [END]
 	if (IS_ERR(reg)) {
 		dev_dbg(host->dev, "vmmc regulator missing\n");
 		/*
@@ -1764,9 +1766,11 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		if (dsor > 250)
 			dsor = 250;
 
+// prime@sdcmicro.com Changed not to overwrite clock rate (make it same as 2.6.32 code) [START]
 #ifndef CONFIG_MACH_LGE_HUB
 		ios->clock = host->master_clock / dsor;
 #endif
+// prime@sdcmicro.com Changed not to overwrite clock rate (make it same as 2.6.32 code) [END]
 	}
 
 #ifdef CONFIG_OMAP_PM
@@ -2608,11 +2612,15 @@ static int omap_hsmmc_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
 
+/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */
+/* LGE_CHANGE_S, [sunggyun.yu@lge.com], 2010-12-11, <WiFi needs host controller function when phone is sleep.> */
 	//printk(KERN_EMERG "skykrkrk %s %d\n", __func__, host->mmc->index);
 	/*
 	if (host->mmc->index == 2)
 		return 0;
 	*/
+/* LGE_CHANGE_E, [sunggyun.yu@lge.com], 2010-12-11, <WiFi needs host controller function when phone is sleep.> */
+/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */
 
 	if (host && host->suspended)
 		return 0;
@@ -2632,14 +2640,18 @@ static int omap_hsmmc_suspend(struct device *dev)
 		}
 		cancel_work_sync(&host->mmc_carddetect_work);
 
+		/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */
+		/* LGE_CHANGE_S, [bill.jung@lge.com], 2011-4-3 BCM43291 can't work properly if mmc_resume_host()/mmc_suspend_host() is called */
 		// If omit hsmmc suspend/resume code, after RESUME state phone can't sleep.
 		// Original
 		// ret = mmc_suspend_host(host->mmc, state); 
 		if (host->mmc->index != 2)
 		ret = mmc_suspend_host(host->mmc);
+		/* LGE_CHANGE_E, [bill.jung@lge.com], 2011-4-3 BCM43291 can't work properly if mmc_resume_host()/mmc_suspend_host() is called */
 		
 		mmc_host_enable(host->mmc);
 		//ret = mmc_suspend_host(host->mmc);
+		/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */		
 		if (ret == 0) {
 			omap_hsmmc_disable_irq(host);
 			OMAP_HSMMC_WRITE(host, HCTL,
@@ -2677,11 +2689,15 @@ static int omap_hsmmc_resume(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_hsmmc_host *host = platform_get_drvdata(pdev);
 
+/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */
+/* LGE_CHANGE_S, [sunggyun.yu@lge.com], 2010-12-11, <WiFi needs host controller function when phone is sleep.> */
 	//printk(KERN_EMERG "skykrkrk %s %d\n", __func__, host->mmc->index);
 	/*
 	if (host->mmc->index == 2)
 		return 0;
 	*/		
+/* LGE_CHANGE_E, [sunggyun.yu@lge.com], 2010-12-11, <WiFi needs host controller function when phone is sleep.> */
+/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */
 
 	if (host && !host->suspended)
 		return 0;
@@ -2705,11 +2721,15 @@ static int omap_hsmmc_resume(struct device *dev)
 		omap_hsmmc_protect_card(host);
 
 		/* Notify the core to resume the host */
+		/* LGE_CHANGE_S, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */		
+		/* LGE_CHANGE_S, [bill.jung@lge.com], 2011-4-3 BCM43291 can't work properly if mmc_resume_host()/mmc_suspend_host() is called */
 		// If omit hsmmc suspend/resume code, after RESUME state phone can't sleep.
 		// Original
 		// ret = mmc_resume_host(host->mmc);
 		if (host->mmc->index != 2)
 		ret = mmc_resume_host(host->mmc);
+		/* LGE_CHANGE_E, [bill.jung@lge.com], 2011-4-3 BCM43291 can't work properly if mmc_resume_host()/mmc_suspend_host() is called */
+		/* LGE_CHANGE_E, [younggil.lee@lge.com], 2011-04-04 BCM43291 P970 migration */
 
 		if (ret == 0)
 			host->suspended = 0;

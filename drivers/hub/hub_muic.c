@@ -31,7 +31,11 @@
 #include <linux/irq.h>		// set_irq_type()
 #include <linux/types.h>	// kernel data types
 #include <asm/system.h>
-
+// kernel/arch/arm/include/asm/gpio.h includes kernel/arch/arm/plat-omap/include/mach/gpio.h which,
+// in turn, includes kernel/include/asm-generic/gpio.h.
+// <mach/gpio.h> declares gpio_get|set_value(), gpio_to_irq().
+// <asm-generic/gpio.h> declares struct gpio_chip, gpio_request(), gpio_free(), gpio_direction_input|output().
+// The actual descriptions are in kernel/drivers/gpio/gpiolib.c and kernel/arch/arm/plat-omap/gpio.c.
 #include <asm/gpio.h>
 #include <linux/i2c.h>
 #include <linux/platform_device.h>
@@ -51,8 +55,10 @@
 #define TS5USBA33402	0x10
 #define MAX14526	0x20
 
-
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2010-12-14, CP retain mode and 910K cable detect*/
 #define CABLE_DETECT_910K
+//#define CP_RETAIN	//LGE_UPDATE [jaejoong.kim] disable CP_RETAIN
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2010-12-14, CP retain mode and 910K cable detect*/
 
 static const char name_muic_mode[MUIC_MODE_NO][30] = {
 	"MUIC_UNKNOWN",		// 0
@@ -91,16 +97,18 @@ extern s32 key_row;
 extern s32 key_col;
 static s32 key_was_pressed = 0;
 
-
-extern void check_chargeroff(void);
-
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2010-12-14, CP retain mode */
 #ifdef CP_RETAIN
 static int is_cp_retained;
 #endif
 static int hidden_menu_switching;
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2010-12-14, CP retain mode */
 
-static int muic_init_done=0;     
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+static int muic_init_done=0;     // 20110113 ks.kwon@lge.com check muic driver init. state
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
 
+/* Wake lock for usb connection */
 struct wlock {
 	int wake_lock_on;
 	struct wake_lock wake_lock;
@@ -115,11 +123,13 @@ s32 muic_AP_USB_set(void);
 s32 muic_CP_USB_set(void);
 
 
-void muic_udelay(u32 microsec);
 
 #ifdef CONFIG_PROC_FS
+/*--------------------------------------------------------------------
+ * BEGINS: Proc file system related functions for MUIC.
+ *--------------------------------------------------------------------
+ */
 #define	HUB_MUIC_PROC_FILE "driver/hmuic"
-
 static struct proc_dir_entry *hub_muic_proc_file;
 
 static ssize_t muic_proc_read(struct file *filp, char *buf, size_t len, loff_t *offset){
@@ -152,31 +162,37 @@ static ssize_t muic_proc_write(struct file *filp, const char *buf, size_t len, l
 
 
 	switch(cmd){
-
+// LGE_UPDATE 20110311 [jaejoong.kim@lge.com] add CP Image Downloadfor Hidden Menu - AP CP USB Swithcing
+		/* CP Image Download */
 		case '3':
                         muic_CP_USB_set();
                         gpio_set_value(26, 0);
 			mdelay(100);
                         gpio_set_value(26, 1);
                         break;
+// LGE_UPDATE 20110311 [jaejoong.kim@lge.com] add CP Image Downloadfor Hidden Menu - AP CP USB Swithcing
 
+		/* AP_UART mode*/
 		case '6':
 			muic_AP_UART_set();
 			break;
-
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2011-01-06, CP retain mode and Hidden Menu AP CP Switching Retain */
+		/* CP_UART mode*/
 		case '7':
-			hidden_menu_switching = 7;
 			muic_CP_UART_set();
+			hidden_menu_switching = 7;
 			break;
 
+		/* AP_USB mode*/
 		case '8':
-			hidden_menu_switching = 8;
 			muic_AP_USB_set();
+			hidden_menu_switching = 8;
 			break;
 
+		/* CP_USB mode*/
 		case '9':
-			hidden_menu_switching = 9;
 			muic_CP_USB_set();
+			hidden_menu_switching = 9;
 			break;
 		case 'w':
 			err = i2c_smbus_write_byte_data(muic_client, reg, val);
@@ -200,6 +216,7 @@ static struct file_operations hub_muic_proc_ops = {
 static void create_hub_muic_proc_file(void){
 	hub_muic_proc_file = create_proc_entry(HUB_MUIC_PROC_FILE, 0777, NULL);
 	if(hub_muic_proc_file) {
+		//hub_muic_proc_file->owner = THIS_MODULE; // 20100617 kernel API changed
 		hub_muic_proc_file->proc_fops = &hub_muic_proc_ops;
 	} else
 		printk(KERN_INFO "[MUIC] LGE: Hub MUIC proc file create failed!\n");
@@ -209,6 +226,10 @@ static void remove_hub_muic_proc_file(void){
 	remove_proc_entry(HUB_MUIC_PROC_FILE, NULL);
 }
 
+/*--------------------------------------------------------------------
+ * ENDS: Proc file system related functions for MUIC.
+ *--------------------------------------------------------------------
+ */
 #endif //CONFIG_PROC_FS
 
 TYPE_MUIC_MODE get_muic_mode(void){
@@ -258,12 +279,15 @@ static void set_wakelock(u32 set) {
 
 void usif_switch_ctrl(TYPE_USIF_MODE mode){
 
-
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+	/* 20110113 ks.kwon@lge.com check muic driver init. state [START] */
 	if(!muic_init_done){
 
 		printk(KERN_WARNING "[MUIC] MUIC has not been initialized! Nothing will be done!!!.\n");
 		return 0;
 	}	
+    /* 20110113 ks.kwon@lge.com check muic driver init. state [END] */
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */    	
 
 	if(mode == USIF_AP){
 		gpio_set_value(USIF_IN_1_GPIO, 0);
@@ -308,15 +332,19 @@ void dp3t_switch_ctrl(TYPE_DP3T_MODE mode){
 s32 muic_AP_UART_set(void){
 
 	s32 ret;
-
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+	/* 20110113 ks.kwon@lge.com check muic driver init. state [START] */
 	if(!muic_init_done){
 
 		printk(KERN_WARNING "[MUIC] MUIC has not been initialized! Nothing will be done!!!.\n");
 		return 0;
 	}	
+    /* 20110113 ks.kwon@lge.com check muic driver init. state [END] */
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
 
-	usif_switch_ctrl(USIF_AP);
-
+	/* Connect CP UART signals to AP */
+	//usif_switch_ctrl(USIF_AP);
+	/* Connect AP UART to MUIC UART */
 	dp3t_switch_ctrl(DP3T_AP_UART);
 
 	if (muic_device == MAX14526) {
@@ -330,6 +358,7 @@ s32 muic_AP_UART_set(void){
 	/* Connect DP, DM to UART_TX, UART_RX*/
 	ret = muic_i2c_write_byte(SW_CONTROL, DP_UART | DM_UART);
 
+	/* Turn on charger IC with FACTORY mode */
 	charging_ic_set_factory_mode();
 
 	muic_mode = MUIC_AP_UART;
@@ -343,24 +372,18 @@ s32 muic_AP_UART_set(void){
 s32 muic_AP_USB_set(void){
 
 	s32 ret;
-
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+	/* 20110113 ks.kwon@lge.com check muic driver init. state [START] */
 	if(!muic_init_done){
 
 		printk(KERN_WARNING "[MUIC] MUIC has not been initialized! Nothing will be done!!!.\n");
 		return 0;
 	}
-
-	if(hidden_menu_switching == 8)	
-	{
-	        ret = muic_i2c_write_byte(SW_CONTROL, DP_OPEN | DM_OPEN);
-	        muic_udelay(100000);
-
-	        if(ret < 0)
-	                printk(KERN_WARNING "[MUIC] i2c write error for D+/D- open in muic_CP_USB_SET\n");
-	}
+    /* 20110113 ks.kwon@lge.com check muic driver init. state [END] */
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
 
 	/* Connect CP UART signals to AP */
-	usif_switch_ctrl(USIF_AP);
+	//usif_switch_ctrl(USIF_AP);
 
 	/* AP USB does not pass through DP3T.
 	 * Just connect AP UART to MUIC UART. */
@@ -380,11 +403,13 @@ s32 muic_AP_USB_set(void){
 	/* Connect DP, DM to USB_DP, USB_DM */
 	ret = muic_i2c_write_byte(SW_CONTROL, DP_USB | DM_USB);
 
+	/* Turn on charger IC with TA mode */
 	charging_ic_set_usb_mode();
 
 	muic_mode = MUIC_AP_USB;
 	printk(KERN_WARNING "[MUIC] muic_distinguish_vbus_accessory(): AP_USB\n");
 
+	/* wake lock for usb connection */
 	set_wakelock(1);
 
 	return ret;
@@ -394,13 +419,17 @@ s32 muic_CP_UART_set(void){
 
 	s32 ret;
 
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+	/* 20110113 ks.kwon@lge.com check muic driver init. state [START] */
 	if(!muic_init_done){
 
 		printk(KERN_WARNING "[MUIC] MUIC has not been initialized! Nothing will be done!!!.\n");
 		return 0;
 	}	
-
-	usif_switch_ctrl(USIF_DP3T);
+    /* 20110113 ks.kwon@lge.com check muic driver init. state [END] */
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
+	/* Connect CP UART signals to DP3T */
+	//usif_switch_ctrl(USIF_DP3T);
 	/* Connect CP UART to MUIC UART */
 	dp3t_switch_ctrl(DP3T_CP_UART);
 
@@ -421,8 +450,10 @@ s32 muic_CP_UART_set(void){
 	muic_mode = MUIC_CP_UART;
 	printk(KERN_WARNING "[MUIC] muic_distinguish_vbus_accessory(): CP_UART\n");
 	
+	/* wake lock for the factory mode */
+/* LGE_CHANG_START 2011-03-30 kenneth.kang@lge.com wakelock on when AT command sequence by CP UART */
 	set_wakelock(1);
-
+/* LGE_CHANGE_END 2011-03-30 kenneth.kang@lge.com */
 
 	return ret;
 }
@@ -430,20 +461,18 @@ s32 muic_CP_UART_set(void){
 s32 muic_CP_USB_set(void){
 
 	s32 ret;
-
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+	/* 20110113 ks.kwon@lge.com check muic driver init. state [START] */
 	if(!muic_init_done){
 
 		printk(KERN_WARNING "[MUIC] MUIC has not been initialized! Nothing will be done!!!.\n");
 		return 0;
 	}	
+    /* 20110113 ks.kwon@lge.com check muic driver init. state [END] */
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
 
-	ret = muic_i2c_write_byte(SW_CONTROL, DP_OPEN | DM_OPEN);
-	muic_udelay(100000);
-
-	if(ret < 0)
-		printk(KERN_WARNING "[MUIC] i2c write error for D+/D- open in muic_CP_USB_SET\n");
-
-	usif_switch_ctrl(USIF_AP);
+	/* Connect CP UART signals to AP */
+	//usif_switch_ctrl(USIF_AP);
 	/* Connect CP USB to MUIC UART */
 	dp3t_switch_ctrl(DP3T_CP_USB);
 
@@ -468,24 +497,17 @@ s32 muic_CP_USB_set(void){
 	muic_mode = MUIC_CP_USB;
 	printk(KERN_ERR "[MUIC] muic_distinguish_vbus_accessory(): CP_USB\n");
 
+	/* wake lock for the factory mode */
 	set_wakelock(1);
 
 	return ret;
 }
 
 
-/*
- * Linux bug: If a constant value larger than 20000,
- * compiler issues a __bad_udelay error.
+/* Initialize MUIC, i.e., the CONTROL_1,2 and SW_CONTROL registers.
+ * 1) Prepare to sense INT_STAT and STATUS bits.
+ * 2) Open MUIC paths. -> To keep the path from uboot setting, remove this stage.
  */
-void muic_udelay(u32 microsec)
-{
-	u32 microseconds;
-	microseconds = microsec;
-	udelay(microseconds);
-}
-
-
 void muic_initialize(TYPE_RESET reset){
 
 	s32 ret;
@@ -555,8 +577,8 @@ s32 muic_distinguish_charger(void){
 	/* Connect AP UART to MUIC UART */
 	dp3t_switch_ctrl(DP3T_AP_UART);
 
-
-	if ((int_stat_val & MIDNO) == 0x05 || (int_stat_val & MIDNO) == 0x06 || (int_stat_val & MIDNO) == 0x0b) {
+	/* IDNO == 0x05 180K. LG TA */
+	if ((int_stat_val & MIDNO) == 0x05 || (int_stat_val & MIDNO) == 0x0b) {
 		muic_mode = MUIC_LG_TA;
 		printk(KERN_WARNING "[MUIC] muic_distinguish_charger(): MUIC_LG_TA\n");
 		set_wakelock(0);
@@ -566,8 +588,10 @@ s32 muic_distinguish_charger(void){
 	if (muic_device == MAX14526) {
 		/* Prepare for reading charger type */
 		ret = muic_i2c_write_byte(CONTROL_2, MINT_EN | MCHG_TYP);		
+		/* LGE_UPDATE_S [daewung.kim@lge.com] 2010-12-01, interrupt clear in TA detection */
 		msleep(70);
 		ret = muic_i2c_read_byte(INT_STAT, &status_val);
+		/* LGE_UPDATE_E [daewung.kim@lge.com] 2010-12-01, interrupt clear in TA detection */
 	}
 
 	/* Read STATUS */
@@ -600,7 +624,7 @@ s32 muic_distinguish_charger(void){
 	set_wakelock(0);
 	return ret;
 }
-
+/* LGE_UPDATE_E [daewung.kim@lge.com] 2010-12-01, modify detection scheme */
 #if 0
 /* Distinguish accessory type which supplies VBUS.
  * These accessories includes AP_UART, CP_UART, AP_USB, and CP_USB.
@@ -659,6 +683,42 @@ s32 muic_distinguish_vbus_accessory(s32 upon_irq){
 	return ret;
 }
 
+/*
+ * ID_200 Set		Connect UID LDO to ID pin via 200KOhm
+ * VLDO Reset		Use 2.6V for all accessory detection (except for MIC bias)
+ * SEMREN Set		Enable Send-End, Mic removal comparators and UID LDO -> Sets MR_COMP, SEND/END bits
+ * ADC_EN Set		Enable ADC and UID LDO to generate IDNO. TI MUIC turns on this automatically.
+ * CP_EN Set		Enable charge pump for USB2.0 and headset.
+ * INT_EN Set		Enable MUIC interrupt generation to OMAP
+ * CHG_TYP Set		Enable charger type recognition (TA or HCHH) -> Sets DCPORT, CHPORT bits
+ * USB_DET_DIS Reset	Enable charger detection (Charger or USB) -> Sets CHGDET bit
+ *
+ * MUIC MODE
+ *
+ * V C D C IDNO IDNO IDNO
+ * B H C H 200K 2.2K 620
+ * U G P P
+ * S D O O
+ *   E R R
+ *   T T T
+ *Cases detected by muic_distinguish_charger():
+ * 1 1 1 - 0101 ---- ---- NA_TA (ID resistor 180KOhm) - Not used actually.
+ * 1 1 1 - ---- ---- ---- LG_TA
+ * 1 1 0 1 ---- ---- ---- HCHH (High current host/hub charger) - Not used actually.
+ * 1 1 0 0 ---- ---- ---- Invalid charger
+ *
+ *Cases detected by muic_distinguish_vbus_accessory():
+ * 1 0 0 0 0010 ---- ---- AP_UART (ID resistor 56KOhm)
+ * 1 0 0 0 0100 ---- ---- CP_UART (ID resistor 130KOhm)
+ * 1 0 0 0 1011 ---- ---- AP_USB (ID resistor open)
+ * 1 0 0 0 ???? ---- ---- CP_USB (ID resistor ????) - Not defined yet.
+ *
+ *Cases detected by muic_distinguish_non_vbus_accessory():
+ * 0 0 - - 0001 ---- ---- TV_OUT_NO_LOAD (ID resistor 24KOhm.) - Not used.
+ * 0 0 - - 0000 01XX ---- EARMIC (ID resistor ground)
+ * 0 0 - - 0000 0000 0001 TV_OUT_LOAD (ID resistor ground) - Not used.
+ * 0 0 - - 0000 0000 0000 OTG (ID resistor ground) - Not used.
+ */
 s32 muic_device_detection(s32 upon_irq){
 
 	s32 ret = 0;
@@ -777,8 +837,8 @@ s32 muic_device_detection(s32 upon_irq){
 	if (muic_mode == MUIC_UNKNOWN)
 		muic_initialize(DEFAULT);
 
-	if (muic_mode == MUIC_NONE) {	
-		charging_ic_deactive();
+	if (muic_mode == MUIC_NONE) {	//20101002 ks.kwon@lge.com charging_ic_deactive only for MUIC_NONE
+		charging_ic_deactive();	//20100506 ks.kwon@lge.com for charging animation, by demand from taehwan.kim
 		printk(KERN_INFO "[MUIC]charging_ic_deactive()\n");
 	}
 
@@ -790,35 +850,38 @@ static void muic_device_none_detect(void)
 {
 	u8 reg_value;
 
-	if ((key_col == 4) && (key_row == 0)) 
+// LGE_UPDATE_S 20110228 [jaejoong.kim@lge.com] modify key_col value from 3 to 4
+	if ((key_col == 4) && (key_row == 0)) // Volume up
 		key_was_pressed = 1;
-	else if ((key_col == 4) && (key_row == 1))
+	else if ((key_col == 4) && (key_row == 1)) // Volume down
 		key_was_pressed = 2;
-
+// LGE_UPDATE_E 20110228 [jaejoong.kim@lge.com] modify key_col value from 3 to 4
 
 	printk(KERN_WARNING "[MUIC] Device_None_Detect int_stat_val = 0x%x\n",int_stat_val);
 
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2010-12-14, CP retain mode */
 #if 0 // CP_RETAIN	//block CP_RETAIN for commercial version
 	if (is_cp_retained)
 	{
 		muic_CP_USB_set();
 	}
-
+	// IDNO=0100? 130Kohm :: CP UART MODE
 	else if(((int_stat_val & MIDNO) == 0x04) || (hidden_menu_switching == 7)) {
-
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2011-01-06, CP retain mode */
 #else		
 	if(((int_stat_val & MIDNO) == 0x04) || (hidden_menu_switching == 7)) {
 #endif	
 		muic_CP_UART_set();
 	}
-
+	// IDNO=0010? 56Kohm  :: CP USB MODE
 	else if (((int_stat_val & MIDNO ) == 0x02) || (hidden_menu_switching == 9)){
 		if (key_was_pressed == 2)
 			muic_AP_UART_set();
 		else
 			muic_CP_USB_set();
 	}
-
+	// LGE_UPDATE_S [kenneth.kang@lge.com] 2010-12-12, for 910K factory download
+	// IDNO=1010? 910Kohm :: CP USB MODE
 #ifdef 	CABLE_DETECT_910K	
 	else if ((int_stat_val & MIDNO ) == 0x0a) {
 		muic_CP_USB_set();
@@ -853,10 +916,24 @@ static void muic_device_none_detect(void)
 				printk(KERN_WARNING "[MUIC] Charger detected\n");
 			}
 			else {	// USB Detected
+// LGE_UPDATE_S 20110521 [jaejoong.kim@lge.com] block CP usb for commercial version
+#if 0
+				if (key_was_pressed == 2)
+					muic_CP_USB_set();
+				else
+#endif /* #if 0 */
+// LGE_UPDATE_S 20110521 [jaejoong.kim@lge.com] block CP usb for commercial version
 				muic_AP_USB_set();
 			}
 		}
 		else { 	// USB Detected
+// LGE_UPDATE_S 20110521 [jaejoong.kim@lge.com] block CP usb for commercial version
+#if 0
+			if (key_was_pressed == 2)
+				muic_CP_USB_set();
+			else
+#endif /* #if 0 */
+// LGE_UPDATE_S 20110521 [jaejoong.kim@lge.com] block CP usb for commercial version
 			muic_AP_USB_set();
 		}
 	}
@@ -870,13 +947,16 @@ static void muic_device_none_detect(void)
 
 s32 muic_device_detection(s32 upon_irq)
 {
-
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+	/* 20110113 ks.kwon@lge.com check muic driver init. state [START] */
 	if(!muic_init_done){
 
 		printk(KERN_WARNING "[MUIC] MUIC has not been initialized! Nothing will be done!!!.\n");
 		return 0;
 	}	
-
+    /* 20110113 ks.kwon@lge.com check muic driver init. state [END] */
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
+	// Read INT_STAT_REG (0x04)
 	muic_i2c_read_byte(INT_STAT, &int_stat_val);
 	printk(KERN_INFO "[MUIC] INT_STAT = %x\n", int_stat_val);
 
@@ -935,8 +1015,6 @@ s32 muic_device_detection(s32 upon_irq)
 		printk(KERN_INFO "[MUIC] muic none\n");
 		charging_ic_deactive();
 		printk(KERN_INFO "[MUIC] charging_ic_deactive()\n");
-		check_chargeroff();
-
 	}
 
 	charger_state_update_by_other();
@@ -945,6 +1023,7 @@ s32 muic_device_detection(s32 upon_irq)
 }
 EXPORT_SYMBOL(muic_device_detection);
 #endif
+/* LGE_UPDATE_E [daewung.kim@lge.com] 2010-12-01, modify detection scheme */
 
 static void muic_wq_func(struct work_struct *muic_wq){
 	muic_device_detection(UPON_IRQ);
@@ -965,6 +1044,7 @@ static irqreturn_t muic_interrupt_handler(s32 irq, void *data){
 	return IRQ_HANDLED;
 }
 
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 ssize_t muic_store_wake_lock(struct device *dev,
 			  struct device_attribute *attr,
 			  const char *buf,
@@ -987,6 +1067,7 @@ ssize_t muic_store_wake_lock(struct device *dev,
 	return count;
 }
 
+/* Shutdown issue at the case of USB booting [kyungyoon.kim@lge.com] 2010-12-25 */
 ssize_t muic_store_charging_mode(struct device *dev, 
 			  struct device_attribute *attr, 
 			  const char *buf, 
@@ -1012,7 +1093,7 @@ ssize_t muic_store_charging_mode(struct device *dev,
 
 	return count;
 }
-
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
 void vbus_irq_muic_handler(int state)
 {
     if(muic_init_done){
@@ -1029,12 +1110,13 @@ void vbus_irq_muic_handler(int state)
     printk("[MUIC] %s completed \n",__func__);
 }
 EXPORT_SYMBOL(vbus_irq_muic_handler);
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
 
+DEVICE_ATTR(charging_mode, 0664, NULL, muic_store_charging_mode);
+/* Shutdown issue at the case of USB booting [kyungyoon.kim@lge.com] 2010-12-25 */
 
-DEVICE_ATTR(charging_mode, 0644, NULL, muic_store_charging_mode);
-
-DEVICE_ATTR(wake_lock, 0644, NULL, muic_store_wake_lock);
-
+DEVICE_ATTR(wake_lock, 0664, NULL, muic_store_wake_lock);
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 /*
  * muic_probe() is called in the middle of booting sequence due to '__init'.
  * '__init' causes muic_probe() to be released after the booting.
@@ -1043,8 +1125,9 @@ static s32 __init muic_probe(struct i2c_client *client, const struct i2c_device_
 
 	s32 ret = 0;
 	u32 retry_no = 0;
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 	int err = 0;
-
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 
 	muic_client = client;
 
@@ -1125,12 +1208,14 @@ static s32 __init muic_probe(struct i2c_client *client, const struct i2c_device_
 
 	/* Prepare a human accessible method to control MUIC */
 	create_hub_muic_proc_file();
-
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 	err = device_create_file(&client->dev, &dev_attr_wake_lock);
 	err = device_create_file(&client->dev, &dev_attr_charging_mode);
-
-	 muic_init_done = 1; 
-
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
+	/* Initialize MUIC - Finally MUIC INT becomes enabled */
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */    
+	 muic_init_done = 1; //20110113 ks.kwon@lge.com check muic driver init. state
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
 	muic_initialize(RESET);
 
 	mdelay(70);
@@ -1163,9 +1248,10 @@ static s32 muic_remove(struct i2c_client *client){
 		// SW_CTRL_REG(0x03=0x24)
 		muic_i2c_write_byte(SW_CONTROL, DP_OPEN | DM_OPEN);
 	}
-
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 	device_remove_file(&client->dev, &dev_attr_wake_lock);
 	device_remove_file(&client->dev, &dev_attr_charging_mode);
+/* B-Prj Power off charging [kyungyoon.kim@lge.com] 2010-12-15 */
 	i2c_set_clientdata(client, NULL);	// For what?
 	remove_hub_muic_proc_file();
 
@@ -1219,6 +1305,7 @@ static void __exit muic_exit(void){
 	i2c_del_driver(&muic_driver);
 }
 
+/* LGE_CHANGE_S [kenneth.kang@lge.com] 2010-12-14, CP retain mode */
 #ifdef CP_RETAIN
 static s32 __init muic_state(char *str)
 {
@@ -1229,10 +1316,8 @@ static s32 __init muic_state(char *str)
 }
 __setup("muic_state=", muic_state);
 #endif
-
-
-arch_initcall(muic_init);
-
+/* LGE_CHANGE_E [kenneth.kang@lge.com] 2010-12-14, CP retain mode */
+module_init(muic_init);
 module_exit(muic_exit);
 
 MODULE_AUTHOR("LG Electronics");

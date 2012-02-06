@@ -26,19 +26,19 @@
 #include <linux/jiffies.h>
 #include <linux/slab.h>
 
-#include <linux/workqueue.h>	
-#include <linux/delay.h> 
-#include <linux/wakelock.h> 	
+#include <linux/workqueue.h>	//20101221 seven.kim@lge.com to use real time work queue
+#include <linux/delay.h> //20101221 seven.kim@lge.com to use mdelay
+#include <linux/wakelock.h> 	//20102121 seven.kim@lge.com to use wake_lock
 
-
+#ifdef CONFIG_LGE_DVFS
 #include <linux/dvs_suite.h>
-
+#endif	// CONFIG_LGE_DVFS
 
 #include "synaptics_ts_firmware.h"
 #include "synaptics_ts_firmware_lgit.h"
 #define SYNAPTICS_SUPPORT_FW_UPGRADE
 
-
+/*<sunggyun.yu@lge.com> enable this for printk message*/
 //#define DEBUG
 
 #if 0 //seven for debugging
@@ -1042,31 +1042,77 @@ static enum hrtimer_restart synaptics_ts_timer_func(struct hrtimer *timer)
 static irqreturn_t synaptics_ts_irq_handler(int irq, void *dev_id)
 {
 	struct synaptics_ts_data *ts = dev_id;
+#ifdef CONFIG_LGE_DVFS
+	int ds_cpu = smp_processor_id();
+	unsigned long touch_interval;
+#endif// CONFIG_LGE_DVFS
 
 	//pr_info("LGE: synaptics_ts_irq_handler\n");
 	disable_irq_nosync(ts->client->irq);
 
+	queue_work(synaptics_wq, &ts->work);
 
-/* Move this code later to somewhere common, such as the irq entry point.
- */
-#if 1
-	if(ds_status.flag_run_dvs == 1){
-        ds_status.flag_touch_timeout_count = DS_TOUCH_TIMEOUT_COUNT_MAX;    // = 6
-        if(ds_status.touch_timeout_sec == 0){
-            if(ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT < 1000000){
-                ds_status.touch_timeout_sec = ds_counter.elapsed_sec;
-                ds_status.touch_timeout_usec = ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT;
+#ifdef CONFIG_LGE_DVFS
+	if(ds_control.flag_run_dvs == 1)
+	{
+		if(ds_cpu == 0){
+			if(per_cpu(ds_sys_status, 0).flag_consecutive_touches == 0){
+				if(per_cpu(ds_counter, ds_cpu).elapsed_sec < 
+				   per_cpu(ds_sys_status, 0).new_touch_sec + 2)
+				{
+					touch_interval = (per_cpu(ds_counter, ds_cpu).elapsed_sec -
+							  per_cpu(ds_sys_status, 0).new_touch_sec) * 1000000 +
+						(per_cpu(ds_counter, ds_cpu).elapsed_usec -
+						 per_cpu(ds_sys_status, 0).new_touch_usec);
+					if(touch_interval <= DS_CONT_TOUCH_THRESHOLD_USEC)
+					{
+						if(per_cpu(ds_sys_status, 0).flag_consecutive_touches == 0){
+							per_cpu(ds_sys_status, 0).first_consecutive_touch_sec =
+								per_cpu(ds_counter, ds_cpu).elapsed_sec;
+						}
+						per_cpu(ds_sys_status, 0).flag_consecutive_touches = 1;
             }
-            else{
-                ds_status.touch_timeout_sec = ds_counter.elapsed_sec + 1;
-                ds_status.touch_timeout_usec = (ds_counter.elapsed_usec + DS_TOUCH_TIMEOUT) - 1000000;
             }
         }
+			per_cpu(ds_sys_status, 0).new_touch_sec = 
+				per_cpu(ds_counter, ds_cpu).elapsed_sec;
+			per_cpu(ds_sys_status, 0).new_touch_usec = 
+				per_cpu(ds_counter, ds_cpu).elapsed_usec;
+			
+			if(per_cpu(ds_sys_status, 0).flag_consecutive_touches == 0){
+				per_cpu(ds_sys_status, 0).flag_touch_timeout_count = 
+					DS_TOUCH_CPU_OP_UP_CNT_MAX;
+				if((per_cpu(ds_counter, ds_cpu).elapsed_usec + 
+				    DS_TOUCH_CPU_OP_UP_INTERVAL) < 1000000)
+				{
+					per_cpu(ds_sys_status, 0).touch_timeout_sec = 
+						per_cpu(ds_counter, ds_cpu).elapsed_sec;
+					per_cpu(ds_sys_status, 0).touch_timeout_usec = 
+						per_cpu(ds_counter, ds_cpu).elapsed_usec + 
+						DS_TOUCH_CPU_OP_UP_INTERVAL;
+				}
+				else{
+					per_cpu(ds_sys_status, 0).touch_timeout_sec = 
+						per_cpu(ds_counter, ds_cpu).elapsed_sec + 1;
+					per_cpu(ds_sys_status, 0).touch_timeout_usec = 
+						(per_cpu(ds_counter, ds_cpu).elapsed_usec + 
+						 DS_TOUCH_CPU_OP_UP_INTERVAL) - 1000000;
+				}
     }
-#endif
 
-
-	queue_work(synaptics_wq, &ts->work);
+			if(per_cpu(ds_sys_status, 0).flag_consecutive_touches == 1){
+				if(per_cpu(ds_sys_status, 0).flag_long_consecutive_touches == 0){
+					if(per_cpu(ds_counter, ds_cpu).elapsed_sec > 
+					   (per_cpu(ds_sys_status, 0).first_consecutive_touch_sec + 
+					    DS_CONT_TOUCH_CARE_WAIT_SEC))
+					{
+						per_cpu(ds_sys_status, 0).flag_long_consecutive_touches = 1;
+					}
+				}
+			}
+		}
+	}
+#endif// CONFIG_LGE_DVFS
 
 	return IRQ_HANDLED;
 }

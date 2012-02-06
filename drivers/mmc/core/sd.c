@@ -640,17 +640,12 @@ static int mmc_sd_resume(struct mmc_host *host)
 		err = mmc_sd_init_card(host, host->ocr, host->card);
 
 		if (err) {
-// re-initialize the SD card power to re-establish on resume
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-			mmc_power_off(host);
-#endif
+			mmc_power_off(host); // Patch Taken From Thunder Froyo
 			printk(KERN_ERR "%s: Re-init card rc = %d (retries = %d)\n",
 			       mmc_hostname(host), err, retries);
-#if 1//def CONFIG_LGE_MMC_WORKAROUND//LGE_CHANGES
-			mmc_power_up(host);
-			mmc_select_voltage(host, host->ocr);
-			BUG_ON(!host->bus_ops->resume);
-#endif
+			mmc_power_up(host); // Patch Taken From Thunder Froyo
+			mmc_select_voltage(host, host->ocr); // Patch Taken From Thunder Froyo
+			BUG_ON(!host->bus_ops->resume); // Patch Taken From Thunder Froyo
 			mdelay(5);
 			retries--;
 			continue;

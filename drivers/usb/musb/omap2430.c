@@ -415,35 +415,6 @@ int __init musb_platform_init(struct musb *musb)
 	/* Fixme this can be enabled when load the gadget driver also*/
 	musb_platform_resume(musb);
 
-	l = musb_readl(musb->mregs, OTG_SYSCONFIG);
-
-        if (cpu_is_omap3630()) {
-        	/*
-		 * Do Forcestdby here, for the case when kernel boots up
-		 * without cable attached, force_active(0) won't be called.
-		*/
-		l |= ENABLEWAKEUP;      /* Enable wakeup */
-		l &= ~NOSTDBY;          /* remove possible nostdby */
-		l |= SMARTSTDBY;        /* enable smart standby */
-		l &= ~AUTOIDLE;         /* disable auto idle */
-		l &= ~NOIDLE;           /* remove possible noidle */
-	        l |= FORCEIDLE;         /* enable force idle */
-	} 
-	else {
-	        l &= ~ENABLEWAKEUP;     /* disable wakeup */
-	        l &= ~NOSTDBY;          /* remove possible nostdby */
-	        l |= SMARTSTDBY;        /* enable smart standby */
-	        l &= ~AUTOIDLE;         /* disable auto idle */
-	        l &= ~NOIDLE;           /* remove possible noidle */
-	        l |= SMARTIDLE;         /* enable smart idle */
-	}
-
-	musb_writel(musb->mregs, OTG_SYSCONFIG, l);
-	/*
-	 * MUSB AUTOIDLE and SMARTIDLE dont' work in 3430
-	 * Workwaround by Richard Woddruff/TI
-	 */
-
 	/*powerup the phy as romcode would have put the phy in some state
 	* which is impacting the core retention if the gadget driver is not
 	* loaded.

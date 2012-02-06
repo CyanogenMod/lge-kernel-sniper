@@ -568,6 +568,7 @@ struct omap_overlay_manager {
 
 	int (*enable)(struct omap_overlay_manager *mgr);
 	int (*disable)(struct omap_overlay_manager *mgr);
+	bool (*is_enabled)(struct omap_overlay_manager *mgr);
 };
 
 enum omap_writeback_source_type {

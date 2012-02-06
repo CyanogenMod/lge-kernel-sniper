@@ -28,14 +28,6 @@ struct switch_dev {
 	ssize_t	(*print_state)(struct switch_dev *sdev, char *buf);
 };
 
-#ifdef CONFIG_LGE_LAB3_BOARD //20110201 jungsoo1221.lee  [LGE_US850_HEADSET]
-struct gpio_h2w_platform_data  {
-           int gpio_detect;
-           int gpio_button_detect;
-           int gpio_jpole;
-           int gpio_mic_bias_en ;
-};
-#endif
 struct gpio_switch_platform_data {
 	const char *name;
 	unsigned 	gpio;

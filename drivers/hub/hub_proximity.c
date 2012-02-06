@@ -341,9 +341,9 @@ static ssize_t hub_proxi_wake_store(struct device *dev,  struct device_attribute
 //echo 1 > /sys/bus/i2c/drivers/hub_proxi/2-0044/onoff
 
 static DEVICE_ATTR(status, 0444, hub_proxi_status_show, NULL);
-static DEVICE_ATTR(onoff, 0666, hub_proxi_onoff_show, hub_proxi_onoff_store);
-static DEVICE_ATTR(delay, 0666, hub_proxi_delay_show, hub_proxi_delay_store);
-static DEVICE_ATTR(wake, 0666, hub_proxi_wake_show, hub_proxi_wake_store);
+static DEVICE_ATTR(onoff, 0664, hub_proxi_onoff_show, hub_proxi_onoff_store);
+static DEVICE_ATTR(delay, 0664, hub_proxi_delay_show, hub_proxi_delay_store);
+static DEVICE_ATTR(wake, 0664, hub_proxi_wake_show, hub_proxi_wake_store);
 
 static struct attribute *hub_proxi_attributes[] = {
 	&dev_attr_status.attr,

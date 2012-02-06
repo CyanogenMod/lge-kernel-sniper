@@ -56,6 +56,7 @@
 #include "cm.h"
 #include "cm-regbits-34xx.h"
 #include "prm-regbits-34xx.h"
+#include "mux34xx.h"
 
 #include "prm.h"
 #include "pm.h"
@@ -159,7 +160,15 @@ static void omap3_core_save_context(void)
 	 */
 	omap_ctrl_writel(omap_ctrl_readl(OMAP343X_PADCONF_ETK_D14),
 		OMAP343X_CONTROL_MEM_WKUP + 0x2a0);
+	//LGSI Saravanan TI Patch 14491
 
+	/*
+	 * override the value saved in scratchpad memory, errata i583
+	 */
+	if (omap_rev() <= OMAP3630_REV_ES1_1)
+		omap_ctrl_writew(0x1f, OMAP343X_CONTROL_MEM_WKUP +
+			OMAP3_CONTROL_PADCONF_SDRC_CKE1_OFFSET);
+	//LGSI Saravanan TI Patch 14491
 	/* Save the Interrupt controller context */
 	omap_intc_save_context();
 	/* Save the GPMC context */
@@ -171,6 +180,19 @@ static void omap3_core_save_context(void)
 
 static void omap3_core_restore_context(void)
 {
+//LGSI Saravanan TI Patch 14491
+	if (omap_rev() <= OMAP3630_REV_ES1_1) {
+		/*
+		 * errata i583 workaround, safe transition sequence for CKE1:
+		 */
+		omap_ctrl_writew(0x1b, OMAP2_CONTROL_PADCONFS +
+			OMAP3_CONTROL_PADCONF_SDRC_CKE1_OFFSET);
+		omap_ctrl_writew(0x19, OMAP2_CONTROL_PADCONFS +
+			OMAP3_CONTROL_PADCONF_SDRC_CKE1_OFFSET);
+		omap_ctrl_writew(0x18, OMAP2_CONTROL_PADCONFS +
+			OMAP3_CONTROL_PADCONF_SDRC_CKE1_OFFSET);
+	}
+//LGSI Saravanan TI Patch 14491
 	/* Restore the control module context, padconf restored by h/w */
 	omap3_control_restore_context();
 	/* Restore the GPMC context */
@@ -324,6 +346,7 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 {
 	u32 irqenable_mpu, irqstatus_mpu;
 	int c = 0;
+	int ct = 0;
 
 	irqenable_mpu = prm_read_mod_reg(OCP_MOD,
 					 OMAP3_PRM_IRQENABLE_MPU_OFFSET);
@@ -335,13 +358,15 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
 		if (irqstatus_mpu & (OMAP3430_WKUP_ST_MASK |
 				     OMAP3430_IO_ST_MASK)) {
 			c = _prcm_int_handle_wakeup();
+			ct++;
 
 			/*
 			 * Is the MPU PRCM interrupt handler racing with the
 			 * IVA2 PRCM interrupt handler ?
 			 */
-			WARN(c == 0, "prcm: WARNING: PRCM indicated MPU wakeup "
-			     "but no wakeup sources are marked\n");
+			WARN(!c && (ct == 1), "prcm: WARNING: PRCM indicated "
+				"MPU wakeup but no wakeup sources are "
+				"marked\n");
 		} else {
 			/* XXX we need to expand our PRCM interrupt handler */
 			WARN(1, "prcm: WARNING: PRCM interrupt received, but "
@@ -455,11 +480,19 @@ void omap_sram_idle(void)
 	int mpu_next_state = PWRDM_POWER_ON;
 	int per_next_state = PWRDM_POWER_ON;
 	int core_next_state = PWRDM_POWER_ON;
-	int core_prev_state, per_prev_state;
+	int core_prev_state = PWRDM_POWER_ON;//LGSI Saravanan TI Patch 14353
+	int per_prev_state = PWRDM_POWER_ON;//LGSI Saravanan TI Patch 14353
 	u32 sdrc_pwr = 0;
 	int per_state_modified = 0;
 	int dss_next_state = PWRDM_POWER_ON;
 	int dss_state_modified = 0;
+	int per_context_saved = 0;
+	int cam_fclken;
+	int dss_fclken;
+	int sgx_fclken;
+	int usb_fclken;
+	int iva2_idlest;
+	int dma_idlest;
 
 	if (!_omap_sram_idle)
 		return;
@@ -491,14 +524,44 @@ void omap_sram_idle(void)
 	if (pwrdm_read_pwrst(neon_pwrdm) == PWRDM_POWER_ON)
 		pwrdm_set_next_pwrst(neon_pwrdm, mpu_next_state);
 
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [START]
 #if 1
 	omap_idle_notifier_start();
 #endif
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [END]
 
 	/* Enable IO-PAD and IO-CHAIN wakeups */
 	per_next_state = pwrdm_read_next_pwrst(per_pwrdm);
 	core_next_state = pwrdm_read_next_pwrst(core_pwrdm);
 	dss_next_state = pwrdm_read_next_pwrst(dss_pwrdm);
+
+	/*
+	 * Hardware maintains sleep dependencies which will keep the core
+	 * domain from sleeping if certain other domains are active.  However,
+	 * we will be making decisions based on what core is doing.  For
+	 * example, should we call set_dpll3_volt_freq() or not.  So let's
+	 * find out what core will really do.
+	 */
+	if (core_next_state < PWRDM_POWER_ON) {
+		cam_fclken = cm_read_mod_reg(OMAP3430_CAM_MOD, CM_FCLKEN);
+		dss_fclken = cm_read_mod_reg(OMAP3430_DSS_MOD, CM_FCLKEN);
+		sgx_fclken = cm_read_mod_reg(OMAP3430ES2_SGX_MOD, CM_FCLKEN);
+		usb_fclken = cm_read_mod_reg(OMAP3430ES2_USBHOST_MOD,
+							CM_FCLKEN);
+		iva2_idlest = cm_read_mod_reg(OMAP3430_IVA2_MOD, CM_IDLEST);
+                dma_idlest = cm_read_mod_reg(CORE_MOD, CM_IDLEST) &
+							OMAP3430_ST_SDMA_MASK;
+
+		if ((cam_fclken != 0) ||
+			(dss_fclken != 0) ||
+			(sgx_fclken != 0) ||
+			(usb_fclken != 0) ||
+			(iva2_idlest == 0) ||
+			(dma_idlest == 0)) {
+			core_next_state = PWRDM_POWER_ON;
+			pwrdm_set_next_pwrst(core_pwrdm, core_next_state);
+		}
+	}
 
 	if (per_next_state < PWRDM_POWER_ON ||
 			core_next_state < PWRDM_POWER_ON) {
@@ -538,16 +601,29 @@ void omap_sram_idle(void)
 // 20100615 sookyoung.kim@lge.com TI patch for sleep current optimizaiton [START_LGE]
 				hgg_padconf_save();	// pad configuration value save
 // 20100615 sookyoung.kim@lge.com TI patch for sleep current optimizaiton [END_LGE]
-
-			omap2_gpio_prepare_for_idle(true);
+//LGSI Saravanan TI Patch 13759
+			//omap2_gpio_prepare_for_idle(true);
+			per_context_saved = 1;
     }
-		else
-			omap2_gpio_prepare_for_idle(false);
+		//else
+		//	omap2_gpio_prepare_for_idle(false);
+	omap2_gpio_prepare_for_idle(per_context_saved);
+//LGSI Saravanan TI Patch 13759
 		omap_uart_prepare_idle(2);
-		omap_uart_prepare_idle(3);	//2011_01_13 by seunghyun.yi@lge.com for UART4 sleep 
+/* sudhir Start */
+		omap_uart_prepare_idle(3);  /* 2011_01_13 by seunghyun.yi@lge.com for UART4 sleep */
+/* sudhir End */
 	}
 
 	/* CORE */
+	if (core_next_state <= PWRDM_POWER_RET) {
+		set_dpll3_volt_freq(0);
+		cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
+				(1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+				PLL_MOD,
+				CM_AUTOIDLE);
+	}
+
 	if (core_next_state < PWRDM_POWER_ON) {
 		omap_uart_prepare_idle(0);
 		omap_uart_prepare_idle(1);
@@ -566,18 +642,22 @@ void omap_sram_idle(void)
 			if (omap_type() != OMAP2_DEVICE_TYPE_GP)
 				omap3_save_secure_ram_context(mpu_next_state);
 		} else {
+			/*LGE_CHANGE_S, mg.jeong@lge.com, 2011-01-, Reason*/
 			if (core_next_state == PWRDM_POWER_RET) {
-				prm_set_mod_reg_bits(0x1<<1, // TEDCHO
+				prm_set_mod_reg_bits(OMAP3430_AUTO_RET_MASK, // TEDCHO
 						OMAP3430_GR_MOD,
 						OMAP3_PRM_VOLTCTRL_OFFSET);
 			}
+			/*LGE_CHANGE_E, mg.jeong@lge.com, 2011-04-06, Reason*/
 			musb_context_save_restore(disable_clk);
 		}
 	}
 
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [START]
 #if 0
 	omap3_intc_prepare_idle();
 #endif
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [END]
 
 	/*
 	* On EMU/HS devices ROM code restores a SRDC value
@@ -623,23 +703,35 @@ void omap_sram_idle(void)
 		}
 		omap_uart_resume_idle(0);
 		omap_uart_resume_idle(1);
+		/*LGE_CHANGE_S, mg.jeong@lge.com, 2011-01-, Reason*/
 		if (core_next_state == PWRDM_POWER_OFF)
 			//prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
 			prm_clear_mod_reg_bits(0x1<<2|0x1<<3,
 					       OMAP3430_GR_MOD,
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
 		else if (core_next_state == PWRDM_POWER_RET)
-			prm_clear_mod_reg_bits(0x1<<1, // TEDCHO
+			prm_clear_mod_reg_bits(OMAP3430_AUTO_RET_MASK, // TEDCHO
 					       OMAP3430_GR_MOD,
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
+			/*LGE_CHANGE_E, mg.jeong@lge.com, 2011-01-, Reason*/
 	}
+	cm_write_mod_reg(1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT,
+				PLL_MOD,
+				CM_AUTOIDLE);
+	if (core_next_state <= PWRDM_POWER_RET)
+	    set_dpll3_volt_freq(1);
+
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [START]
 #if 0
 	omap3_intc_resume_idle();
 #endif
+// 20110425 prime@sdcmicro.com Patch for INTC autoidle management to make sure it is done in atomic operation with interrupt disabled [END]
 
 #if 1
 	if (core_next_state <= PWRDM_POWER_RET) {
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-02-21, SmartReflex error */
 //		i2c4_pulltype_restore();
+/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-02-21, SmartReflex error */
 		cm_rmw_mod_reg_bits(OMAP3430_AUTO_CORE_DPLL_MASK,
 						0x0, PLL_MOD, CM_AUTOIDLE);
 	}
@@ -649,9 +741,12 @@ void omap_sram_idle(void)
 	//if (per_next_state < PWRDM_POWER_ON) {
 	if ((per_next_state < PWRDM_POWER_ON) &&(core_next_state < PWRDM_POWER_ON)) { //TOUCH_PERFORMANCE
 		omap_uart_resume_idle(2);
-		omap_uart_resume_idle(3); //2011_01_13 by seunghyun.yi@lge.com for UART4 idle off UART ON
+/* sudhir Start */
+		omap_uart_resume_idle(3);
+/* sudhir End */
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
-		if (per_prev_state == PWRDM_POWER_OFF)
+		//LGSI Saravanan TI Patch 13759
+	/*	if (per_prev_state == PWRDM_POWER_OFF)
 		{ 
 // 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [START_LGE]
 				hgg_padconf_restore();	// pad configuration value restore
@@ -666,7 +761,32 @@ void omap_sram_idle(void)
 // 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [END_LGE]
 
 			omap2_gpio_resume_after_idle(false);
+		}*/
+// 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [START_LGE]
+	hgg_padconf_restore();	// pad configuration value restore
+// 20100608 sookyoung.kim@lge.com TI patch for sleep current optimization [END_LGE]
+	omap2_gpio_resume_after_idle(per_context_saved);
+	//LGSI Saravanan TI Patch 13759;
+//LGSI Saravanan TI Patch 14353
+/* Errata i582 */
+		if ((omap_rev() <= OMAP3630_REV_ES1_1) &&
+			omap_uart_check_per_uarts_used() &&
+			(core_prev_state == PWRDM_POWER_ON) &&
+			(per_prev_state == PWRDM_POWER_OFF)) {
+			/*
+			 * We dont seem to have a real recovery other than reset
+			 * Errata i582:Alternative available here is to do a
+			 * reboot OR go to per off/core off, we will just print
+			 * and cause uart to be in an unstable state and
+			 * continue on till we hit the next off transition.
+			 * Reboot of the device due to this corner case is
+			 * undesirable.
+			 */
+			if (omap_uart_per_errata())
+				pr_err("%s: PER UART hit with Errata i582 "
+					"Corner case.\n", __func__);
 		}
+//LGSI Saravanan TI Patch 14353
 		if (per_state_modified)
 			pwrdm_set_next_pwrst(per_pwrdm, PWRDM_POWER_OFF);
 	}
@@ -725,6 +845,16 @@ int set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 	cur_state = pwrdm_read_next_pwrst(pwrdm);
 	if (cur_state == state)
 		return ret;
+
+	/*
+	 * Bridge pm handles dsp hibernation. just return success
+	 * If OFF mode is not enabled, sleep switch is performed for IVA which
+	 * is not necessary. This causes conflict between PM and bridge
+	 * touching IVA reg.
+	 * REVISIT: Bridge has to set powerstate based on enable_off_mode state.
+	 */
+	if (!strcmp(pwrdm->name, "iva2_pwrdm"))
+		return 0;
 
 	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
 		omap2_clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
@@ -925,29 +1055,403 @@ static int omap3_pm_prepare(void)
 
 	disable_hlt();
 
-// jungsoo1221.lee [Call Wake Lock Start]
+#if 0
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x00);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, CFG_P1_TRANSITION", 0x00, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x01);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, CFG_P2_TRANSITION", 0x01, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x02);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, CFG_P3_TRANSITION", 0x02, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x03);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, CFG_P123_TRANSITION", 0x03, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x04);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, STS_BOOT", 0x04, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x05);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, CFG_BOOT", 0x05, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x06);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SHUNDAN", 0x06, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x07);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, BOOT_BCI", 0x07, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x08);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, CFG_PWRANA1", 0x08, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x09);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, CFG_PWRANA2", 0x09, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x0b);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, BACKUP_MISC_STS", 0x0b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x0c);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, BACKUP_MISC_CFG", 0x0c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x0e);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, PROTECT_KEY", 0x0e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x0f);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, STS_HW_CONDITIONS", 0x0f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x10);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, P1_SW_EVENTS", 0x10, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x11);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, P2_SW_EVENTS", 0x11, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x12);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, P3_SW_EVENTS", 0x12, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x13);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, STS_P123_STATE", 0x13, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x14);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, PB_CFG", 0x14, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x15);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, PB_WORD_MSB", 0x15, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x16);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, PB_WORD_LSB", 0x16, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x17);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, RESERVED_A", 0x17, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x18);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, RESERVED_B", 0x18, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x19);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, RESERVED_C", 0x19, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x1a);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, RESERVED_D", 0x1a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x1b);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, RESERVED_E", 0x1b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x1c);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SEQ_ADD_W2P", 0x1c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x1d);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SEQ_ADD_P2A", 0x1d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x1e);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SEQ_ADD_A2W", 0x1e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x1f);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SEQ_ADD_A2S", 0x1f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x20);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SEQ_ADD_S2A12", 0x20, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x21);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SEQ_ADD_S2A3", 0x21, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x22);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, SEQ_ADD_WARM", 0x22, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER,&buf_from_twl, 0x23);
+	printk("\n[TWL_MASTER]ADDRESS:%02x, VALUE:%02x, MEMORY_ADDRESS", 0x23, buf_from_twl);
+
+	
+
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x00);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, SC_CONFIG", 0x00, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x01);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, SC_DETECT1", 0x01, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x02);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, SC_DETECT2", 0x02, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x03);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, WATCHDOG_CF", 0x03, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x04);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, IT_CHECK_CFG", 0x04, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x05);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIBRATOR_CFG", 0x05, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x06);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, dc_GLOBAL_CFG", 0x06, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x07);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_TRIM1", 0x07, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x08);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_TRIM2", 0x08, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x09);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_TRIM1", 0x09, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x0a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_TRIM2", 0x0a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x0b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_TRIM1", 0x0b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x0c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_TRIM2", 0x0c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x0d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, MISC_CFG", 0x0d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x0e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, LS_TST_A", 0x0e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x0f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, LS_TST_B", 0x0f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x10);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, LS_TST_C", 0x10, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x11);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, LS_TST_D", 0x11, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x12);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, BB_CFG", 0x12, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x13);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, MISC_TST", 0x13, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x14);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, TRIM1", 0x14, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x15);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, TRIM2", 0x15, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x16);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, dc_TIMEOUT", 0x16, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x17);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX1_DEV_GRP", 0x17, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x18);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX1_TYPE", 0x18, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x19);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX1_REMAP", 0x19, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x1a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX1_DEDICATED", 0x1a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x1b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX2_DEV_GRP", 0x1b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x1c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX2_TYPE", 0x1c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x1d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX2_REMAP", 0x1d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x1e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX2_DEDICATED", 0x1e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x1f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX3_DEV_GRP", 0x1f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x20);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX3_TYPE", 0x20, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x21);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX3_REMAP", 0x21, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x22);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX3_DEDICATED", 0x22, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x23);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX4_DEV_GRP", 0x23, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x24);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX4_TYPE", 0x24, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x25);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX4_REMAPv", 0x25, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x26);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VAUX4_DEDICATED", 0x26, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x27);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VMMC1_DEV_GRP", 0x27, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x28);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VMMC1_TYPE", 0x28, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x29);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VMMC1_REMAP", 0x29, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x2a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VMMC1_DEDICATED", 0x2a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x2b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VMMC2_DEV_GRP", 0x2b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x2c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VMMC2_TYPE", 0x2c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x2d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, MMC2_REMAP", 0x2d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x2e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VMMC2_DEDICATED", 0x2e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x2f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL1_DEV_GRP", 0x2f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x30);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL1_TYPE", 0x30, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x31);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL1_REMAP", 0x31, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x32);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL1_DEDICATED", 0x32, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x33);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL2_DEV_GRP", 0x33, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x34);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL2_TYPE", 0x34, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x35);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL2_REMAP", 0x35, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x36);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VPLL2_DEDICATED", 0x36, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x37);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VSIM_DEV_GRP", 0x37, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x38);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VSIM_TYPE", 0x38, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x39);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VSIM_REMAP", 0x39, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x3a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VSIM_DEDICATED", 0x3a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x3b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDAC_DEV_GRP", 0x3b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x3c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDAC_TYPE", 0x3c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x3d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDAC_REMAP", 0x3d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x3e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDAC_DEDICATED", 0x3e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x3f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA1_DEV_GRP", 0x3f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x40);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA1_TYPE", 0x40, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x41);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA1_REMAP", 0x41, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x42);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA1_DEDICATE", 0x42, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x43);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA2_DEV_GRP", 0x43, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x44);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA2_TYPE", 0x44, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x45);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA2_REMAP", 0x45, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x46);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTANA2_DEDICATE", 0x46, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x47);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTDIG_DEV_GRP", 0x47, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x48);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTDIG_TYPE", 0x48, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x49);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTDIG_REMAP", 0x49, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x4a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VINTDIG_DEDICATED", 0x4a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x4b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_DEV_GRP", 0x4b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x4c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_TYPE", 0x4c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x4d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_REMAP", 0x4d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x4e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_CFG", 0x4e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x4f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_MISC_CFG", 0x4f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x50);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_TEST1", 0x50, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x51);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_TEST2", 0x51, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x52);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_OSC", 0x52, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x53);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_RESERVED", 0x53, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x54);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VIO_VSEL", 0x54, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x55);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_DEV_GRP", 0x55, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x56);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_TYPE", 0x56, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x57);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_REMAP", 0x57, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x58);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_CFG", 0x58, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x59);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_MISC_CFG", 0x59, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x5a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_TEST1", 0x5a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x5b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_TEST2", 0x5b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x5c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_OSC", 0x5c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x5d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_RESERVED", 0x5d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x5e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_VSEL", 0x5e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x5f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_VMODE_CFG", 0x5f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x60);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_VFLOOR", 0x60, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x61);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_VROOF", 0x61, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x62);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD1_STEP", 0x62, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x63);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_DEV_GRP", 0x63, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x64);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_TYPE", 0x64, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x65);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_REMAP", 0x65, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x66);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_CFG", 0x66, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x67);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_MISC_CFG", 0x67, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x68);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_TEST1", 0x68, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x69);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_TEST2", 0x69, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x6a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_OSC", 0x6a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x6b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_RESERVED", 0x6b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x6c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_VSEL", 0x6c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x6d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_VMODE_CFG", 0x6d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x6e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_VFLOOR", 0x6e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x6f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_VROOF", 0x6f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x70);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VDD2_STEP", 0x70, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x71);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB1V5_DEV_GRP", 0x71, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x72);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB1V5_TYPE", 0x72, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x73);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB1V5_REMAP", 0x73, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x74);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB1V8_DEV_GRP", 0x74, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x75);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB1V8_TYPE", 0x75, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x76);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB1V8_REMAP", 0x76, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x77);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB3V1_DEV_GRP", 0x77, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x78);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB3V1_TYPE", 0x78, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x79);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB3V1_REMAP", 0x79, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x7a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSBCP_DEV_GRP", 0x7a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x7b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSBCP_TYPE", 0x7b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x7c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSBCP_REMAP", 0x7c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x7d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB_DEDICATED1", 0x7d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x7e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, VUSB_DEDICATED2", 0x7e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x7f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, REGEN_DEV_GRP", 0x7f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x80);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, REGEN_TYPE", 0x80, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x81);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, REGEN_REMAP", 0x81, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x82);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, NRESPWRON_DEV_G", 0x82, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x83);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, NRESPWRON_TYPE", 0x83, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x84);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, NRESPWRON_REMAP", 0x84, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x85);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, CLKEN_DEV_GRP", 0x85, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x86);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, CLKEN_TYPE", 0x86, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x87);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, CLKEN_REMAP", 0x87, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x88);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, SYSEN_DEV_GRP", 0x88, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x89);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, SYSEN_TYPE", 0x89, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x8a);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, SYSEN_REMAP", 0x8a, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x8b);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, HFCLKOUT_DEV_GRP", 0x8b, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x8c);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, HFCLKOUT_TYPE", 0x8c, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x8d);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, HFCLKOUT_REMAP", 0x8d, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x8e);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, 32KCLKOUT_DEV_GR", 0x8e, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x8f);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, 32KCLKOUT_TYPE", 0x8f, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x90);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, 32KCLKOUT_REMAP", 0x90, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x91);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, TRITON_RESET_DEV_", 0x91, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x92);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, TRITON_RESET_TYPE", 0x92, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x93);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, TRITON_RESET_REMA", 0x93, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x94);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, MAINREF_DEV_GRP", 0x94, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x95);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, MAINREF_TYPE", 0x95, buf_from_twl);
+	twl_i2c_read_u8(TWL4030_MODULE_PM_RECEIVER,&buf_from_twl, 0x96);
+	printk("\n[TWL_RECEIVER]ADDRESS:%02x, VALUE:%02x, MAINREF_REMAP", 0x96, buf_from_twl);
+#endif
+
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x01, 0x22);
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x01, 0x2a);
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x0f, 0x88);
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0xff, 0x8a);
-#if 0 //Original Code 
-	omap_ctrl_writel(omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0) & ~(1 << 6), OMAP2_CONTROL_DEVCONF0); 
-	omap_mcbsp_disable_fclk(1);
-#else
-	if(voice_get_curmode() != 0 || fmradio_get_curmode()!=0) //20101222 inbang.park@lge.com Wake lock for  FM Radio [START] 
+
+//LGSI_VS910_FroyoToGB_FM radio sleep shidhar.ms@lge.com_24Aug2011_START 
+if(voice_get_curmode() != 0 || fmradio_get_curmode()!=0) //20101222 inbang.park@lge.com Wake lock for  FM Radio [START] 
 	{
-		//Call Mode or FM Radio Mode
+		printk("[mg.jeong] Wake state of Call");
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x41); //VINTANA1_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x45); //VINTANA2_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x49); //VINTDIG_REMAP
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x87); //CLKEN_REMAP
 		/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-02-09, Bug Fix: insufficient RF Clock when FMR+Call both using */
-		if (voice_get_curmode() != 0)
+	//if (voice_get_curmode() != 0) /* B Project GB FM Radio sleep issue */ // aravind.srinivas@lge.com
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x8D); //HFCLKOUT_REMAP
-		else
-			twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x8D); //HFCLKOUT_REMAP
+	//else // aravind.srinivas@lge.com
+	//	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x8D); //HFCLKOUT_REMAP
 		/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-02-09, Bug Fix: insufficient RF Clock when FMR+Call both using */
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x0e, 0x35); //VPLL2_REMAP
+//LGSI_VS910_FroyoToGB_FM radio sleep shidhar.ms@lge.com_24Aug2011_END
 	}
 	else
 	{
@@ -962,20 +1466,9 @@ static int omap3_pm_prepare(void)
 		twl_i2c_read_u8(TWL4030_MODULE_KEYPAD, &reg_save_TWL_KEYP_IMR1, 0x12);
 		twl_i2c_write_u8(TWL4030_MODULE_KEYPAD, 0xff, 0x12);
 	}
-#endif
-// jungsoo1221.lee [Call Wake Lock End]
-
 
 	return 0;
 }
-
-#if defined(CONFIG_MACH_LGE_OMAP3)
-#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
-extern void lock_scratchpad_sem(void);
-extern void unlock_scratchpad_sem(void);
-#endif
-#endif
-
 
 static int omap3_pm_suspend(void)
 {
@@ -1026,17 +1519,9 @@ static int omap3_pm_suspend(void)
 
 // prime@sdcmicro.com Enable PM dump [START]
 //	pm_dump_on_suspend = 1;
-
-#if defined(CONFIG_MACH_LGE_OMAP3)
-#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
 	lock_scratchpad_sem();
-#endif
 	omap3_save_scratchpad_contents();
-#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
 	unlock_scratchpad_sem();
-#endif
-#endif	
-
 	omap_sram_idle();
 //	pm_dump_on_suspend = 0;
 // prime@sdcmicro.com Enable PM dump [END]
@@ -1058,17 +1543,10 @@ restore:
 		set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
 	}
 	if (ret)
-	{
-		printk(KERN_ERR "????????????????????????????????????????????\n");
-		printk(KERN_ERR "?Could not enter target state in pm_suspend?\n");
-		printk(KERN_ERR "????????????????????????????????????????????\n");
-	}
+		printk(KERN_ERR "Could not enter target state in pm_suspend\n");
 	else
-	{
-		printk(KERN_INFO "###################################################\n");
-		printk(KERN_INFO "#Successfully put all powerdomains to target state#\n");
-		printk(KERN_INFO "###################################################\n");
-	}
+		printk(KERN_INFO "Successfully put all powerdomains "
+		       "to target state\n");
 
 	return ret;
 }
@@ -1328,8 +1806,7 @@ static void __init prcm_setup_regs(void)
 	cm_write_mod_reg(1 << OMAP3430_AUTO_MPU_DPLL_SHIFT,
 			 MPU_MOD,
 			 CM_AUTOIDLE2);
-	cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT) |
-			 (1 << OMAP3430_AUTO_CORE_DPLL_SHIFT),
+	cm_write_mod_reg((1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT),
 			 PLL_MOD,
 			 CM_AUTOIDLE);
 	cm_write_mod_reg(1 << OMAP3430ES2_AUTO_PERIPH2_DPLL_SHIFT,
@@ -1601,6 +2078,27 @@ static int __init omap3_pm_init(void)
 /* LGE_CHANGE_E [LS855:bking.moon@lge.com] 2011-07-15 */
 
 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
+//LGSI Saravanan TI Patch 13759
+	/*
+	 * Part of fix for errata i468.
+	 * GPIO pad spurious transition (glitch/spike) upon wakeup
+	 * from SYSTEM OFF mode.
+	 */
+	if (omap_rev() <= OMAP3630_REV_ES1_2) {
+		struct clockdomain *wkup_clkdm;
+
+		clkdm_add_wkdep(per_clkdm, core_clkdm);
+
+		/* Also part of fix for errata i582. */
+		wkup_clkdm = clkdm_lookup("wkup_clkdm");
+		if (wkup_clkdm)
+			clkdm_add_wkdep(per_clkdm, wkup_clkdm);
+		else
+			printk(KERN_ERR "%s: failed to look up wkup clock "
+				"domain\n", __func__);
+	}
+//LGSI Saravanan TI Patch 13759
+//LGSI Saravanan TI Patch 13948
 	if (cpu_is_omap3630())
 		pm34xx_errata |= RTA_ERRATA_i608;
 	/*

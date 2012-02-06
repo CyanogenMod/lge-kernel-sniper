@@ -21,10 +21,11 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/syscalls.h>
-
+#include <linux/timer.h> /* 20100802 jugwan.eom@lge.com */
 
 struct keyreset_state {
 	struct input_handler input_handler;
+	int crash_key;
 	unsigned long keybit[BITS_TO_LONGS(KEY_CNT)];
 	unsigned long upbit[BITS_TO_LONGS(KEY_CNT)];
 	unsigned long key[BITS_TO_LONGS(KEY_CNT)];
@@ -36,15 +37,22 @@ struct keyreset_state {
 };
 
 int restart_requested;
+int crash_requested;
 static void deferred_restart(struct work_struct *dummy)
 {
 	restart_requested = 2;
 	sys_sync();
 	restart_requested = 3;
+	if (crash_requested) {
+		BUG();
+	} else {
 	kernel_restart(NULL);
 }
+}
+
 static DECLARE_WORK(restart_work, deferred_restart);
 
+/* 20100802 jugwan.eom@lge.com [START_LGE] */
 void hub_reboot_device(void)
 {
 	schedule_work(&restart_work);
@@ -58,6 +66,11 @@ static void keyreset_timeout(unsigned long data)
 
         printk("keyreset_timeout!\n");
         state->restart_disabled = 1;
+		if (crash_requested) {
+			printk(KERN_EMERG "current process is %d:%s, prio is %d.\n",
+                        current->pid, current->comm, current->prio);
+			dump_stack();
+        }
         if (restart_requested)
                 panic("keyboard reset failed, %d", restart_requested);
         pr_info("keyboard reset\n");
@@ -65,6 +78,7 @@ static void keyreset_timeout(unsigned long data)
         restart_requested = 1;
 }
 static struct timer_list keyreset_timer = TIMER_INITIALIZER(keyreset_timeout, 0, 0);
+/* 20100802 jugwan.eom@lge.com [END_LGE] */
 
 static void keyreset_event(struct input_handle *handle, unsigned int type,
 			   unsigned int code, int value)
@@ -77,14 +91,17 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 
 	if (code >= KEY_MAX)
 		return;
-
+	if (code == state->crash_key)
+		crash_requested = value;
 	if (!test_bit(code, state->keybit))
 	{
+		/* 20100802 jugwan.eom@lge.com [START_LGE] */
 		if (keyreset_started) {
                         pr_info("keyreset end!\n");
                         keyreset_started = 0;
                         del_timer(&keyreset_timer);
 		}
+		/* 20100802 jugwan.eom@lge.com [END_LGE] */
 		return;
 	}
 
@@ -103,21 +120,25 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 			state->key_down++;
 		else
 		{
+			/* 20100802 jugwan.eom@lge.com [START_LGE] */
 			if (keyreset_started) {
 				pr_info("keyreset end!\n");
 				keyreset_started = 0;
 				del_timer(&keyreset_timer);
 			}
+			/* 20100802 jugwan.eom@lge.com [END_LGE] */
 			state->key_down--;
 	}
 	}
 	if (state->key_down == 0 && state->key_up == 0)
 	{
+		/* 20100802 jugwan.eom@lge.com [START_LGE] */
 		if (keyreset_started) {
 			pr_info("keyreset end!\n");
 			keyreset_started = 0;
 			del_timer(&keyreset_timer);
 		}
+		/* 20100802 jugwan.eom@lge.com [END_LGE] */
 		state->restart_disabled = 0;
 	}
 
@@ -125,6 +146,10 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 		 state->key_down, state->key_up, state->restart_disabled);
 
 	if (value && !state->restart_disabled &&
+		/* 20100802 jugwan.eom@lge.com, Change keyreset behaivor
+		 * to follow LGE scenario: It needs at least 5 secs before reset
+		 * [START_LGE]
+		 */
 	    state->key_down == state->key_down_target && !keyreset_started) {
 		pr_debug("keyreset start!\n");
 		keyreset_started = 1;
@@ -133,12 +158,18 @@ static void keyreset_event(struct input_handle *handle, unsigned int type,
 		add_timer(&keyreset_timer);
 #if 0
 		state->restart_disabled = 1;
+		if (crash_requested) {
+			printk(KERN_EMERG "current process is %d:%s, prio is %d.\n",
+			       current->pid, current->comm, current->prio);
+			dump_stack();
+		}
 		if (restart_requested)
 			panic("keyboard reset failed, %d", restart_requested);
 		pr_info("keyboard reset\n");
 		schedule_work(&restart_work);
 		restart_requested = 1;
 #endif
+		/* 20100802 jugwan.eom@lge.com [END_LGE] */
 	}
 done:
 	spin_unlock_irqrestore(&state->lock, flags);
@@ -218,7 +249,7 @@ static int keyreset_probe(struct platform_device *pdev)
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 	if (!state)
 		return -ENOMEM;
-
+	state->crash_key = pdata->crash_key;
 	spin_lock_init(&state->lock);
 	keyp = pdata->keys_down;
 	while ((key = *keyp++)) {

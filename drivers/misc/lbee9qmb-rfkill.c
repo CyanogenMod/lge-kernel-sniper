@@ -34,8 +34,6 @@
 #include <linux/wakelock.h>
 #include <linux/spinlock.h>
 
-#include <linux/io.h>
-
 #define BRCM_WAKELOCKTIMEOUT
 
 struct bcm_bt_lpm {
@@ -73,9 +71,7 @@ static int lbee9qmb_rfkill_set_power(void *data, bool blocked)
 
 	if (!blocked) {
 //		regulator_enable(regulator); /* 20100721 jaewoo56.lee@lge.com for BTLA Porting to Froyo */
-		/*LGE_CHANGE_S, mg.jeong@lge.com, 2011-04-05, Temp change for after Sleep BT die*/
 		//gpio_set_value(plat->gpio_reset, 0);
-		/*LGE_CHANGE_E, mg.jeong@lge.com, 2011-04-05, Temp change for after Sleep BT die*/
 //		if (plat->gpio_pwr!=-1)
 //			gpio_set_value(plat->gpio_pwr, 0);
 		msleep(plat->delay);
