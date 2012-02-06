@@ -42,6 +42,23 @@
 /*
  *  Compatibility
  */
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/ 
+#define MODULE_NAME		"PCM-NATIVE"
+
+
+#ifndef DEBUG
+//#define DEBUG
+//#undef DEBUG
+#endif
+
+#ifdef DEBUG
+#define DBG(fmt, args...) 				\
+	printk(KERN_DEBUG "[%s] %s(%d): " 		\
+		fmt, MODULE_NAME, __func__, __LINE__, ## args); 
+#else	/* DEBUG */
+#define DBG(...) 
+#endif
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/
 
 struct snd_pcm_hw_params_old {
 	unsigned int flags;
@@ -1415,6 +1432,7 @@ static int snd_pcm_drop(struct snd_pcm_substream *substream);
 /* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
 extern int cur_mode_check;
 /* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
+extern unsigned char pcm_hw_enable; //20110910 /*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11*/
 static int snd_pcm_drain(struct snd_pcm_substream *substream,
 			 struct file *file)
 {
@@ -1490,9 +1508,12 @@ static int snd_pcm_drain(struct snd_pcm_substream *substream,
 		snd_power_unlock(card);
 /* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
 	//	if ((cur_mode_check==11)||(cur_mode_check==10))
-//		if((pcm_hw_enable)||(cur_mode_check==11)||(cur_mode_check==10))
-		if(cur_mode_check == 0)
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/	
+		if((pcm_hw_enable)||(cur_mode_check==11)||(cur_mode_check==10))
+//20110910		if(cur_mode_check == 0)
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/
 		{
+			printk("BT CALL is working=%d\n",cur_mode_check);
 			tout = schedule_timeout(1 * HZ);
 		}
 		else
@@ -2582,7 +2603,14 @@ static int snd_pcm_common_ioctl1(struct file *file,
 	snd_printd("unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
 }
-
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/
+#if 1	//20110910
+int capture_running_flag = 0;
+int playback_running_flag = 0;
+EXPORT_SYMBOL(playback_running_flag);
+EXPORT_SYMBOL(capture_running_flag);
+#endif
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/
 static int snd_pcm_playback_ioctl1(struct file *file,
 				   struct snd_pcm_substream *substream,
 				   unsigned int cmd, void __user *arg)
@@ -2591,6 +2619,11 @@ static int snd_pcm_playback_ioctl1(struct file *file,
 		return -ENXIO;
 	if (snd_BUG_ON(substream->stream != SNDRV_PCM_STREAM_PLAYBACK))
 		return -EINVAL;
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/
+#if 1	//20110910
+	playback_running_flag = substream->runtime->status->state;
+#endif	
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/	
 	switch (cmd) {
 	case SNDRV_PCM_IOCTL_WRITEI_FRAMES:
 	{
@@ -2671,6 +2704,11 @@ static int snd_pcm_capture_ioctl1(struct file *file,
 		return -ENXIO;
 	if (snd_BUG_ON(substream->stream != SNDRV_PCM_STREAM_CAPTURE))
 		return -EINVAL;
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/
+#if 1	//20110910
+	capture_running_flag = substream->runtime->status->state;
+#endif	
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/
 	switch (cmd) {
 	case SNDRV_PCM_IOCTL_READI_FRAMES:
 	{

@@ -39,6 +39,23 @@
  *
  * when runtime->silence_size >= runtime->boundary - fill processed area with silence immediately
  */
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/
+#define MODULE_NAME		"PCM-CORE"
+
+
+#ifndef DEBUG
+//#define DEBUG
+//#undef DEBUG
+#endif
+
+#ifdef DEBUG
+#define DBG(fmt, args...) 				\
+	printk(KERN_DEBUG "[%s] %s(%d): " 		\
+		fmt, MODULE_NAME, __func__, __LINE__, ## args); 
+#else	/* DEBUG */
+#define DBG(...) 
+#endif
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/
 void snd_pcm_playback_silence(struct snd_pcm_substream *substream, snd_pcm_uframes_t new_hw_ptr)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -1708,6 +1725,7 @@ EXPORT_SYMBOL(snd_pcm_period_elapsed);
  * on the capture stream, it indicates the stream is in DRAINING state.
  */
 extern int cur_mode_check; /* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
+extern unsigned char pcm_hw_enable; //20110910 /*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11*/
 static int wait_for_avail_min(struct snd_pcm_substream *substream,
 			      snd_pcm_uframes_t *availp)
 {
@@ -1727,17 +1745,21 @@ static int wait_for_avail_min(struct snd_pcm_substream *substream,
 		}
 		set_current_state(TASK_INTERRUPTIBLE);
 		snd_pcm_stream_unlock_irq(substream);
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/		
 /* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
-//		if((pcm_hw_enable)||(cur_mode_check==11)||(cur_mode_check==10))
-		if(cur_mode_check == 0)
+		if((pcm_hw_enable)||(cur_mode_check==11)||(cur_mode_check==10))
+//20110910	if(cur_mode_check == 0)
 		{
-		tout = schedule_timeout(msecs_to_jiffies(10000)); /* default */
+	        	tout = schedule_timeout(msecs_to_jiffies(1000)); /* default */ //20110910
 		}
 		else
 		{
-			tout = schedule_timeout(msecs_to_jiffies(1000));
+			//printk("[BIZZ]wait_for_avail_min 10s start\n");
+			tout = schedule_timeout(msecs_to_jiffies(10000));  //20110910
+			//printk("[BIZZ]wait_for_avail_min 10s end\n");
 		}
 /* [2011.03.25] jung.chanmin@lge.com - bt sound competition */
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/
 		snd_pcm_stream_lock_irq(substream);
 		switch (runtime->status->state) {
 		case SNDRV_PCM_STATE_SUSPENDED:
@@ -1921,7 +1943,16 @@ snd_pcm_sframes_t snd_pcm_lib_write(struct snd_pcm_substream *substream, const v
 	struct snd_pcm_runtime *runtime;
 	int nonblock;
 	int err;
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_START*/	
+	snd_pcm_sframes_t t_size;
+	DBG("Entering size=%d cur_mode_check=%d\n",size,cur_mode_check);
 
+	if ((cur_mode_check==11)||(cur_mode_check==10))
+	{
+		DBG("snd_pcm_lib_write VT CALL END return\n");
+		return size;
+	}
+/*LGSI_P970_TelephonyTeam_TDID:110516_POP Noise Issue_22.09.11_END*/
 	err = pcm_sanity_check(substream);
 	if (err < 0)
 		return err;

@@ -38,12 +38,14 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/initval.h>
+/* [2011.04.04] jung.chanmin@lge.com - change audio sys file system */
 #include <linux/i2c/twl.h>
 
 #define NAME_SIZE	32
 
 static DECLARE_WAIT_QUEUE_HEAD(soc_pm_waitq);
 extern int voice_get_curmode(void);
+extern int fmradio_get_curmode(void);//+DEJA /* B Project GB FM Radio sleep issue */ //aravind.srinivas@lge.com
 
 #ifdef CONFIG_DEBUG_FS
 static struct dentry *debugfs_root;
@@ -137,11 +139,11 @@ static ssize_t soc_codec_reg_show(struct snd_soc_codec *codec, char *buf)
 			 * the register being volatile and the device being
 			 * powered off.
 			 */
-#if 0 	 
+#if 0 /* [2011.04.04] jung.chanmin@lge.com - change audio sys file system */		 
 			ret = codec->driver->read(codec, i);
 #else
 			twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE, (u8*)&ret, (u8)i);		
-#endif 		
+#endif /* [2011.04.04] jung.chanmin@lge.com - change audio sys file system */		
 //				printk("[BIZZ][soc_codec_reg_show] i=%x ret = %x\n",i,ret);
 			if (ret >= 0)
 				count += snprintf(buf + count,
@@ -194,11 +196,11 @@ ssize_t codec_reg_store(struct device *dev,
 	data = simple_strtoul(d, NULL, 16);
 
 	printk("[LUCKYJUN77] reg: %x, data : %x\n", reg, data);			
-#if 0 
+#if 0 /* [2011.04.04] jung.chanmin@lge.com - change audio sys file system */
     snd_soc_write(rtd->codec, reg, data);
 #else	
 	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE, (u8)data, (u8)reg);		
-#endif 
+#endif /* [2011.04.04] jung.chanmin@lge.com - change audio sys file system */	
 	return count;
 }
 
@@ -1182,7 +1184,7 @@ static int soc_suspend(struct device *dev)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	int i;
-	int phone_suspended = voice_get_curmode();
+	int phone_suspended = voice_get_curmode() | fmradio_get_curmode();//~DEJA /* B Project GB FM Radio sleep issue */ //aravind.srinivas@lge.com
 	
 
 	printk("soc_suspend...phone_suspended=%d\n",phone_suspended);
@@ -1417,6 +1419,7 @@ static int soc_resume(struct device *dev)
 	{
 		incallnosuspend = 0;
 		printk("incallsuspend -> soc-resume......return\n");
+//		return 0;   //20110520 junday.lee anyway soc_resume because sound noise(call sleep and resume when camcoder mode)
 	}
 	/* AC97 devices might have other drivers hanging off them so
 	 * need to resume immediately.  Other drivers don't have that
@@ -3704,6 +3707,7 @@ found:
 }
 EXPORT_SYMBOL_GPL(snd_soc_unregister_codec);
 
+// prime@sdcmicro.com Added function to get the codec instance [START]
 struct snd_soc_codec *snd_soc_get_codec(const char *name) {
 	struct snd_soc_codec *codec;
 
@@ -3715,6 +3719,7 @@ struct snd_soc_codec *snd_soc_get_codec(const char *name) {
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_soc_get_codec);
+// prime@sdcmicro.com Added function to get the codec instance [END]
 
 static int __init snd_soc_init(void)
 {

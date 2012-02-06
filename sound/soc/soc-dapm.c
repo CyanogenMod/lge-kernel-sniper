@@ -984,6 +984,10 @@ static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 	unsigned int value = 0;
 	unsigned int mask = 0;
 	unsigned int cur_mask;
+	/* B Project GB FM Radio sleep issue : remove lines */ // aravind.srinivas@lge.com
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-01-08, FM Radio current consumption workaround */
+	//extern int cur_fmradio_mode;
+/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-01-08, FM Radio current consumption workaround */
 
 	_w = list_first_entry(pending, struct snd_soc_dapm_widget,
 				power_list);
@@ -1028,8 +1032,17 @@ static void dapm_seq_run_coalesced(struct snd_soc_dapm_context *dapm,
 				       w->name, ret);
 		}
 	}
-
+/* B Project GB FM Radio sleep issue : remove lines */ // aravind.srinivas@lge.com
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-01-08, FM Radio current consumption workaround */
+#if 0
+	if (cur_fmradio_mode) {
+		// DONT UPDATE PGA REGS WHILE FMR PLAYING
+		printk(KERN_WARNING "%s: Trying to write reg=%x mask=%x val=%x when fmr on\n",__func__, reg, mask, value);
+	}
+	else if (reg >= 0) {
+#else
 	if (reg >= 0) {
+#endif
 		pop_dbg(dapm->pop_time,
 			"pop test : Applying 0x%x/0x%x to %x in %dms\n",
 			value, mask, reg, dapm->pop_time);

@@ -652,6 +652,7 @@ struct snd_soc_card {
 	int num_links;
 	struct snd_soc_pcm_runtime *rtd;
 	int num_rtd;
+	struct snd_soc_codec *codec;//LGSI_VS910_FroyoToGB_VT Call shidhar.ms@lge.com_14Jul2011_START
 
 	struct work_struct deferred_resume_work;
 
