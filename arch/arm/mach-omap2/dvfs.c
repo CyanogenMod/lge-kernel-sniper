@@ -783,19 +783,9 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 	if (!curr_volt)
 		curr_volt = omap_get_operation_voltage(curr_vdata);
 
-/* S[, 2012.07.12, mannsik.chung@lge.com, 
-** Enable calibration even if one calibrated value is same as another nominal value. */
-#if 0
-	if (curr_volt == new_volt)
-#else
-	if (curr_volt == new_vdata->volt_calibrated)
-#endif
-/* E], 2012.07.12, mannsik.chung@lge.com, 
-** Enable calibration even if one calibrated value is same as another nominal value. */
-	{
-		volt_scale_dir = DVFS_VOLT_SCALE_NONE;
-	} else if (curr_volt < new_volt) {
-
+	/* Make a decision to scale dependent domain based on nominal voltage */
+	if (omap_get_nominal_voltage(new_vdata) >
+			omap_get_nominal_voltage(curr_vdata)) {
 		ret = _dep_scale_domains(target_dev, vdd);
 		if (ret) {
 			dev_err(target_dev,
@@ -803,7 +793,13 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 				__func__, ret, new_volt);
 			goto fail;
 		}
+	}
 
+	/* Now decide on switching OPP */
+
+	if (curr_volt == new_volt) {
+		volt_scale_dir = DVFS_VOLT_SCALE_NONE;
+	} else if (curr_volt < new_volt) {
 		ret = voltdm_scale(voltdm, new_vdata);
 		if (ret) {
 			dev_err(target_dev,
@@ -860,8 +856,12 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 	if (ret)
 		goto fail;
 
-	if (DVFS_VOLT_SCALE_DOWN == volt_scale_dir) {
+	if (DVFS_VOLT_SCALE_DOWN == volt_scale_dir)
 		voltdm_scale(voltdm, new_vdata);
+
+	/* Make a decision to scale dependent domain based on nominal voltage */
+	if (omap_get_nominal_voltage(new_vdata) <
+			omap_get_nominal_voltage(curr_vdata)) {
 		_dep_scale_domains(target_dev, vdd);
 	}
 
