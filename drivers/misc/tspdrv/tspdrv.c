@@ -431,6 +431,7 @@ static int ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsig
 #ifdef QA_TEST
     	int i;
 #endif
+	VibeInt8 nForce[1] = {128};
 
 	DbgOut(( "[tspdrv] : ioctl cmd = %d   %x\n", cmd, cmd ));
 
@@ -461,9 +462,15 @@ static int ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsig
 #endif
             		break;
 
-        	case TSPDRV_MAGIC_NUMBER:
-            		file->private_data = (void*)TSPDRV_MAGIC_NUMBER;
-            		break;
+		case TSPDRV_MAGIC_NUMBER:
+			file->private_data = (void*)TSPDRV_MAGIC_NUMBER;
+			break;
+
+		case TSPDRV_ENABLE_TIMED_AMP:
+			ImmVibeSPI_ForceOut_AmpEnable(0);
+			ImmVibeSPI_ForceOut_SetSamples(0, 8, 1, nForce);
+			VibeOSKernelLinuxAutoTimer(*((int*)arg));
+			break;
 
         	case TSPDRV_ENABLE_AMP:
 					ImmVibeSPI_ForceOut_AmpEnable( arg );
