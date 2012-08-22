@@ -891,7 +891,7 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		return IMG_FALSE;
 	}
 
-	if(psDssData->num_ovls == 0 || ui32NumMemInfos == 0)
+	if (ui32NumMemInfos == 0)
 	{
 		WARN(1, "must have at least one layer");
 		return IMG_FALSE;
@@ -988,9 +988,12 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 		apsTilerPAs[i] = asMemInfo[ix].psTilerInfo;
 	}
 
-	dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
-						  dsscomp_proxy_cmdcomplete,
-						  (void *)hCmdCookie);
+	if (psDssData->num_ovls == 0)
+		dsscomp_proxy_cmdcomplete((void *)hCmdCookie, IMG_TRUE);
+	else
+		dsscomp_gralloc_queue(psDssData, apsTilerPAs, false,
+						dsscomp_proxy_cmdcomplete,
+						(void *)hCmdCookie);
 
 #ifdef CONFIG_OMAP2_DSS_HDMI //porting natting for new ddk for HDMI S/W rotation : TI - shawn
 	{
