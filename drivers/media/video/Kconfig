@@ -505,6 +505,32 @@ config VIDEO_LV8093
 	  It is currently working with the TI OMAP3 camera controller
 	  and Sony IMX046 sensor.
 
+#//--[[ LGE_UBIQUIX_MODIFIED_START : ymjun@mnbt.co.kr [2012.03.27] - CAM from GB
+config VIDEO_IMX072
+	tristate "Sony IMX072 sensor driver (5MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Sony
+	  IMX072 camera.  It is currently working with the TI OMAP3
+          camera controller.
+
+config VIDEO_YACD5B1S
+	tristate "Hynix YACD5B1S sensor driver (2MP)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Hynix
+	  YACD5B1S camera.  It is currently working with the TI OMAP3
+          camera controller.
+          
+config VIDEO_MT9V113
+	tristate "Aptina MT9V113 sensor driver (VGA)"
+	depends on I2C && VIDEO_V4L2
+	---help---
+	  This is a Video4Linux2 sensor-level driver for the Aptina
+	  MT9V113 camera.  It is currently working with the TI OMAP3
+          camera controller.
+#//--]] LGE_UBIQUIX_MODIFIED_END : ymjun@mnbt.co.kr [2012.03.27] - CAM from GB
+
 comment "Video improvement chips"
 
 config VIDEO_UPD64031A

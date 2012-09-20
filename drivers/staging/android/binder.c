@@ -692,7 +692,15 @@ free_range:
 err_vm_insert_page_failed:
 		unmap_kernel_range((unsigned long)page_addr, PAGE_SIZE);
 err_map_kernel_failed:
+		/* LGE_CHANGE_S [jugwan.eom@lge.com] 2011-10-22, workaround for *page has been already NULL */
+#if 1
+		if (*page) {
+			__free_page(*page);
+		}
+#else /* Original */
 		__free_page(*page);
+#endif
+		/* LGE_CHANGE_E [jugwan.eom@lge.com] 2011-10-22, workaround for *page has been already NULL */
 		*page = NULL;
 err_alloc_page_failed:
 		;
@@ -1389,7 +1397,11 @@ static void binder_transaction(struct binder_proc *proc,
 	wait_queue_head_t *target_wait;
 	struct binder_transaction *in_reply_to = NULL;
 	struct binder_transaction_log_entry *e;
+#if 0 //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-19, WBT
 	uint32_t return_error;
+#else
+	uint32_t return_error = BR_ERROR;
+#endif
 
 	e = binder_transaction_log_add(&binder_transaction_log);
 	e->call_type = reply ? 2 : !!(tr->flags & TF_ONE_WAY);
@@ -1815,6 +1827,11 @@ int binder_thread_write(struct binder_proc *proc, struct binder_thread *thread,
 			    (cmd == BC_INCREFS || cmd == BC_ACQUIRE)) {
 				ref = binder_get_ref_for_node(proc,
 					       binder_context_mgr_node);
+#if defined(CONFIG_MACH_LGE_OMAP3) //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-19, WBT
+				if (ref == NULL) {
+					return -ENOMEM;
+				}
+#endif
 				if (ref->desc != target) {
 					binder_user_error("binder: %d:"
 						"%d tried to acquire "
@@ -2439,6 +2456,10 @@ retry:
 					ALIGN(t->buffer->data_size,
 					    sizeof(void *));
 
+		/* LGE_CHANGE_S [jugwan.eom@lge.com] 2011-11-04, verify user ptr */
+		if (!access_ok(VERIFY_WRITE, (uint32_t __user *)ptr, 4))
+			return -EFAULT;
+		/* LGE_CHANGE_E [jugwan.eom@lge.com] 2011-11-04, verify user ptr */
 		if (put_user(cmd, (uint32_t __user *)ptr))
 			return -EFAULT;
 		ptr += sizeof(uint32_t);
@@ -2600,6 +2621,13 @@ static unsigned int binder_poll(struct file *filp,
 
 	mutex_lock(&binder_lock);
 	thread = binder_get_thread(proc);
+#if defined(CONFIG_MACH_LGE_OMAP3) //LGE_CHANGE [sunggyun.yu@lge.com] 2011-03-19, WBT
+	if (thread == NULL) {
+		printk(KERN_ERR "binder_get_thread failed.\n");
+		mutex_unlock(&binder_lock);
+		return 0;
+	}
+#endif
 
 	wait_for_proc_work = thread->transaction_stack == NULL &&
 		list_empty(&thread->todo) && thread->return_error == BR_OK;

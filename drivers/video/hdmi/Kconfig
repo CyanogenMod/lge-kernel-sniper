@@ -1,0 +1,10 @@
+config NXP_HDMI
+        tristate "NXP HDMI support (EXPERIMENTAL)"
+        help
+          NXP HDMI Driver.
+
+config OMAP3_HDMI
+	tristate "OMAP3 HDMI for HUB_PROJECT."
+	default n
+	help
+	  OMAP3 HDMI for HUB_PROJECT.

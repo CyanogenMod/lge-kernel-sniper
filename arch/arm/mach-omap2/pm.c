@@ -23,7 +23,7 @@
 #include "powerdomain.h"
 #include "clockdomain.h"
 #include "pm.h"
-
+#include "omap_opp_data.h"   // rt5604: 20120710 camera dsp boost
 /**
  * struct omap2_pm_lp_description - Describe low power behavior of the system
  * @oscillator_startup_time:	Time rounded up to uSec for the oscillator to
@@ -80,6 +80,117 @@ static struct device *fdif_dev;
 
 bool omap_pm_is_ready_status;
 
+#if defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_MACH_LGE_OMAP3)
+enum {
+	RESET_NORMAL,
+	RESET_CHARGER_DETECT,
+	RESET_GLOBAL_SW_RESET,
+	RESET_KERNEL_PANIC,
+	RESET_HIDDEN_SW_RESET,
+	RESET_FACTORY_RESET_DONE,
+	RESET_FTM_MODE,
+	RESET_WEB_DOWNLOAD,
+};
+
+int reset_status = RESET_NORMAL;
+int hidden_reset_enabled = 1;
+static int hub_secure_mode = 0;
+
+static ssize_t reset_status_show(struct kobject *, struct kobj_attribute *, char *);
+static struct kobj_attribute reset_status_attr =
+	__ATTR(reset_status, 0644, reset_status_show, NULL);
+
+static ssize_t hidden_reset_show(struct kobject *, struct kobj_attribute *, char *);
+static ssize_t hidden_reset_store(struct kobject *k, struct kobj_attribute *,
+		const char *buf, size_t n);
+static struct kobj_attribute hidden_reset_attr =
+	__ATTR(hidden_reset, 0644, hidden_reset_show, hidden_reset_store);
+
+
+static ssize_t secure_mode_show(struct kobject *, struct kobj_attribute *, char *);
+static struct kobj_attribute secure_mode_attr =
+	__ATTR(secure_mode, 0644, secure_mode_show, NULL);
+
+#endif
+
+#if defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_MACH_LGE_OMAP3)
+static void reset_status_setup(char *str)
+{
+	if (str[0] == 'p')
+		reset_status = RESET_KERNEL_PANIC;
+	else if (str[0] == 'h')
+		reset_status = RESET_HIDDEN_SW_RESET;
+	else if (str[0] == 'c')
+		reset_status = RESET_CHARGER_DETECT;
+	else if (str[0] == 't')
+		reset_status = RESET_FTM_MODE;
+	else if (str[0] == 's')
+		reset_status = RESET_GLOBAL_SW_RESET;
+	else if (str[0] == 'F')
+		reset_status = RESET_FACTORY_RESET_DONE;
+	else if (str[0] == 'd') //jb.chae@lge.com
+		reset_status = RESET_WEB_DOWNLOAD;
+
+	printk("reset_status: %c\n", str[0]);
+}
+__setup("rs=", reset_status_setup);
+
+static void hub_secure_mode_setup(char *str)
+{
+	if (str[0] == '1')
+		hub_secure_mode = 1;
+	else
+		hub_secure_mode = 0;
+
+	printk("hub_secure_mode: %d\n", hub_secure_mode);
+}
+__setup("secure=", hub_secure_mode_setup);
+
+static ssize_t reset_status_show(struct kobject *kobj, struct kobj_attribute *attr,
+		char *buf)
+{
+	if (attr == &reset_status_attr)
+		return sprintf(buf, "%d\n", reset_status);
+	else
+		return -EINVAL;
+}
+
+static ssize_t hidden_reset_show(struct kobject *kobj, struct kobj_attribute *attr,
+		char *buf)
+{
+	if (attr == &hidden_reset_attr)
+		return sprintf(buf, "%d\n", hidden_reset_enabled);
+	else
+		return -EINVAL;
+}
+
+static ssize_t hidden_reset_store(struct kobject *kobj, struct kobj_attribute *attr,
+		const char *buf, size_t n)
+{
+	unsigned short value;
+
+	if (sscanf(buf, "%hu", &value) != 1)
+		return -EINVAL;
+
+	if (attr == &hidden_reset_attr) {
+		hidden_reset_enabled = value;
+	} else {
+		return -EINVAL;
+	}
+	return n;
+}
+
+static ssize_t secure_mode_show(struct kobject *kobj, struct kobj_attribute *attr,
+		char *buf)
+{
+	if (attr == &secure_mode_attr)
+		return sprintf(buf, "%d\n", hub_secure_mode);
+	else
+		return -EINVAL;
+}
+
+#endif
+
 struct device *omap2_get_mpuss_device(void)
 {
 	WARN_ON_ONCE(!mpu_dev);
@@ -114,6 +225,78 @@ struct device *omap4_get_fdif_device(void)
 	return fdif_dev;
 }
 EXPORT_SYMBOL(omap4_get_fdif_device);
+
+// (+) rt5604: 20120710 camera dsp boost
+#ifdef CONFIG_OMAP_PM
+static ssize_t vdd_opp_show(struct kobject *, struct kobj_attribute *, char *);
+static ssize_t vdd_opp_store(struct kobject *k, struct kobj_attribute *,
+			  const char *buf, size_t n);
+
+static struct kobj_attribute dsp_freq_attr =
+	__ATTR(dsp_freq, 0644, vdd_opp_show, vdd_opp_store);
+
+static ssize_t vdd_opp_show(struct kobject *kobj, struct kobj_attribute *attr,
+			 char *buf)
+{
+
+	if (attr == &dsp_freq_attr)
+	{
+		static struct clk *clk_handle;
+		unsigned long freq;	
+		clk_handle = clk_get(NULL, "dpll2_ck");
+			if (!clk_handle)
+				pr_err("%s: clk_get failed to get dpll2_ck\n", __func__);
+				
+			        freq = clk_get_rate(clk_handle);
+		
+		return sprintf(buf, "%lu\n", freq/1000);
+	}
+	else
+		return -EINVAL;
+}
+
+static ssize_t vdd_opp_store(struct kobject *kobj, struct kobj_attribute *attr,
+			  const char *buf, size_t n)
+{
+	unsigned long value;
+	if (sscanf(buf, "%lu", &value) != 1)
+		return -EINVAL;
+
+	if (attr == &dsp_freq_attr) {
+		u8 opp_id = 1;
+		u8 i, size;
+		size  =
+		    sizeof(omap36xx_opp_def_list_shared)/sizeof(struct omap_opp_def);
+
+		for (i = 0; i < size; i++) {
+			if (omap36xx_opp_def_list_shared[i].freq == 0)
+			       break;
+			
+			if (!strcmp("iva", omap36xx_opp_def_list_shared[i].hwmod_name))
+			{
+				if ((omap36xx_opp_def_list_shared[i].freq/1000) == value)
+					break;
+				else
+					opp_id ++;
+			}
+		  }
+  
+		if (opp_id == 0) {
+			printk(KERN_ERR "%s: Invalid value\n", __func__);
+			return -EINVAL;
+		}
+
+		printk(KERN_DEBUG "rt5604: ---> vdd_opp_store: call omap_pm_dsp_set_min_opp(opp_id=%d)\n", opp_id);
+		omap_pm_dsp_set_min_opp(opp_id);
+ 
+	} else {
+		return -EINVAL;
+	}
+
+	return n;
+}
+#endif
+// (-) rt5604: 20120710 camera dsp boost
 
 /**
  * omap_pm_get_pmic_lp_time() - retrieve the oscillator time
@@ -259,16 +442,17 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
 	if (cur_state == state)
 		return ret;
 
-	if (cpu_is_omap34xx()) {
-		/*
-		 * Bridge pm handles dsp hibernation. just return success
-		 * Sleep switch is performed for IVA which is not necessary.
-		 * This causes conflict between PM and bridge.
-		 * This touching IVA reg hence adding below condition.
-		 */
-		if (!strcmp(pwrdm->name, "iva2_pwrdm"))
-			return 0;
-	}
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-09, preventing IVA SS Address Hole & In-band error */
+	/*
+	 * Bridge pm handles dsp hibernation. just return success
+	 * If OFF mode is not enabled, sleep switch is performed for IVA which
+	 * is not necessary. This causes conflict between PM and bridge
+	 * touching IVA reg.
+	 * REVISIT: Bridge has to set powerstate based on enable_off_mode state.
+	 */
+	if (!strcmp(pwrdm->name, "iva2_pwrdm"))
+		return 0;
+/* LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-09 */
 
 	if (pwrdm_read_pwrst(pwrdm) < PWRDM_POWER_ON) {
 		if ((pwrdm_read_pwrst(pwrdm) > state) &&
@@ -451,8 +635,48 @@ static void __init omap4_init_voltages(void)
 
 static int __init omap2_common_pm_init(void)
 {
+#if defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_MACH_LGE_OMAP3)
+	int error = -EINVAL;
+#endif
+
 	omap2_init_processor_devices();
 	omap_pm_if_init();
+
+// (+) rt5604: 20120710 camera dsp boost
+#ifdef CONFIG_OMAP_PM
+	{
+		int error = -EINVAL;
+
+		printk(KERN_DEBUG "rt5604: ---> omap2_common_pm_init: sysfs_create_file\n");
+		
+		error = sysfs_create_file(power_kobj, &dsp_freq_attr.attr);
+		if (error) {
+			printk(KERN_ERR "%s: sysfs_create_file(dsp_freq) failed %d\n", __func__, error);
+			return error;
+		}
+	}
+#endif
+// (-) rt5604: 20120710 camera dsp boost
+
+#if defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_MACH_LGE_OMAP3)
+	error = sysfs_create_file(power_kobj, &reset_status_attr.attr);
+	if (error) {
+		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
+		return error;
+	}
+	error = sysfs_create_file(power_kobj, &hidden_reset_attr.attr);
+	if (error) {
+		printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
+		return error;
+	}
+	if (hub_secure_mode) {
+		error = sysfs_create_file(power_kobj, &secure_mode_attr.attr);
+		if (error) {
+			printk(KERN_ERR "sysfs_create_file failed: %d\n", error);
+			return error;
+		}
+	}
+#endif
 
 	return 0;
 }

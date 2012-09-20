@@ -601,7 +601,8 @@ int drv_remove_dev_object(struct drv_object *driver_obj,
 int drv_request_resources(u32 dw_context, u32 *dev_node_strg)
 {
 	int status = 0;
-	struct drv_object *pdrv_object;
+	// struct drv_object *pdrv_object; 
+	struct drv_object *pdrv_object = NULL; // 20120213 taeju.park@lge.com To delete compile warning, it is uninitialized local variable.
 	struct drv_ext *pszdev_node;
 	struct drv_data *drv_datap = dev_get_drvdata(bridge);
 

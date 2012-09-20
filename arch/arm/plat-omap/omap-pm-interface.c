@@ -57,6 +57,8 @@ int omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, long r)
 		return -EINVAL;
 	};
 
+	if (r == 0) r = -1;
+
 	if (r == -1)
 		pr_debug("OMAP PM: remove min bus tput constraint: "
 			 "dev %s for agent_id %d\n", dev_name(dev), agent_id);

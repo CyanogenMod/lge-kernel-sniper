@@ -769,6 +769,7 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	unsigned char cval = 0;
 	unsigned long flags = 0;
 	unsigned int baud, quot;
+	unsigned int status;
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
@@ -853,8 +854,13 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
 	 * Modem status interrupts
 	 */
 	up->ier &= ~UART_IER_MSI;
-	if (UART_ENABLE_MS(&up->port, termios->c_cflag))
-		up->ier |= UART_IER_MSI;
+	//if (UART_ENABLE_MS(&up->port, termios->c_cflag))
+	if (UART_ENABLE_MS(&up->port, termios->c_cflag)) {
+		status = serial_in(up, UART_MSR);
+		if (status & UART_MSR_CTS)
+			uart_handle_cts_change(&up->port, status & UART_MSR_CTS);
+ 		up->ier |= UART_IER_MSI;
+	}
 	serial_out(up, UART_IER, up->ier);
 	serial_out(up, UART_LCR, cval);		/* reset DLAB */
 	up->lcr = cval;

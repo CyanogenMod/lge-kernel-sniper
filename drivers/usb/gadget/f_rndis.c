@@ -444,6 +444,9 @@ rndis_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 			if (buf) {
 				memcpy(req->buf, buf, n);
 				req->complete = rndis_response_complete;
+				/* LGE_SJIT_S 12/05/2011 [mohamed.khadri@lge.com] Ensure context is non-null */
+				req->context = rndis;
+				/* LGE_SJIT_E 12/05/2011 [mohamed.khadri@lge.com] Ensure context is non-null */
 				rndis_free_response(rndis->config, buf);
 				value = n;
 			}

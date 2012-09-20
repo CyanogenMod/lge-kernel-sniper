@@ -1442,6 +1442,19 @@ static int omap_dispc_init(struct omapfb_device *fbdev, int ext_mode,
 	l = dispc_read_reg(DISPC_IRQSTATUS);
 	dispc_write_reg(DISPC_IRQSTATUS, l);
 
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-13, patch for boot failure by COMPLEXIO_ERR interrupt
+ * Derived from Froyo, Gingerbread field issue patch */
+#ifdef CONFIG_OMAP2_DSS_DSI
+	/* disable the dsi interrupts so no spurious dsi irq's are deliverd
+	 * before the dsi block is fully initialzed -- this is especially an
+	 * issue if skip_init is true, as resetting the dss block would clear
+	 * these interupts anyway */
+	omap_writel(0, 0x4804FC1C); // DSI_IRQENABLE
+	omap_writel(0xFFFFFFFF, 0x4804FC4C); // COMPLEXIO_ERR
+	omap_writel(0x00FFFFFF, 0x4804FC18); // DSI_IRQSTATUS
+#endif
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-13 */
+
 	recalc_irq_mask();
 
 	if ((r = request_irq(INT_24XX_DSS_IRQ, omap_dispc_irq_handler,

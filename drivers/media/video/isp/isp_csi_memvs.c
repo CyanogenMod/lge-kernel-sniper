@@ -1008,8 +1008,10 @@ static int isp_csi_memvs_vout_release(struct file *file)
 	}
 	mutex_unlock(&sensor->mutex);
 
+	// (+) ymjun [0719] : memleak patch from GB
 	if (&ofh->vbq)
 		videobuf_mmap_free(&ofh->vbq);
+	// (-)  ymjun [0719] : memleak patch from GB
 
 	kfree(ofh);
 

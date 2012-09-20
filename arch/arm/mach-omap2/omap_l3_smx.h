@@ -36,6 +36,13 @@
 
 #define L3_ERROR_LOG_ADDR		0x060
 
+// LGE_CHANGE_S kibum.lee@lge.com, TI CSR OMAPS00262192 WA code, omap3_l3_app_irq()'s BUG_ON macro defence
+/* LOGAN_TEST */
+#define L3_RT_NETWORK_CONTROL		0x078
+#define L3_DSS_IA_CONTROL		0x5400
+// LGE_CHANGE_E kibum.lee@lge.com, TI CSR OMAPS00262192 WA code, omap3_l3_app_irq()'s BUG_ON macro defence
+
+
 /* Register definitions for Sideband Interconnect */
 #define L3_SI_CONTROL			0x020
 #define L3_SI_FLAG_STATUS_0		0x510

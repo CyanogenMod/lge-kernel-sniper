@@ -24,6 +24,7 @@
 #include "control.h"
 #include "omap_opp_data.h"
 #include "pm.h"
+#include "omap3_voltages.h"
 
 #include <plat/common.h>
 struct omap_opp_def omap36xx_opp_def_list_shared[15];  /*shared*/
@@ -82,13 +83,15 @@ struct omap_vdd_dep_info omap34xx_vddmpu_dep_info[] = {
 
 /* VDD1 */
 
+#if 0
 #define OMAP3630_VDD_MPU_OPP50_UV		1012500
 #define OMAP3630_VDD_MPU_OPP100_UV		1200000
 #define OMAP3630_VDD_MPU_OPP120_UV		1325000
 #define OMAP3630_VDD_MPU_OPP1G_UV		1375000
+#endif
 
 struct omap_volt_data omap36xx_vddmpu_volt_data[] = {
-	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP50_UV, 0, OMAP3630_CONTROL_FUSE_OPP50_VDD1, 0xf4, 0x0c, OMAP_ABB_NOMINAL_OPP),
+	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP50_UV, 100000, OMAP3630_CONTROL_FUSE_OPP50_VDD1, 0xf4, 0x0c, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP100_UV, 0, OMAP3630_CONTROL_FUSE_OPP100_VDD1, 0xf9, 0x16, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP120_UV, 0, OMAP3630_CONTROL_FUSE_OPP120_VDD1, 0xfa, 0x23, OMAP_ABB_NOMINAL_OPP),
 	VOLT_DATA_DEFINE(OMAP3630_VDD_MPU_OPP1G_UV, 0, OMAP3630_CONTROL_FUSE_OPP1G_VDD1, 0xfa, 0x27, OMAP_ABB_FAST_OPP),
@@ -97,8 +100,10 @@ struct omap_volt_data omap36xx_vddmpu_volt_data[] = {
 
 /* VDD2 */
 
+#if 0
 #define OMAP3630_VDD_CORE_OPP50_UV		1000000
 #define OMAP3630_VDD_CORE_OPP100_UV		1200000
+#endif
 
 struct omap_volt_data omap36xx_vddcore_volt_data[] = {
 	VOLT_DATA_DEFINE(OMAP3630_VDD_CORE_OPP50_UV, 0, OMAP3630_CONTROL_FUSE_OPP50_VDD2, 0xf4, 0x0c, OMAP_ABB_NONE),
@@ -158,12 +163,23 @@ static struct omap_opp_def __initdata omap36xx_opp_def_list[] = {
 	OPP_INITIALIZER("mpu", "dpll1_ck", "mpu_iva", true,
 				1000000000, OMAP3630_VDD_MPU_OPP1G_UV),
 
+/* S[, 2012.07.02, mannsik.chung@lge.com, Boost L3 clock. (TI patch by deepak.muddegowda@sasken.com) */
+#if 0
 	/* L3 OPP1 - OPP50 */
 	OPP_INITIALIZER("l3_main", "l3_ick", "core", true,
 				100000000, OMAP3630_VDD_CORE_OPP50_UV),
 	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
 	OPP_INITIALIZER("l3_main", "l3_ick", "core", true,
 				200000000, OMAP3630_VDD_CORE_OPP100_UV),
+#else
+	/* L3 OPP1 - OPP50 */
+	OPP_INITIALIZER("l3_main", "dpll3_m2_ck", "core", true,
+				200000000, OMAP3630_VDD_CORE_OPP50_UV),
+	/* L3 OPP2 - OPP100, OPP-Turbo, OPP-SB */
+	OPP_INITIALIZER("l3_main", "dpll3_m2_ck", "core", true,
+				400000000, OMAP3630_VDD_CORE_OPP100_UV),
+#endif
+/* E], 2012.07.02, mannsik.chung@lge.com, Boost L3 clock. (TI patch by deepak.muddegowda@sasken.com) */
 
 	/* DSP OPP1 - OPP50 */
 	OPP_INITIALIZER("iva", "dpll2_ck", "mpu_iva", true,  260000000, OMAP3630_VDD_MPU_OPP50_UV),

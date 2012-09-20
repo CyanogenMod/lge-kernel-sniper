@@ -31,6 +31,9 @@
 #include <linux/console.h>
 #include <trace/events/power.h>
 
+// LGE_CHANGE [daewung.kim] power optimization code
+#include <linux/i2c/twl.h>
+
 #include <plat/sram.h>
 #include "clockdomain.h"
 #include "powerdomain.h"
@@ -350,6 +353,55 @@ static void restore_table_entry(void)
 	set_cr(control_reg_value);
 }
 
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-03-22, power optimization
+static unsigned int padconf[128][2];
+static int padindex = 0;
+/* Save the current register value into padconf[][]
+ * then update the register with the given value in the parameter. */
+static void pad_save(u16 value, unsigned int addr)
+{
+	padconf[padindex][0] = addr;
+	padconf[padindex][1] = (u32) omap_readw(addr);
+	omap_writew(value, addr);
+	padindex ++;
+}
+
+static void hgg_padconf_restore()
+{
+	int j;
+	for(j=0;j<padindex;j++)
+		omap_writew((u16) padconf[j][1], padconf[j][0]);
+
+	padindex = 0;
+}
+
+static void hgg_padconf_save()
+{
+//#if defined(CONFIG_PRODUCT_LGE_LU6800) /* from GB */
+#if 0
+	pad_save(0x010F/*GPIO-OUT*/, 0x4800207E);	//  GPMC_A3 GPIO_36 VT_CAM_PWDN
+	pad_save(0x000C/*GPIO-IN*/, 0x48002088);	//  GPMC_A8 GPIO_41 GYRO_INT_N (PULL UP)
+	pad_save(0x000C/*GPIO-IN*/, 0x480020BC);	//  GPMC_nCS7 GPIO_58 COM_INT
+	pad_save(0x010F/*GPIO-OUT*/, 0x4800211C);	//  CAM_D3 GPIO_102 FLASH_LED_EN
+	pad_save(0x010F/*GPIO-OUT*/, 0x4800218E);	//  McBSP1_FSR GPIO_157 FLASH_LED_TOURCH
+#else
+	pad_save(0x010F/*GPIO-OUT*/, 0x4800207E);//  GPMC_A3 GPIO_36 VT_CAM_PWDN
+	/* LGE_CHANGE_S [daewung.kim@lge.com] 2011-02-09, Prevent Sensors i2c failure */
+	pad_save(0x000C/*GPIO-IN*/, 0x48002088);//  GPMC_A8 GPIO_41 GYRO_INT_N (PULL UP)
+	pad_save(0x000C/*GPIO-IN*/, 0x480020BC);//  GPMC_nCS7 GPIO_58 COM_INT
+	//pad_save(0x000C/*GPIO-OUT*/, 0x480021C2);//  I2C3_SCL Output PD mode 4 to prevent gyro i2c failure
+	//pad_save(0x000C/*GPIO-OUT*/, 0x480021C4);//  I2C3_SDA Output PD mode 4 to prevent gyro i2c failure
+	/* LGE_CHANGE_E [daewung.kim@lge.com] 2011-02-09, Prevent Sensors i2c failure */
+
+	//pad_save(0x010F/*GPIO-OUT*/, 0x48002080);	//  GPMC_A4 GPIO_37 CAM_SUBPM_EM
+	pad_save(0x010F/*GPIO-OUT*/, 0x48002188);   //  McBSP4_DX GPIO_154 FLASH_LED_TOURCH
+	pad_save(0x010F/*GPIO-OUT*/, 0x4800218A);   //  McBSP4_FSX GPIO_155 FLASH_LED_EN
+	pad_save(0x011C/*IN*/, 0x48002A00);	//  I2C4_SCL Input PU mode 4 to reduce sleep current.
+	pad_save(0x011C/*IN*/, 0x48002A02);	//  I2C4_SDA Input PU mode 4 to reduce sleep current.
+#endif
+}
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-03-22, power optimization
+
 void omap_sram_idle(bool suspend)
 {
 	/* Variable to tell what needs to be saved and restored
@@ -443,26 +495,31 @@ void omap_sram_idle(bool suspend)
 	}
 
 	/* PER */
-	if (per_next_state < PWRDM_POWER_ON) {
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-03-16, preventing GPIO interrupt lost when cpu idle
+//	if (per_next_state < PWRDM_POWER_ON) {
+	if (per_next_state < PWRDM_POWER_ON && core_next_state < PWRDM_POWER_ON) {
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-03-16
 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
 		omap2_gpio_prepare_for_idle(per_going_off, suspend);
+		hgg_padconf_save();	// LGE_CHANGE [daewung.kim] power optimization code
 	}
 
 	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
 		if (core_next_state == PWRDM_POWER_OFF) {
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 			omap2_prm_set_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
-						OMAP3430_GR_MOD,
-						OMAP3_PRM_VOLTCTRL_OFFSET);
+						   OMAP3430_GR_MOD,
+						   OMAP3_PRM_VOLTCTRL_OFFSET);
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 			omap3_core_save_context();
 			omap3_cm_save_context();
-
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 		} else {
 			omap2_prm_set_mod_reg_bits(OMAP3430_AUTO_RET_MASK,
-						OMAP3430_GR_MOD,
-						OMAP3_PRM_VOLTCTRL_OFFSET);
-
-
+						   OMAP3430_GR_MOD,
+						   OMAP3_PRM_VOLTCTRL_OFFSET);
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 		}
 	}
 
@@ -497,7 +554,7 @@ void omap_sram_idle(bool suspend)
 	if (pwrdm_read_prev_pwrst(mpu_pwrdm) == PWRDM_POWER_OFF)
 		restore_table_entry();
 
-
+	/* CORE */
 	if (core_next_state < PWRDM_POWER_ON) {
 		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
 		if (core_prev_state == PWRDM_POWER_OFF) {
@@ -510,10 +567,12 @@ void omap_sram_idle(bool suspend)
 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
 					       OMAP3430_GR_MOD,
 					       OMAP3_PRM_VOLTCTRL_OFFSET);
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 		else
 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_RET_MASK,
-						OMAP3430_GR_MOD,
-						OMAP3_PRM_VOLTCTRL_OFFSET);
+						     OMAP3430_GR_MOD,
+						     OMAP3_PRM_VOLTCTRL_OFFSET);
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 	}
 
 	omap2_cm_write_mod_reg(1 << OMAP3430_AUTO_PERIPH_DPLL_SHIFT, PLL_MOD,
@@ -525,10 +584,15 @@ void omap_sram_idle(bool suspend)
 	pwrdm_post_transition();
 
 	/* PER */
-	if (per_next_state < PWRDM_POWER_ON) {
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-03-16, preventing GPIO interrupt lost when cpu idle
+//	if (per_next_state < PWRDM_POWER_ON) {
+	if (per_next_state < PWRDM_POWER_ON && core_next_state < PWRDM_POWER_ON) {
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-03-16
 		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
+		hgg_padconf_restore();  // LGE_CHANGE [daewung.kim] power optimization code
 		omap2_gpio_resume_after_idle(per_going_off);
 	}
+
 
 	/* Disable IO-PAD and IO-CHAIN wakeup */
 	if (omap3_has_io_wakeup() &&
@@ -541,6 +605,18 @@ void omap_sram_idle(bool suspend)
 
 	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
 }
+
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
+static int __init omap3_pm_early_init(void)
+{
+	/* set sys_off_mode active low */
+	omap2_prm_clear_mod_reg_bits(OMAP3430_OFFMODE_POL_MASK, OMAP3430_GR_MOD,
+				     OMAP3_PRM_POLCTRL_OFFSET);
+	return 0;
+}
+
+arch_initcall(omap3_pm_early_init);
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 
 int omap3_can_sleep(void)
 {
@@ -573,15 +649,45 @@ out:
 	local_irq_enable();
 }
 
+// LGE_CHANGE_S [daewung.kim] power optimization code
+static int omap3_pm_prepare(void)
+{
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x01, 0x22);
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x01, 0x2a);
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0x0f, 0x88);
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER,0xff, 0x8a);
+
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x08, 0x41); //VINTANA1_REMAP
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x08, 0x45); //VINTANA2_REMAP
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x08, 0x49); //VINTDIG_REMAP
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x87); //CLKEN_REMAP
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x8D); //HFCLKOUT_REMAP
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x00, 0x35); //VPLL2_REMAP
+	
+	return 0;
+}
+// LGE_CHANGE_E [daewung.kim] power optimization code
+
 #ifdef CONFIG_SUSPEND
 static int omap3_pm_suspend(void)
 {
 	struct power_state *pwrst;
 	int state, ret = 0;
 
+#if 0 // just debug
 	if (wakeup_timer_seconds || wakeup_timer_milliseconds)
 		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
 					 wakeup_timer_milliseconds);
+#else
+	if (wakeup_timer_seconds || wakeup_timer_milliseconds) {
+		printk(KERN_DEBUG "wakeup_timer_seconds = %d\n"
+				"wakeup_timer_milliseconds = %d\n",
+				wakeup_timer_seconds, 
+				wakeup_timer_milliseconds);
+		omap2_pm_wakeup_on_timer(wakeup_timer_seconds,
+					 wakeup_timer_milliseconds);
+	}
+#endif
 
 	/* Read current next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node)
@@ -599,13 +705,20 @@ static int omap3_pm_suspend(void)
 	omap_sram_idle(true);
 
 restore:
+// LGE_CHANGE_S [kibum.lee@lge.com] from GB, for debug
+#if 1
+	pr_info("Read Powerdomain states..\n");
+	pr_info("0 : off, 1 : retention, 2 : on-inactive, 3 : on-active\n");
+#endif
+// LGE_CHANGE_E [kibum.lee@lge.com] from GB, for debug
 	/* Restore next_pwrsts */
 	list_for_each_entry(pwrst, &pwrst_list, node) {
 		state = pwrdm_read_prev_pwrst(pwrst->pwrdm);
+		printk(KERN_INFO "2army, Powerdomain (%s) target state %d, current %d\n", pwrst->pwrdm->name, pwrst->next_state, state);		// kibum.lee@lge.com for debug
 		if (state > pwrst->next_state) {
 			printk(KERN_INFO "Powerdomain (%s) didn't enter "
-			       "target state %d\n",
-			       pwrst->pwrdm->name, pwrst->next_state);
+			       "target state %d, current state=%d\n",
+			       pwrst->pwrdm->name, pwrst->next_state, state );
 			ret = -1;
 		}
 		omap_set_pwrdm_state(pwrst->pwrdm, pwrst->saved_state);
@@ -635,6 +748,13 @@ static int omap3_pm_enter(suspend_state_t unused)
 	return ret;
 }
 
+// LGE_CHANGE_S [daewung.kim] power optimization code
+static void omap3_pm_finish(void)
+{
+	return;
+}
+// LGE_CHANGE_E [daewung.kim] power optimization code
+
 /* Hooks to enable / disable UART interrupts during suspend */
 static int omap3_pm_begin(suspend_state_t state)
 {
@@ -653,7 +773,9 @@ static void omap3_pm_end(void)
 static const struct platform_suspend_ops omap_pm_ops = {
 	.begin		= omap3_pm_begin,
 	.end		= omap3_pm_end,
+	.prepare	= omap3_pm_prepare, // LGE_CHANGE [daewung.kim] power optimization code
 	.enter		= omap3_pm_enter,
+	.finish		= omap3_pm_finish, // LGE_CHANGE [daewung.kim] power optimization code
 	.valid		= suspend_valid_only_mem,
 };
 #endif /* CONFIG_SUSPEND */
@@ -879,16 +1001,6 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
 	return omap_set_pwrdm_state(pwrst->pwrdm, pwrst->next_state);
 }
 
-static int __init omap3_pm_early_init(void)
-{
-	/* set sys_off_mode active low */
-	omap2_prm_clear_mod_reg_bits(OMAP3430_OFFMODE_POL_MASK, OMAP3430_GR_MOD,
-				OMAP3_PRM_POLCTRL_OFFSET);
-	return 0;
-}
-
-arch_initcall(omap3_pm_early_init);
-
 /*
  * Enable hw supervised mode for all clockdomains if it's
  * supported. Initiate sleep transition for other clockdomains, if
@@ -989,6 +1101,25 @@ static int __init omap3_pm_init(void)
 		omap3630_ctrl_disable_rta();
 
 	clkdm_add_wkdep(neon_clkdm, mpu_clkdm);
+// START 20120810 sangki.hyun@lge.com glitch patch {
+	/*
+	 * Part of fix for errata i468.
+	 * GPIO pad spurious transition (glitch/spike) upon wakeup
+	 * from SYSTEM OFF mode.
+	 */
+	if (omap_rev() <= OMAP3630_REV_ES1_2) {
+		struct clockdomain *wkup_clkdm;
+
+		clkdm_add_wkdep(per_clkdm, core_clkdm);
+
+		/* Also part of fix for errata i582. */
+		wkup_clkdm = clkdm_lookup("wkup_clkdm");
+		if (wkup_clkdm)
+			clkdm_add_wkdep(per_clkdm, wkup_clkdm);
+		else
+			printk(KERN_ERR "%s: failed to look up wkup clock ""domain\n", __func__);
+	}
+// END 20120810 sangki.hyun@lge.com glitch patch }
 	if (omap_type() != OMAP2_DEVICE_TYPE_GP) {
 		omap3_secure_ram_storage =
 			kmalloc(0x803F, GFP_KERNEL);

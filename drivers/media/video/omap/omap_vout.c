@@ -2501,7 +2501,9 @@ static int omap_vout_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static int __init omap_vout_probe(struct platform_device *pdev)
+// kibum.lee@lge.com section mismatch error fix
+//static int __init omap_vout_probe(struct platform_device *pdev)
+static int omap_vout_probe(struct platform_device *pdev)
 {
 	int ret = 0, i;
 	struct omap_overlay *ovl;
@@ -2552,7 +2554,7 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 		if (def_display) {
 			struct omap_dss_driver *dssdrv = def_display->driver;
 
-			ret = dssdrv->enable(def_display);
+			ret = dssdrv->enable(def_display);		//  -> omap_dss_drive_enable()
 			if (ret) {
 				/* Here we are not considering a error
 				 *  as display may be enabled by frame
@@ -2566,7 +2568,8 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 			if (def_display->caps &
 					OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE) {
 				if (dssdrv->enable_te)
-					dssdrv->enable_te(def_display, 0);
+					dssdrv->enable_te(def_display, 1);
+//					dssdrv->enable_te(def_display, 0);	// kyungtae.oh ICS
 				if (dssdrv->set_update_mode)
 					dssdrv->set_update_mode(def_display,
 							OMAP_DSS_UPDATE_MANUAL);
@@ -2587,7 +2590,8 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 	ret = omap_vout_create_video_devices(pdev);
 	if (ret)
 		goto probe_err2;
-
+// LGE_CHANGE ICS
+#if 0
 	for (i = 0; i < vid_dev->num_displays; i++) {
 		struct omap_dss_device *display = vid_dev->displays[i];
 
@@ -2596,6 +2600,7 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 					display->panel.timings.x_res,
 					display->panel.timings.y_res);
 	}
+#endif
 	return 0;
 
 probe_err2:

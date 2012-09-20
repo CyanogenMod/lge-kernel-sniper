@@ -1938,6 +1938,7 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 			preferred_zone->compact_considered = 0;
 			preferred_zone->compact_defer_shift = 0;
 			count_vm_event(COMPACTSUCCESS);
+			printk("__alloc_pages_direct_compact:Memory compaction Success !!!\n");
 			return page;
 		}
 
@@ -1947,10 +1948,14 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		 * but not enough to satisfy watermarks.
 		 */
 		count_vm_event(COMPACTFAIL);
+		printk("__alloc_pages_direct_compact:Memory compaction Fail !!!\n");
 		defer_compaction(preferred_zone);
 
 		cond_resched();
 	}
+	else
+		printk("__alloc_pages_direct_compact:Memory compaction Skipped !!!\n");
+
 
 	return NULL;
 }

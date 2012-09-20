@@ -205,6 +205,29 @@ static int twl4030battery_current(int raw_volt)
 	else /* slope of 0.88 mV/mA */
 		return (raw_volt * CURR_STEP_SIZE) / CURR_PSR_R2;
 }
+
+
+//LGE_CHANGE_S  DEJA from GB ICS porting (TODO item)
+static int twl4030_madc_read_channelsEx(struct twl4030_madc_data *madc,
+		u8 reg_base, u16 channels, int *buf)
+{
+	int count = 0;
+	u8 reg, i;
+
+	if (unlikely(!buf))
+		return 0;
+
+	for (i = 0; i < TWL4030_MADC_MAX_CHANNELS; i++) {
+		if (channels & (1<<i)) {
+			reg = reg_base + 2*i;
+			buf[i] = twl4030_madc_channel_raw_read(madc, reg);
+			count++;
+		}
+	}
+	return count;
+}
+//LGE_CHANGE_E  DEJA from GB ICS porting  (TODO item)
+
 /*
  * Function to read channel values
  * @madc - pointer to twl4030_madc_data struct
@@ -260,10 +283,18 @@ static int twl4030_madc_read_channels(struct twl4030_madc_data *madc,
 			 * R = Prescaler ratio for input channels.
 			 * Result given in mV hence multiplied by 1000.
 			 */
+#if defined(CONFIG_MACH_LGE_HUB)
+			 if(i !=2)	 //LGE_CHANGE_S  DEJA from GB ICS porting, LG used only raw data (channel 2)
+			 {
+				buf[i] = (buf[i] * 3 * 1000 * twl4030_divider_ratios[i].denominator)
+					/ (2 * 1023 * twl4030_divider_ratios[i].numerator);
+			 }
+#else
 			buf[i] = (buf[i] * 3 * 1000 *
 				 twl4030_divider_ratios[i].denominator)
 				/ (2 * 1023 *
 				twl4030_divider_ratios[i].numerator);
+#endif
 		}
 	}
 	if (count_req)
@@ -583,8 +614,20 @@ int twl4030_madc_conversion(struct twl4030_madc_request *req)
 		twl4030_madc->requests[req->method].active = 0;
 		goto out;
 	}
+
+//LGE_CHANGE_S  DEJA from GB ICS porting (TODO ITEM)
+#if defined(CONFIG_MACH_LGE_HUB)
+//	ret = twl4030_madc_read_channelsEx(twl4030_madc, method->rbase,
+//					 (u16)req->channels, req->rbuf);
 	ret = twl4030_madc_read_channels(twl4030_madc, method->rbase,
 					 req->channels, req->rbuf);
+#else
+
+	ret = twl4030_madc_read_channels(twl4030_madc, method->rbase,
+					 req->channels, req->rbuf);
+#endif
+//LGE_CHANGE_E  DEJA from GB ICS porting
+
 	twl4030_madc->requests[req->method].active = 0;
 
 out:

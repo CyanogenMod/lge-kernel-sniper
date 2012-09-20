@@ -51,16 +51,22 @@ static ssize_t display_enabled_store(struct device *dev,
 		return r;
 
 	enabled = !!enabled;
-
-	if (enabled != (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) {
-		if (enabled) {
-			r = dssdev->driver->enable(dssdev);
-			if (r)
-				return r;
-		} else {
-			dssdev->driver->disable(dssdev);
-		}
-	}
+#if defined(CONFIG_OMAP2_DSS_HDMI)  // goochang.jeong@lge.com LCD ON when video HDMI display
+	// nothing
+#else
+	if (enabled != (dssdev->state != OMAP_DSS_DISPLAY_DISABLED)) 
+#endif
+		{
+		    if (enabled) 
+			{
+			    r = dssdev->driver->enable(dssdev);
+			    if (r)
+				    return r;
+		    } else 
+		    {
+			    dssdev->driver->disable(dssdev);
+		    }
+	    }
 
 	return size;
 }
@@ -292,19 +298,30 @@ static ssize_t display_wss_store(struct device *dev,
 	return size;
 }
 
+#if defined(CONFIG_OMAP2_DSS_HDMI) 
+extern bool hdmi_detect_power_enabled;
 static ssize_t display_device_detect_enabled_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 	unsigned long device_detect_enabled;
 
-	if (!dssdev->enable_device_detect || !dssdev->get_device_detect)
+	if (!dssdev->platform_enable || !dssdev->get_device_detect)
 		return -ENOENT;
-
 	if (strict_strtoul(buf, 0, &device_detect_enabled))
 		return -EINVAL;
-
-	dssdev->enable_device_detect(dssdev, device_detect_enabled);
+	if(device_detect_enabled)
+	{
+		if(dssdev->platform_enable)
+			dssdev->platform_enable(dssdev);
+	}
+	else
+	{
+		if (dssdev->platform_disable)
+			dssdev->platform_disable(dssdev);
+	}
+	
+	hdmi_detect_power_enabled = device_detect_enabled;
 
 	return size;
 }
@@ -315,33 +332,13 @@ static ssize_t display_device_detect_enabled_show(struct device *dev,
 	struct omap_dss_device *dssdev = to_dss_device(dev);
 	unsigned int device_detect_enabled;
 
-	if (!dssdev->enable_device_detect || !dssdev->get_device_detect)
+	if (!dssdev->platform_enable || !dssdev->get_device_detect)
 		return -ENOENT;
 
 	device_detect_enabled = dssdev->get_device_detect(dssdev);
-
 	return snprintf(buf, PAGE_SIZE, "%d\n", device_detect_enabled);
 }
-
-static ssize_t display_device_connected_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct omap_dss_device *dssdev = to_dss_device(dev);
-	int device_connected;
-
-	if (!dssdev->enable_device_detect ||
-		!dssdev->get_device_detect ||
-		!dssdev->get_device_connected)
-		return -ENOENT;
-
-	device_connected = dssdev->get_device_connected(dssdev);
-
-	if (device_connected == -EINVAL)
-		return -EINVAL;
-
-	return snprintf(buf, PAGE_SIZE, "%d\n", device_connected);
-}
-
+#endif
 
 static DEVICE_ATTR(enabled, S_IRUGO|S_IWUSR,
 		display_enabled_show, display_enabled_store);
@@ -357,12 +354,11 @@ static DEVICE_ATTR(mirror, S_IRUGO|S_IWUSR,
 		display_mirror_show, display_mirror_store);
 static DEVICE_ATTR(wss, S_IRUGO|S_IWUSR,
 		display_wss_show, display_wss_store);
+#if defined(CONFIG_OMAP2_DSS_HDMI) 
 static DEVICE_ATTR(device_detect_enabled, S_IRUGO|S_IWUSR,
 		display_device_detect_enabled_show,
 		display_device_detect_enabled_store);
-static DEVICE_ATTR(device_connected, S_IRUGO,
-		display_device_connected_show,
-		NULL);
+#endif
 
 static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_enabled,
@@ -372,8 +368,9 @@ static struct device_attribute *display_sysfs_attrs[] = {
 	&dev_attr_rotate,
 	&dev_attr_mirror,
 	&dev_attr_wss,
+#if defined(CONFIG_OMAP2_DSS_HDMI) 
 	&dev_attr_device_detect_enabled,
-	&dev_attr_device_connected,
+#endif
 	NULL
 };
 

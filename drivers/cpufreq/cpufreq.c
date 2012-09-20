@@ -459,6 +459,46 @@ static ssize_t store_scaling_governor(struct cpufreq_policy *policy,
 		return count;
 }
 
+
+/*
+** S[, 2012.08.06, mannsik.chung@lge.com, Backup scaling governor. 
+** It's for use at zygot restart by GC. 
+*/
+
+/*
+** Some APPs need this backed up scaling governor information, at restart of zygot.
+*/
+static char scaling_governor_backup[CPUFREQ_NAME_LEN];
+
+/*
+** show_scaling_governor_bak - show backup scaling governor.
+*/
+static ssize_t show_scaling_governor_bak(struct cpufreq_policy *policy, char *buf)
+{
+	return scnprintf(buf, CPUFREQ_NAME_LEN, "%s\n",
+			scaling_governor_backup);
+}
+
+/*
+** store_scaling_governor_bak- store backup scaling governor.
+*/
+static ssize_t store_scaling_governor_bak(struct cpufreq_policy *policy,
+                    const char *buf, size_t count)
+{
+	unsigned int ret = -EINVAL;
+
+	ret = sscanf(buf, "%15s", scaling_governor_backup);
+	if (ret != 1)
+		return -EINVAL;
+
+	return count;
+}
+
+/*
+** E], 2012.08.06, mannsik.chung@lge.com, Backup scaling governor. 
+** It's for use at zygot restart by GC. 
+*/
+
 /**
  * show_scaling_driver - show the cpufreq driver currently loaded
  */
@@ -581,6 +621,7 @@ cpufreq_freq_attr_ro(affected_cpus);
 cpufreq_freq_attr_rw(scaling_min_freq);
 cpufreq_freq_attr_rw(scaling_max_freq);
 cpufreq_freq_attr_rw(scaling_governor);
+cpufreq_freq_attr_rw(scaling_governor_bak); /*2012.08.06, mannsik.chung@lge.com, Backup scaling governor. */
 cpufreq_freq_attr_rw(scaling_setspeed);
 
 static struct attribute *default_attrs[] = {
@@ -592,6 +633,7 @@ static struct attribute *default_attrs[] = {
 	&affected_cpus.attr,
 	&related_cpus.attr,
 	&scaling_governor.attr,
+	&scaling_governor_bak.attr, /*2012.08.06, mannsik.chung@lge.com, Backup scaling governor. */
 	&scaling_driver.attr,
 	&scaling_available_governors.attr,
 	&scaling_setspeed.attr,

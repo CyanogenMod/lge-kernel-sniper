@@ -222,6 +222,12 @@ struct _mmc_csd {
  */
 #define MMC_CARD_BUSY	0x80000000	/* Card Power up status bit */
 
+/*LGE_CHANGE_S sunggyun.yu@lge.com for Sandisk eMMC patch*/
+#if 1
+#define MMC_ACCESS_MODE 0x40000000 /* Select card access mode(Byte/Sector) */
+#endif
+/*LGE_CHANGE_E sunggyun.yu@lge.com for Sandisk eMMC patch*/
+
 /*
  * Card Command Classes (CCC)
  */

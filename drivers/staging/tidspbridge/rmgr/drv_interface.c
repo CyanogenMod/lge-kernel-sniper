@@ -331,7 +331,8 @@ static int __devinit omap34_xx_bridge_probe(struct platform_device *pdev)
 	int err;
 	dev_t dev = 0;
 #ifdef CONFIG_TIDSPBRIDGE_DVFS
-	int i = 0;
+// 20120213 taeju.park@lge.com To delete compile warning, it is unused code.
+//	int i = 0;
 #endif
 
 	omap_dspbridge_dev = pdev;
@@ -409,8 +410,6 @@ static int __devexit omap34_xx_bridge_remove(struct platform_device *pdev)
 		driver_context = 0;
 		DBC_ASSERT(ret == true);
 	}
-	kfree(drv_datap);
-	dev_set_drvdata(bridge, NULL);
 
 func_cont:
 	mem_ext_phys_pool_release();
@@ -502,8 +501,11 @@ static int bridge_open(struct inode *ip, struct file *filp)
 	}
 #endif
 	pr_ctxt = kzalloc(sizeof(struct process_context), GFP_KERNEL);
+
+// (+) TI patch 20120723 : memleak 
 	if (!pr_ctxt)
 		return -ENOMEM;
+// (-) TI patch 20120723 : memleak 
 
 	pr_ctxt->res_state = PROC_RES_ALLOCATED;
 	spin_lock_init(&pr_ctxt->dmm_map_lock);
@@ -512,33 +514,39 @@ static int bridge_open(struct inode *ip, struct file *filp)
 	INIT_LIST_HEAD(&pr_ctxt->dmm_rsv_list);
 
 	pr_ctxt->node_id = kzalloc(sizeof(struct idr), GFP_KERNEL);
+// (+) TI patch 20120723 : memleak 
 	if (!pr_ctxt->node_id) {
-		status = -ENOMEM;
+ 		status = -ENOMEM;
 		goto err1;
-	}
+ 	}
 
 	idr_init(pr_ctxt->node_id);
+// (-) TI patch 20120723 : memleak 
 
 	pr_ctxt->stream_id = kzalloc(sizeof(struct idr), GFP_KERNEL);
+// (+) TI patch 20120723 : memleak 
 	if (!pr_ctxt->stream_id) {
 		status = -ENOMEM;
 		goto err2;
 	}
 
 	idr_init(pr_ctxt->stream_id);
+// (-) TI patch 20120723 : memleak 
 
 	filp->private_data = pr_ctxt;
-
-	#ifdef CONFIG_TIDSPBRIDGE_RECOVERY
+#ifdef CONFIG_TIDSPBRIDGE_RECOVERY
+	if (!status)
 		atomic_inc(&bridge_cref);
-	#endif
-	return 0;
+#endif
+	return status;
 
+// (+) TI patch 20120723 : memleak 
 err2:
 	kfree(pr_ctxt->node_id);
 err1:
 	kfree(pr_ctxt);
-	return status;
+ 	return status;
+// (-) TI patch 20120723 : memleak 
 }
 
 /*
@@ -559,8 +567,15 @@ static int bridge_release(struct inode *ip, struct file *filp)
 	flush_signals(current);
 	drv_remove_all_resources(pr_ctxt);
 	proc_detach(pr_ctxt);
-	kfree(pr_ctxt->node_id);
-	kfree(pr_ctxt->stream_id);
+
+	// (+) TI patch 20120723 : memleak 
+	if(pr_ctxt->node_id != NULL)
+		kfree(pr_ctxt->node_id);
+
+	if(pr_ctxt->stream_id != NULL)
+		kfree(pr_ctxt->stream_id);
+	// (-) TI patch 20120723 : memleak 
+
 	kfree(pr_ctxt);
 
 	filp->private_data = NULL;

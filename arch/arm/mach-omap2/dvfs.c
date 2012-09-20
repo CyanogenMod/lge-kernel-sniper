@@ -763,7 +763,16 @@ static int _dvfs_scale(struct device *req_dev, struct device *target_dev,
 	/* Disable smartreflex module across voltage and frequency scaling */
 	omap_sr_disable(voltdm);
 
-	if (curr_volt == new_volt) {
+/* S[, 2012.07.12, mannsik.chung@lge.com, 
+** Enable calibration even if one calibrated value is same as another nominal value. */
+#if 0
+	if (curr_volt == new_volt)
+#else
+	if (curr_volt == new_vdata->volt_calibrated)
+#endif
+/* E], 2012.07.12, mannsik.chung@lge.com, 
+** Enable calibration even if one calibrated value is same as another nominal value. */
+	{
 		volt_scale_dir = DVFS_VOLT_SCALE_NONE;
 	} else if (curr_volt < new_volt) {
 

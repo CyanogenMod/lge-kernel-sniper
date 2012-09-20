@@ -34,6 +34,7 @@
 #include <linux/io.h>
 #include <linux/slab.h>
 #include <linux/pm_runtime.h>
+#include <plat/omap-pm.h>
 
 #include <linux/spi/spi.h>
 
@@ -554,7 +555,11 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		sync_type = OMAP_DMA_SYNC_ELEMENT;
 		frame_count = 1;
 	}
-
+	
+	if ( spi->master->bus_num == 2 ) {
+		omap_pm_set_min_bus_tput(&spi->dev,OCP_INITIATOR_AGENT, 800000);  //20120912 jisil.park@lge.com
+	}
+	
 	if (tx != NULL) {
 
 		omap_set_dma_transfer_params(mcspi_dma->dma_tx_channel,
@@ -707,6 +712,11 @@ omap2_mcspi_txrx_dma(struct spi_device *spi, struct spi_transfer *xfer)
 		}
 		omap2_mcspi_set_enable(spi, 1);
 	}
+	
+	if ( spi->master->bus_num == 2 ) {
+		omap_pm_set_min_bus_tput(&spi->dev,OCP_INITIATOR_AGENT, -1);    //omap-pm.c
+    }
+	
 	return count;
 }
 

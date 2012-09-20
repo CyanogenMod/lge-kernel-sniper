@@ -55,3 +55,22 @@ obj-$(CONFIG_OMAP_DIE_TEMP_SENSOR)	+= omap_temp_sensor.o
 obj-$(CONFIG_OMAP4_DUTY_CYCLE)  += omap4_duty_cycle.o
 obj-$(CONFIG_TWL6040_VIB)	+= twl6040-vib.o
 obj-$(CONFIG_GC_CORE)		+= gc-core/
+# from GB
+# LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
+obj-$(CONFIG_GP2AP_PROXIMITY) += gp2ap_proximity.o
+# LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
+# from GB
+# LGE_CHANGE_S, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
+#Description: Enable modem watcher
+# LGE_CHANGE [jugwan.eom@lge.com] 2011-04-25, Modem Watcher
+obj-$(CONFIG_LGE_MODEM_WATCHER)	+= modem_watcher.o
+obj-$(CONFIG_MPU_SENSORS_MPU3050)   += mpu3050/
+# LGE_CHANGE_E, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
+# prime@sdcmicro.com Merge from 2.6.32 [START]
+obj-$(CONFIG_TSPDRV)		+= tspdrv/
+# prime@sdcmicro.com Merge from 2.6.32 [END]
+# Bluetooth chanha.park@lge.com
+obj-$(CONFIG_LBEE9QMB_RFKILL)	+= lbee9qmb-rfkill.o
+obj-$(CONFIG_BD_ADDRESS)        += bd_address.o
+# Black & Justin sensor drivers is added.
+obj-$(CONFIG_BJ_SENSORS)	+= bj_sensors/

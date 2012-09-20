@@ -128,4 +128,13 @@ obj-$(CONFIG_REMOTE_PROC)	+= remoteproc/
 
 obj-$(CONFIG_DMM_OMAP)		+= media/
 obj-$(CONFIG_TILER_OMAP)	+= media/
+# from GB
+obj-$(CONFIG_MACH_LGE_HUB)      += hub/
 obj-$(CONFIG_OMAP_HSI)		+= omap_hsi/
+
+# from P940 ICS
+obj-$(CONFIG_MUIC) += muic/
+
+# -- [[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.03.29] - TDMB
+obj-$(CONFIG_LGE_BROADCAST_TDMB)	+= broadcast/
+# -- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.03.29] - TDMB

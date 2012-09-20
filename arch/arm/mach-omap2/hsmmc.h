@@ -36,6 +36,13 @@ struct omap2_hsmmc_info {
 	void (*init_card)(struct mmc_card *card);
 };
 
+// from GB
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+int omap_wifi_status_register(void (*callback)(int card_present, void *dev_id), void *dev_id);
+int omap_wifi_status(struct device *dev, int slot);
+#endif
+// from GB
+
 #if defined(CONFIG_MMC_OMAP_HS) || defined(CONFIG_MMC_OMAP_HS_MODULE)
 
 void omap2_hsmmc_init(struct omap2_hsmmc_info *);

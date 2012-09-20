@@ -15,6 +15,26 @@
 
 /* Hynix H8MBX00U0MER-0EM */
 static struct omap_sdrc_params h8mbx00u0mer0em_sdrc_params[] = {
+// from GB
+#if 1
+	[0] = {
+		.rate        = 200000000,
+		.actim_ctrla = 0x92E1C4C6,
+		.actim_ctrlb = 0x0002121C,
+		.rfr_ctrl    = 0x0005E601,
+		.mr          = 0x00000032,
+	},
+	[1] = {
+		.rate        = 100000000,
+		.actim_ctrla = 0x4A15B485,
+		.actim_ctrlb = 0x0001120e,
+		.rfr_ctrl    = 0x0002da01,
+		.mr          = 0x00000032,
+	},
+	[2] = {
+		.rate        = 0
+	},
+#else
 	[0] = {
 		.rate        = 200000000,
 		.actim_ctrla = 0xa2e1b4c6,
@@ -46,6 +66,7 @@ static struct omap_sdrc_params h8mbx00u0mer0em_sdrc_params[] = {
 	[4] = {
 		.rate        = 0
 	},
+#endif
 };
 
 #endif

@@ -1,3 +1,15 @@
+# from GB
+# LGE_UPDATE_S
+config WAKE_IRQ_PRINT
+	bool "Print IRQ when resuming..."
+	depends on PM_DEBUG
+	depends on PM_SLEEP
+	depends on MACH_LGE_OMAP3
+	default y
+	---help---
+	This enables to print irqs when waking up from suspend..
+# LGE_UPDATE_E
+
 config SUSPEND
 	bool "Suspend to RAM and standby"
 	depends on ARCH_SUSPEND_POSSIBLE

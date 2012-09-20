@@ -88,6 +88,13 @@ unsigned int __atags_pointer __initdata;
 unsigned int system_rev;
 EXPORT_SYMBOL(system_rev);
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.07.30] - smpl_boot check.
+unsigned int is_smpl_boot;
+EXPORT_SYMBOL(is_smpl_boot);
+unsigned int muic_reg;
+EXPORT_SYMBOL(muic_reg);
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.07.30]- smpl_boot check.
+
 unsigned int system_serial_low;
 EXPORT_SYMBOL(system_serial_low);
 
@@ -660,6 +667,29 @@ static int __init parse_tag_revision(const struct tag *tag)
 
 __tagtable(ATAG_REVISION, parse_tag_revision);
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.07.31] - For smpl_boot string find
+static int findstr(const char *str, const char *what)
+{
+	int i, j, Ls=strlen(str), Lw=strlen(what);
+
+	for(i=0;i<=Ls-Lw;i++)
+	{
+		if(str[i] == what[0])
+		{
+			for(j=1;j<Lw;j++)
+			{
+				if(str[i+j] != what[j])
+					break;
+			}
+
+			if(j == Lw) return i;
+		}
+	}
+
+	return -1;
+}
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.07.31]- For smpl_boot string find
+
 static int __init parse_tag_cmdline(const struct tag *tag)
 {
 #if defined(CONFIG_CMDLINE_EXTEND)
@@ -672,6 +702,12 @@ static int __init parse_tag_cmdline(const struct tag *tag)
 	strlcpy(default_command_line, tag->u.cmdline.cmdline,
 		COMMAND_LINE_SIZE);
 #endif
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.07.31] - Setting is_smpl_boot.
+	is_smpl_boot = findstr(default_command_line, "smpl");
+//	printk("[SHYUN] [%s] is_smpl_boot = %d\n",__func__, is_smpl_boot);
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.07.31]- Setting is_smpl_boot.
+
 	return 0;
 }
 

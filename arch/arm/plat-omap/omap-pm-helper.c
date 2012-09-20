@@ -274,7 +274,12 @@ int omap_pm_set_min_bus_tput_helper(struct device *dev, u8 agent_id, long r)
 	if (r == -1)
 		target_level = remove_req_tput(dev);
 	else
+	{
+		if (cpu_is_omap34xx())
+			r *= 2;
+
 		target_level = add_req_tput(dev, r);
+	}
 
 	/* Convert the throughput(in KiB/s) into Hz. */
 	target_level = (target_level * 1000) / 4;

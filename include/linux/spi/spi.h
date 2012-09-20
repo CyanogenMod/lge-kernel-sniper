@@ -19,6 +19,11 @@
 #ifndef __LINUX_SPI_H
 #define __LINUX_SPI_H
 
+// from GB
+#ifndef  LGE_SLAVE_SPI
+#define  LGE_SLAVE_SPI
+#endif
+
 #include <linux/device.h>
 #include <linux/mod_devicetable.h>
 #include <linux/slab.h>
@@ -99,6 +104,11 @@ struct spi_device {
 	 *  - chipselect delays
 	 *  - ...
 	 */
+// from GB
+#ifdef  LGE_SLAVE_SPI     
+     void (* slave_ready)(struct spi_device *spi, int enable);/*This is callback function will 
+                                  called when spi is ready to transfer*/
+#endif     
 };
 
 static inline struct spi_device *to_spi_device(struct device *dev)
@@ -569,6 +579,7 @@ extern int spi_sync(struct spi_device *spi, struct spi_message *message);
 extern int spi_sync_locked(struct spi_device *spi, struct spi_message *message);
 extern int spi_bus_lock(struct spi_master *master);
 extern int spi_bus_unlock(struct spi_master *master);
+extern int spi_sync_killable(struct spi_device *spi, struct spi_message *message);
 
 /**
  * spi_write - SPI synchronous write

@@ -436,6 +436,9 @@ static int alarm_suspend(struct platform_device *pdev, pm_message_t state)
 			err = -EBUSY;
 			spin_unlock_irqrestore(&alarm_slock, flags);
 		}
+		else
+			printk(KERN_WARNING "rtc alarm set at %ld, now %ld,(+%ld sec)\n",
+					 rtc_alarm_time, rtc_current_time, (rtc_alarm_time - rtc_current_time));
 	}
 	return err;
 }

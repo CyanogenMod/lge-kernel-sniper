@@ -264,6 +264,69 @@ enum twl4030_codec_res {
 	TWL4030_CODEC_RES_APLL,
 	TWL4030_CODEC_RES_MAX,
 };
+// 20110106 prime@sdcmicro.com copy from sound/codecs/twl4030.h [START]
+#if defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)
+typedef enum {
+	TWL4030_AUDIO_MODE,
+	TWL4030_HEADSET_CALL_MODE,
+	TWL4030_SPEAKER_CALL_MODE,
+	TWL4030_RECEIVER_CALL_MODE,
+	TWL4030_HEADPHONE_CALL_MODE
+	,TWL4030_VT_BT_CALL_MODE
+	,TWL4030_VT_HEADSET_CALL_MODE
+	,TWL4030_VT_SPEAKER_CALL_MODE
+	,TWL4030_VT_RECEIVER_CALL_MODE
+	,TWL4030_VT_HEADPHONE_CALL_MODE
+	,TWL4030_VT_CALL_END_MODE
+	,TWL4030_VOIP_CALL_END_MODE
+}voice_mode_enum;
+
+
+typedef enum
+{
+    TWL4030_CMD,
+    TWL4030_DELAY,
+    TWL4030_END_SEQ
+} twl_reg_control_type;
+
+typedef struct
+{
+  twl_reg_control_type irc;
+  u8 address;
+  int data;
+} twl_reg_type;
+
+#if defined(CONFIG_PRODUCT_LGE_KU5900)
+void set_ext_amp_mode(int mode);
+int get_twl4030_headset_spk_codec_status(void);
+int get_twl4030_apll_state(void);
+#endif
+
+int voice_get_curmode(void);
+void voice_configure_path(voice_mode_enum mode);
+void twl4030_set_mic_switch(int mic); //jongik2.kim 20101220 add mic2 control
+// 20100426 junyeop.kim@lge.com Add the mic mute [START_LGE]
+typedef enum {
+	TWL4030_OFF_MIC_MODE,
+	TWL4030_RESTORE_MIC_MODE
+}mic_mode_enum;
+
+int mic_get_curmode(void);
+void mic_configure_path(voice_mode_enum mode);
+
+// 20100426 junyeop.kim@lge.com Add the mic mute [END_LGE]
+
+// 20100521 junyeop.kim@lge.com call recording path [START_LGE]
+typedef enum {
+	TWL4030_CALLREC_BUILTIN_MODE,
+	TWL4030_CALLREC_HEADSET_MODE,
+	TWL4030_CALLREC_OFF_MODE		
+}callrec_mode_enum;
+
+int callrec_get_curmode(void);
+void callrec_configure_path(callrec_mode_enum mode);
+// 20100521 junyeop.kim@lge.com call recording path [END_LGE]
+#endif	// defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)
 
 int twl4030_codec_disable_resource(enum twl4030_codec_res id);
 int twl4030_codec_enable_resource(enum twl4030_codec_res id);

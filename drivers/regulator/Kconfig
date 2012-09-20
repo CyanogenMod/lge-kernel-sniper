@@ -188,6 +188,15 @@ config REGULATOR_LP3972
 	 Say Y here to support the voltage regulators and convertors
 	 on National Semiconductors LP3972 PMIC
 
+# from GB
+config REGULATOR_LP8720
+	tristate "National Semiconductors LP8720 regulator driver"
+	depends on I2C
+	help
+	 Say Y here to support the One Step-Down DC/DC and
+	 Five Linear Regulator with I2C Compatible Interface
+	 on National Semiconductors LP8720 Chip.
+
 config REGULATOR_PCAP
 	tristate "PCAP2 regulator driver"
 	depends on EZX_PCAP

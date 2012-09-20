@@ -184,6 +184,9 @@ static irqreturn_t omap3_l3_app_irq(int irq, void *_l3)
 		 * of such errors and handle the others. timeout error
 		 * is severe and not expected to occur.
 		 */
+		if (status & L3_STATUS_0_TIMEOUT_MASK)
+			printk("\n L3_STATUS_0_TIMEOUT_MASK = 0x%llx \n",status);
+
 		BUG_ON(status & L3_STATUS_0_TIMEOUT_MASK);
 	} else {
 		status = omap3_l3_readll(l3->rt, L3_SI_FLAG_STATUS_1);
@@ -246,6 +249,20 @@ static int __init omap3_l3_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "couldn't request debug irq\n");
 		goto err1;
 	}
+
+// LGE_CHANGE_S kibum.lee@lge.com, TI CSR OMAPS00262192 WA code, omap3_l3_app_irq()'s BUG_ON macro defence
+	/* LOGAN_TEST : dss interconnect timeout error.
+	 * Disable the l3 timeout reporting feature for all modules.
+	 * Also reset the dss initiator agent with which the error is seen
+	 * to clear the interrupt. This is a temporary fix and should be
+	 * removed after root causing the issue.
+	 */
+
+	// after m4 release, comment
+	//omap3_l3_writell(l3->rt, L3_RT_NETWORK_CONTROL, 0x0);
+	//omap3_l3_writell(l3->rt + L3_DSS_IA_CONTROL, L3_AGENT_CONTROL, 0x1);
+	//omap3_l3_writell(l3->rt + L3_DSS_IA_CONTROL, L3_AGENT_CONTROL, 0x0);
+// LGE_CHANGE_E kibum.lee@lge.com, TI CSR OMAPS00262192 WA code, omap3_l3_app_irq()'s BUG_ON macro defence
 
 	l3->app_irq = platform_get_irq(pdev, 1);
 	ret = request_irq(l3->app_irq, omap3_l3_app_irq,

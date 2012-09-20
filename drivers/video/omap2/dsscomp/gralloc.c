@@ -10,7 +10,6 @@
 #ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
 #include "dsscomp_ispresizer.h"
 #endif
-
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
 #endif

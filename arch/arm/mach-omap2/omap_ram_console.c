@@ -20,6 +20,7 @@
 #include <plat/cpu.h>
 #include "resetreason.h"
 #include "omap_ram_console.h"
+#include "omap_ion.h"
 
 static struct resource ram_console_resources[] = {
 	{
@@ -81,23 +82,12 @@ device_initcall(omap_ram_console_register);
  * IMPORTANT: board files need to ensure that the DDR configurations
  * enable self refresh mode for this to function properly.
  */
-
-int __init omap_ram_console_init(phys_addr_t phy_addr, size_t size)
+/* LGE_CHANGE_E, [jinsu.park@lge.com], 2012-06-08, <add Setting enable ram console> */
+int __init omap_ram_console_init(void)
 {
 	int ret;
-
-	/* Remove the ram console region from kernel's map */
-	ret = memblock_remove(phy_addr, size);
-	if (ret) {
-		pr_err("%s: unable to remove memory for ram console:"
-			"start=0x%08x, size=0x%08x, ret=%d\n",
-			__func__, (u32)phy_addr, (u32)size, ret);
-		return ret;
-	}
-
-	/* Update reset reason for platforms that have support for it */
-	if (cpu_is_omap44xx())
-		ram_console_pdata.bootinfo = omap4_get_resetreason();
+	phys_addr_t phy_addr = OMAP_RAM_CONSOLE_START;
+	size_t size = OMAP_RAM_CONSOLE_SIZE;
 
 	ram_console_resources[0].start = phy_addr;
 	ram_console_resources[0].end = phy_addr + size - 1;
@@ -107,3 +97,5 @@ int __init omap_ram_console_init(phys_addr_t phy_addr, size_t size)
 
 	return ret;
 }
+early_initcall(omap_ram_console_init);
+

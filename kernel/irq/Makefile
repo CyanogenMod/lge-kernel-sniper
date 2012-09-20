@@ -5,3 +5,7 @@ obj-$(CONFIG_GENERIC_IRQ_PROBE) += autoprobe.o
 obj-$(CONFIG_PROC_FS) += proc.o
 obj-$(CONFIG_GENERIC_PENDING_IRQ) += migration.o
 obj-$(CONFIG_PM_SLEEP) += pm.o
+# from GB
+# LGE_UPDATE_S
+obj-$(CONFIG_WAKE_IRQ_PRINT) += wake_irq_print.o
+# LGE_UPDATE_E

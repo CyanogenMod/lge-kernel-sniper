@@ -126,6 +126,7 @@ static int dpi_set_mode(struct omap_dss_device *dssdev)
 	int lck_div = 0, pck_div = 0;
 	unsigned long fck = 0;
 	unsigned long pck;
+	// unsigned long cache_req_pck = 0; // 20120213 taeju.park@lge.com To delete compile warning, unused variable.
 	bool is_tft;
 	int r = 0;
 
@@ -181,13 +182,13 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 		DSSERR("failed to start device\n");
 		goto err_start_dev;
 	}
-
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (cpu_is_omap34xx()) {
 		r = regulator_enable(dpi.vdds_dsi_reg);
 		if (r)
 			goto err_reg_enable;
 	}
-
+#endif
 	r = dss_runtime_get();
 	if (r)
 		goto err_get_dss;
@@ -202,8 +203,11 @@ int omapdss_dpi_display_enable(struct omap_dss_device *dssdev)
 		r = dsi_runtime_get(dpi.dsidev);
 		if (r)
 			goto err_get_dsi;
-
+    #if 1    // wooho.jeong@lge.com // for TI patch
 		r = dsi_pll_init(dpi.dsidev, 0, 1);
+    #else
+		r = dsi_pll_init(dpi.dsidev, 1, 1);
+    #endif
 		if (r)
 			goto err_dsi_pll_init;
 	}
@@ -229,8 +233,10 @@ err_get_dsi:
 err_get_dispc:
 	dss_runtime_put();
 err_get_dss:
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (cpu_is_omap34xx())
 		regulator_disable(dpi.vdds_dsi_reg);
+#endif
 err_reg_enable:
 	omap_dss_stop_device(dssdev);
 err_start_dev:
@@ -250,10 +256,10 @@ void omapdss_dpi_display_disable(struct omap_dss_device *dssdev)
 
 	dispc_runtime_put();
 	dss_runtime_put();
-
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (cpu_is_omap34xx())
 		regulator_disable(dpi.vdds_dsi_reg);
-
+#endif
 	omap_dss_stop_device(dssdev);
 }
 EXPORT_SYMBOL(omapdss_dpi_display_disable);
@@ -338,7 +344,7 @@ EXPORT_SYMBOL(dpi_check_timings);
 int dpi_init_display(struct omap_dss_device *dssdev)
 {
 	DSSDBG("init_display\n");
-
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (cpu_is_omap34xx() && dpi.vdds_dsi_reg == NULL) {
 		struct regulator *vdds_dsi;
 
@@ -351,7 +357,7 @@ int dpi_init_display(struct omap_dss_device *dssdev)
 
 		dpi.vdds_dsi_reg = vdds_dsi;
 	}
-
+#endif
 	if (dpi_use_dsi_pll(dssdev)) {
 		enum omap_dss_clk_source dispc_fclk_src =
 			dssdev->clocks.dispc.dispc_fclk_src;

@@ -48,6 +48,10 @@
 #define DISPC_IRQ_FRAMEDONE2		(1 << 22)
 #define DISPC_IRQ_FRAMEDONETV		(1 << 24)
 
+#if defined(CONFIG_OMAP2_DSS_HDMI)
+#define HDMI_DSS_DBG 0  
+#endif
+
 struct omap_dss_device;
 struct omap_overlay_manager;
 
@@ -94,22 +98,6 @@ enum omap_color_mode {
 	OMAP_DSS_COLOR_RGBX16		= 1 << 16, /* RGBx16 - 4444 */
 	OMAP_DSS_COLOR_ARGB16_1555	= 1 << 17, /* ARGB16 - 1555 */
 	OMAP_DSS_COLOR_XRGB16_1555	= 1 << 18, /* xRGB16 - 1555 */
-};
-
-/* Writeback data structures */
-enum omap_writeback_source {
-	OMAP_WB_LCD1		= 0,
-	OMAP_WB_TV		= 1,
-	OMAP_WB_LCD2		= 2,
-	OMAP_WB_GFX		= 3,
-	OMAP_WB_VID1		= 4,
-	OMAP_WB_VID2		= 5,
-	OMAP_WB_VID3		= 6
-};
-
-enum omap_writeback_mode {
-	OMAP_WB_CAPTURE_MODE	= 0x0,
-	OMAP_WB_MEM2MEM_MODE	= 0x1,
 };
 
 enum omap_lcd_display_type {
@@ -438,6 +426,20 @@ struct omap_overlay {
 	int (*wait_for_go)(struct omap_overlay *ovl);
 };
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB
+/* YUV2RGB CCS Coefficient tuning from mbp_display_platform.h */
+#define FB_CCS_SIZE 9
+#define FB_DV_SIZE  3
+
+struct omap_dss_dmb_coefs {
+	s32 direction;
+	s16 ccs[FB_CCS_SIZE];
+	s16 bv[FB_DV_SIZE];
+};
+#endif /* CONFIG_LGE_BROADCAST */
+//--]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
+
 struct omap_overlay_manager_info {
 	u32 default_color;
 
@@ -451,6 +453,11 @@ struct omap_overlay_manager_info {
 
 	bool cpr_enable;
 	struct omap_dss_cpr_coefs cpr_coefs;
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB
+	struct omap_dss_dmb_coefs dmb_coefs;
+#endif /* CONFIG_LGE_BROADCAST */
+//--]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
 };
 
 struct omap_overlay_manager {
@@ -616,16 +623,14 @@ struct omap_dss_device {
 
 	struct blocking_notifier_head state_notifiers;
 
-	/* HDMI specific */
-	void (*enable_device_detect)(struct omap_dss_device *dssdev, u8 enable);
-	bool (*get_device_detect)(struct omap_dss_device *dssdev);
-	int (*get_device_connected)(struct omap_dss_device *dssdev);
-
 	/* platform specific  */
 	int (*platform_enable)(struct omap_dss_device *dssdev);
 	void (*platform_disable)(struct omap_dss_device *dssdev);
 	int (*set_backlight)(struct omap_dss_device *dssdev, int level);
 	int (*get_backlight)(struct omap_dss_device *dssdev);
+#if defined(CONFIG_OMAP2_DSS_HDMI)  
+	bool (*get_device_detect)(struct omap_dss_device *dssdev);
+#endif	
 };
 
 struct omap_dss_driver {
@@ -680,12 +685,6 @@ struct omap_dss_driver {
 	int (*get_modedb)(struct omap_dss_device *dssdev,
 			  struct fb_videomode *modedb,
 			  int modedb_len);
-
-	void (*enable_device_detect)(struct omap_dss_device *dssdev, u8 enable);
-	bool (*get_device_detect)(struct omap_dss_device *dssdev);
-	int (*get_device_connected)(struct omap_dss_device *dssdev);
-
-
 	int (*set_mode)(struct omap_dss_device *dssdev,
 			struct fb_videomode *mode);
 

@@ -18,6 +18,11 @@
 #include <asm/mach/mmc.h>
 #include <plat/board.h>
 
+// from GB
+#ifdef CONFIG_MMC_EMBEDDED_SDIO
+#include <linux/mmc/card.h>
+#endif
+
 #define OMAP15XX_NR_MMC		1
 #define OMAP16XX_NR_MMC		2
 #define OMAP1_MMC_SIZE		0x080

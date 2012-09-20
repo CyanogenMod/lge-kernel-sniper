@@ -451,13 +451,15 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
 
 #ifdef	CONFIG_PM
 
+//kibum.lee@lge.com M4 supplemental patch, Fix for usb runtime suspend/resume
 #ifdef CONFIG_USB_SUSPEND
 	/* enabling auto suspend does not disabling
-	 * the clocks properly during suspend
-	 */
+	* the clocks properly during suspend
+	*/
 	if (cpu_is_omap34xx())
 		usb_autosuspend_delay = 0;
 #endif
+//kibum.lee@lge.com M4 supplemental patch, Fix for usb runtime suspend/resume
 
 	pm_runtime_set_autosuspend_delay(&dev->dev,
 			usb_autosuspend_delay * 1000);

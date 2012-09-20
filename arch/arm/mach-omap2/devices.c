@@ -574,13 +574,70 @@ static int omap_mcspi_init(struct omap_hwmod *oh, void *unused)
 			return -EINVAL;
 	}
 
-	spi_num++;
-	od = omap_device_build(name, spi_num, oh, pdata,
+	switch (spi_num) {
+	case 0:
+#if defined(CONFIG_PRODUCT_LGE_HUB) || defined(CONFIG_PRODUCT_LGE_LU6800)
+		pdata->num_cs = 4;
+		pdata->mode = OMAP2_MCSPI_SLAVE;
+		pdata->dma_mode = 1;
+		pdata->force_cs_mode = 0;
+		pdata->fifo_depth = 0;
+		
+#endif		
+        break;
+	case 1:
+#if defined(CONFIG_PRODUCT_LGE_HUB) || defined(CONFIG_PRODUCT_LGE_LU6800)
+
+		pdata->num_cs = 2;
+		pdata->mode = OMAP2_MCSPI_SLAVE;
+		pdata->dma_mode = 1;
+		pdata->force_cs_mode = 0;
+		pdata->fifo_depth = 16;
+#endif		
+
+		break;
+	case 2:
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.03.29] - TDMB
+#ifdef CONFIG_PRODUCT_LGE_KU5900
+		pdata->num_cs = 2;
+		pdata->mode = OMAP2_MCSPI_MASTER;
+		pdata->dma_mode = 0;
+		pdata->force_cs_mode = 1;
+		pdata->fifo_depth = 0;
+		pdata->dmb_mode = 1;
+#else
+		pdata->num_cs = 2;
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.03.29] - TDMB
+		break;
+	case 3:
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.03.29] - TDMB
+#ifdef CONFIG_PRODUCT_LGE_LU6800
+		pdata->num_cs = 1;
+		pdata->mode = OMAP2_MCSPI_MASTER;
+		pdata->dma_mode = 0;
+		pdata->force_cs_mode = 1;
+		pdata->fifo_depth = 0;
+		pdata->dmb_mode = 1;
+#else
+		pdata->num_cs = 1;
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.03.29] - TDMB
+		break;
+	}
+
+	if (cpu_is_omap44xx())
+		pdata->regs_data = (u16 *)omap4_reg_map;
+	else
+		pdata->regs_data = (u16 *)omap2_reg_map;
+
+	od = omap_device_build(name, spi_num + 1, oh, pdata,
 				sizeof(*pdata),	omap_mcspi_latency,
 				ARRAY_SIZE(omap_mcspi_latency), 0);
-	WARN(IS_ERR(od), "Can't build omap_device for %s:%s\n",
+	WARN(IS_ERR(od), "\nCant build omap_device for %s:%s\n",
 				name, oh->name);
-	kfree(pdata);
+	spi_num++;
+//	kfree(pdata);
 	return 0;
 }
 

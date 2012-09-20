@@ -633,10 +633,12 @@ static struct omap_hwmod_class omap3xxx_timer_hwmod_class = {
 	.rev =  OMAP_TIMER_IP_VERSION_1,
 };
 
+//kibum.lee@lge.com M4 supplemental patch, Added timer12 device attributes as a secure timer.
 /* secure timer can assign this to .dev_attr field */
 static struct omap_secure_timer_dev_attr secure_timer_dev_attr = {
 	.is_secure_timer	= true,
 };
+//kibum.lee@lge.com M4 supplemental patch, Added timer12 device attributes as a secure timer.
 
 /* timer1 */
 static struct omap_hwmod omap3xxx_timer1_hwmod;
@@ -1235,7 +1237,7 @@ static struct omap_hwmod omap3xxx_timer12_hwmod = {
 	.slaves		= omap3xxx_timer12_slaves,
 	.slaves_cnt	= ARRAY_SIZE(omap3xxx_timer12_slaves),
 	.class		= &omap3xxx_timer_hwmod_class,
-	.dev_attr       = &secure_timer_dev_attr,
+	.dev_attr       = &secure_timer_dev_attr,			/* kibum.lee@lge.com M4 supplemental patch, Added timer12 device attributes as a secure timer. */
 	.omap_chip	= OMAP_CHIP_INIT(CHIP_IS_OMAP3430)
 };
 
@@ -1744,6 +1746,7 @@ static struct omap_hwmod omap3430es1_dss_core_hwmod = {
 
 static struct omap_hwmod omap3xxx_dss_core_hwmod = {
 	.name		= "dss_core",
+	.flags		= HWMOD_INIT_NO_RESET,  // 20120726 sangki.hyun@lge.com
 	.class		= &omap3xxx_dss_hwmod_class,
 	.main_clk	= "dss1_alwon_fck", /* instead of dss_fck */
 	.sdma_reqs	= omap3xxx_dss_sdma_chs,
@@ -2340,7 +2343,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio1_slaves[] = {
 
 static struct omap_hwmod omap3xxx_gpio1_hwmod = {
 	.name		= "gpio1",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_INIT_NO_RESET,//~DEJA HWMOD_CONTROL_OPT_CLKS_IN_RESET, for save GPIO configuration 
 	.mpu_irqs	= omap3xxx_gpio1_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio1_irqs),
 	.main_clk	= "gpio1_ick",
@@ -2377,7 +2380,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio2_slaves[] = {
 
 static struct omap_hwmod omap3xxx_gpio2_hwmod = {
 	.name		= "gpio2",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_INIT_NO_RESET,//~DEJA HWMOD_CONTROL_OPT_CLKS_IN_RESET, for save GPIO configuration 
 	.mpu_irqs	= omap3xxx_gpio2_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio2_irqs),
 	.main_clk	= "gpio2_ick",
@@ -2414,7 +2417,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio3_slaves[] = {
 
 static struct omap_hwmod omap3xxx_gpio3_hwmod = {
 	.name		= "gpio3",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_INIT_NO_RESET,//~DEJA HWMOD_CONTROL_OPT_CLKS_IN_RESET, for save GPIO configuration
 	.mpu_irqs	= omap3xxx_gpio3_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio3_irqs),
 	.main_clk	= "gpio3_ick",
@@ -2488,7 +2491,7 @@ static struct omap_hwmod_ocp_if *omap3xxx_gpio5_slaves[] = {
 
 static struct omap_hwmod omap3xxx_gpio5_hwmod = {
 	.name		= "gpio5",
-	.flags		= HWMOD_CONTROL_OPT_CLKS_IN_RESET,
+	.flags		= HWMOD_INIT_NO_RESET,  // sangki.hyun@lge.com HWMOD_CONTROL_OPT_CLKS_IN_RESET,  for save GPIO configuration
 	.mpu_irqs	= omap3xxx_gpio5_irqs,
 	.mpu_irqs_cnt	= ARRAY_SIZE(omap3xxx_gpio5_irqs),
 	.main_clk	= "gpio5_ick",
@@ -3400,7 +3403,7 @@ static struct omap_hwmod_ocp_if *omap34xx_mcspi1_slaves[] = {
 };
 
 static struct omap2_mcspi_dev_attr omap_mcspi1_dev_attr = {
-	.num_chipselect	= 4,
+	.num_chipselect = 4,
 	.force_cs_mode	= 1,
 	.mode		= OMAP2_MCSPI_MASTER,
 	.fifo_depth	= 0,

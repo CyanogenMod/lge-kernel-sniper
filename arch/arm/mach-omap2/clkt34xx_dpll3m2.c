@@ -60,24 +60,41 @@ int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	int ret;
 
 	if (!clk || !rate)
+	{
+		//printk("clk # rate compare fail\n");/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 		return -EINVAL;
+	}
 
 	validrate = omap2_clksel_round_rate_div(clk, rate, &new_div);
 	if (validrate != rate)
+	{
+		//printk("validrate & rate comapare fail\n");/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 		return -EINVAL;
+	}
 
 	sdrcrate = sdrc_ick_p->rate;
+	//printk("sdrcrate 0x%x\n",sdrcrate);/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 	if (rate > clk->rate)
+	{
 		sdrcrate <<= ((rate / clk->rate) >> 1);
+		//printk(" not small:: change sdrcrate 0x%x\n",sdrcrate);/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
+	}
 	else
+	{
 		sdrcrate >>= ((clk->rate / rate) >> 1);
+		//printk("small:: change sdrcrate 0x%x\n",sdrcrate);/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
+	}
 
 	ret = omap2_sdrc_get_params(sdrcrate, &sdrc_cs0, &sdrc_cs1);
 	if (ret)
+	{
+		//printk("omap2_sdrc_get_params fail\n");/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 		return -EINVAL;
+	}
 
-	if (sdrcrate < MIN_SDRC_DLL_LOCK_FREQ) {
-		pr_debug("clock: will unlock SDRC DLL\n");
+	if (sdrcrate < MIN_SDRC_DLL_LOCK_FREQ) 
+	{
+		//printk("clock: will unlock SDRC DLL\n");/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 		unlock_dll = 1;
 	}
 
@@ -91,18 +108,17 @@ int omap3_core_dpll_m2_set_rate(struct clk *clk, unsigned long rate)
 	c >>= SDRC_MPURATE_SCALE;
 	if (c == 0)
 		c = 1;
-
-	pr_debug("clock: changing CORE DPLL rate from %lu to %lu\n", clk->rate,
-		 validrate);
+	
+	pr_debug("clock: changing CORE DPLL rate from %lu to %lu\n", clk->rate,validrate);/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 	pr_debug("clock: SDRC CS0 timing params used:"
 		 " RFR %08x CTRLA %08x CTRLB %08x MR %08x\n",
 		 sdrc_cs0->rfr_ctrl, sdrc_cs0->actim_ctrla,
-		 sdrc_cs0->actim_ctrlb, sdrc_cs0->mr);
+		 sdrc_cs0->actim_ctrlb, sdrc_cs0->mr);/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 	if (sdrc_cs1)
 		pr_debug("clock: SDRC CS1 timing params used: "
 		 " RFR %08x CTRLA %08x CTRLB %08x MR %08x\n",
 		 sdrc_cs1->rfr_ctrl, sdrc_cs1->actim_ctrla,
-		 sdrc_cs1->actim_ctrlb, sdrc_cs1->mr);
+		 sdrc_cs1->actim_ctrlb, sdrc_cs1->mr);/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  timming setting*/
 
 	if (sdrc_cs1)
 		omap3_configure_core_dpll(

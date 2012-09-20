@@ -1203,7 +1203,11 @@ FreeIONLinuxMemArea(LinuxMemArea *psLinuxMemArea)
 #if defined(DEBUG_LINUX_MEM_AREAS)
     DebugLinuxMemAreaRecordRemove(psLinuxMemArea);
 #endif
-
+	/* OMAP3 hack: In ICS currently there isn't a way to know when video
+	playback is completed at kernel level, at which time VRFB contexts
+	have to be released. ION memory is use only for MM scenarios, so
+	freeing here.
+	*/
 	if (cpu_is_omap3630()) {
 #ifdef CONFIG_OMAP2_VRFB
 		/* OMAP3 hack: In ICS currently there isn't a way to know when
@@ -1225,7 +1229,7 @@ FreeIONLinuxMemArea(LinuxMemArea *psLinuxMemArea)
 #endif
 
 #ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
-	isp_reset = 1;
+    isp_reset = 1;
 #endif
     
     psLinuxMemArea->uData.sIONTilerAlloc.pCPUPhysAddrs = IMG_NULL;

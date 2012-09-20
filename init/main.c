@@ -344,6 +344,9 @@ static void __init setup_command_line(char *command_line)
 
 static __initdata DECLARE_COMPLETION(kthreadd_done);
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.07.30] - smpl_count prototype
+static void smpl_count(void);
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.07.30]- smpl_count prototype
 static noinline void __init_refok rest_init(void)
 {
 	int pid;
@@ -369,6 +372,10 @@ static noinline void __init_refok rest_init(void)
 	init_idle_bootup_task(current);
 	preempt_enable_no_resched();
 	schedule();
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.07.30] - Use the smpl_count API.
+	printk("[SHYUN] smpl applied version\n");
+	smpl_count();
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.07.30]- Use the smpl_count API.
 	preempt_disable();
 
 	/* Call into cpu_idle with preempt disabled */
@@ -452,6 +459,98 @@ static void __init mm_init(void)
 	pgtable_cache_init();
 	vmalloc_init();
 }
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.07.30] - SMPL boot porting
+extern struct file *fget(unsigned int fd);
+extern void fput(struct file *);
+extern unsigned int is_smpl_boot;
+
+static int my_atoi(const char *name)
+{
+	int val = 0;
+
+	for (;; name++) {
+		switch (*name) {
+		case '0' ... '9':
+			val = 10*val+(*name-'0');
+			break;
+		default:
+			return val;
+		}
+	}
+}
+
+static int read_file(char* filename)
+{
+	int fd = -1;
+	int val = 0;
+	char buf[2];
+	loff_t pos = 0;
+	struct file *file;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(KERNEL_DS);
+	fd = sys_open((const char __user *)filename, O_RDONLY, 0);
+	//printk("[SMPL_CNT] ===> read() : fd is %d\n", fd);
+	if (fd < 0) {
+		printk("[SMPL_CNT] === > sys_open error!!!!\n");
+		return -1;
+	}
+	else
+	{
+		file = fget(fd);
+
+		if(file)
+		{
+			vfs_read(file, buf, sizeof(buf),&pos);
+			val = my_atoi(buf);
+			printk("[SMPL_CNT] ===> buf is %s\n", buf);
+		}
+		sys_close(fd);
+	}
+	set_fs(old_fs);
+	return val;
+}
+
+static void write_file(char *filename, char* data)
+{
+	int fd = -1;
+	loff_t pos = 0;
+	struct file* file;
+	mm_segment_t old_fs = get_fs();
+	set_fs(KERNEL_DS);
+
+	fd = sys_open((const char __user *)filename, O_WRONLY | O_CREAT, 0644);
+	//printk("[SMPL_CNT] ===> write() : fd is %d\n", fd);
+	if(fd >= 0)
+	{
+		file = fget(fd);
+		if(file)
+		{
+			vfs_write(file, data, strlen(data), &pos);
+			fput(file);
+		}
+
+		sys_close(fd);
+	}
+	else
+		printk("[SMPL_CNT] === > write : sys_open error!!!!\n");
+
+	set_fs(old_fs);
+}
+
+static void smpl_count(void)
+{
+	char* file_name = "/smpl_boot";
+
+	printk("[SHYUN] ===> is_smpl_boot = %d\n", is_smpl_boot);
+	if(is_smpl_boot == -1)
+		write_file(file_name, "0");
+	else
+		write_file(file_name, "1");
+}
+
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.07.30]- SMPL boot porting
 
 asmlinkage void __init start_kernel(void)
 {

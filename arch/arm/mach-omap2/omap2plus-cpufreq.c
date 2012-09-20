@@ -27,6 +27,7 @@
 #include <linux/io.h>
 #include <linux/opp.h>
 #include <linux/cpu.h>
+#include <linux/earlysuspend.h>
 #include <linux/thermal_framework.h>
 #include <linux/platform_device.h>
 
@@ -66,6 +67,15 @@ static unsigned int current_cooling_level;
 static bool omap_cpufreq_ready;
 static bool omap_cpufreq_suspended;
 
+#ifdef CONFIG_LGE_IDLE_MAX_FREQ
+static unsigned int max_capped;
+static unsigned int screen_off_max_freq;
+#endif
+
+/* 2012.06.19, mannsik.chung@lge.com, Minimize power consumption at LCD OFF state */
+/* 2012.06.19, mannsik.chung@lge.com, Disabled currently, but, monitoring. */
+#define PM_LCDOFF_MIN_POWER 0
+
 static unsigned int omap_getspeed(unsigned int cpu)
 {
 	unsigned long rate;
@@ -79,7 +89,7 @@ static unsigned int omap_getspeed(unsigned int cpu)
 
 static int omap_cpufreq_scale(unsigned int target_freq, unsigned int cur_freq)
 {
-	unsigned int i;
+	// unsigned int i; 20120213 
 	int ret;
 	struct cpufreq_freqs freqs;
 
@@ -92,7 +102,10 @@ static int omap_cpufreq_scale(unsigned int target_freq, unsigned int cur_freq)
 	 */
 	if (freqs.new > max_thermal)
 		freqs.new = max_thermal;
-
+#ifdef CONFIG_LGE_IDLE_MAX_FREQ
+	if (max_capped && freqs.new > max_capped)
+		freqs.new = max_capped;
+#endif
 	if ((freqs.old == freqs.new) && (cur_freq = freqs.new))
 		return 0;
 
@@ -258,6 +271,113 @@ static int omap_target(struct cpufreq_policy *policy,
 	return ret;
 }
 
+#if PM_LCDOFF_MIN_POWER
+extern void				set_hispeed_freq(u64 value);
+extern u64				get_hispeed_freq();
+extern void				set_go_hispeed_load(unsigned long value);
+extern unsigned long	get_go_hispeed_load();
+extern void				set_min_sample_time(unsigned long value);
+extern unsigned long	get_min_sample_time();
+extern void				set_timer_rate(unsigned long value);
+extern unsigned long 	get_timer_rate();
+
+static u64 				stored_hispeed_freq;
+static unsigned long	stored_go_hispeed_load;
+static unsigned long	stored_min_sample_time;
+static unsigned long	stored_timer_rate;
+
+static int isInteractiveMode = 0;
+
+static void omap_cpu_early_suspend(struct early_suspend *h)
+{
+	struct cpufreq_policy *policy = cpufreq_cpu_get(0);
+
+	printk("[debug mschung] %s\n", policy->governor->name);
+
+	if (!strncmp(policy->governor->name, "interactive", 11))
+	{
+		isInteractiveMode = 1 ;
+	}
+
+	// TODO : make this work only in interactive mode.
+	if(isInteractiveMode)
+	{
+		stored_hispeed_freq		= get_hispeed_freq();
+		stored_go_hispeed_load	= get_go_hispeed_load();
+		stored_min_sample_time	= get_min_sample_time();
+		stored_timer_rate		= get_timer_rate();
+
+		// TODO : find best for each model(H/W).
+		// Parameters for interactive scaling governor at LCD OFF state.
+		// These values are only for LU6800.
+		set_go_hispeed_load(100); // 0~100
+		set_hispeed_freq(300000); // 300-, 600-, 800-, 1000-
+		set_min_sample_time(500);
+		set_timer_rate(650000);
+	}
+}
+
+static void omap_cpu_late_resume(struct early_suspend *h)
+{
+	if(isInteractiveMode)
+	{
+		// TODO : make this work only in interactive mode.
+		set_hispeed_freq	(stored_hispeed_freq);
+		set_go_hispeed_load	(stored_go_hispeed_load);
+		set_min_sample_time	(stored_min_sample_time);
+		set_timer_rate		(stored_timer_rate);
+	}
+}
+
+static struct early_suspend omap_cpu_early_suspend_handler = {
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+	.suspend = omap_cpu_early_suspend,
+	.resume = omap_cpu_late_resume,
+};
+#endif
+
+#ifdef CONFIG_LGE_IDLE_MAX_FREQ
+static void omap_cpu_early_suspend(struct early_suspend *h)
+{
+	unsigned int cur;
+
+	mutex_lock(&omap_cpufreq_lock);
+
+	if (screen_off_max_freq) {
+		max_capped = screen_off_max_freq;
+
+		cur = omap_getspeed(0);
+		if (cur > max_capped)
+			omap_cpufreq_scale(max_capped, cur);
+	}
+
+	mutex_unlock(&omap_cpufreq_lock);
+}
+
+static void omap_cpu_late_resume(struct early_suspend *h)
+{
+	unsigned int cur;
+
+	mutex_lock(&omap_cpufreq_lock);
+
+	if (max_capped) {
+		max_capped = 0;
+
+		cur = omap_getspeed(0);
+		if (cur != current_target_freq)
+			omap_cpufreq_scale(current_target_freq, cur);
+	}
+
+	mutex_unlock(&omap_cpufreq_lock);
+}
+
+static struct early_suspend omap_cpu_early_suspend_handler = {
+	.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN,
+	.suspend = omap_cpu_early_suspend,
+	.resume = omap_cpu_late_resume,
+};
+#endif
+
 static inline void freq_table_free(void)
 {
 	if (atomic_dec_and_test(&freq_table_users))
@@ -421,7 +541,13 @@ static int __cpuinit omap_cpu_init(struct cpufreq_policy *policy)
 
 	omap_cpufreq_cooling_init();
 	/* FIXME: what's the actual transition time? */
+/* LGE_CHANGE_S <sunggyun.yu@lge.com> 2010-12-01 For fast ondemand freq. change */
+#if 01
+	policy->cpuinfo.transition_latency = 15 * 1000;
+#else
 	policy->cpuinfo.transition_latency = 300 * 1000;
+#endif
+/* LGE_CHANGE_E <sunggyun.yu@lge.com> 2010-12-01 For fast ondemand freq. change */
 
 	return 0;
 
@@ -439,8 +565,56 @@ static int omap_cpu_exit(struct cpufreq_policy *policy)
 	return 0;
 }
 
+#ifdef CONFIG_LGE_IDLE_MAX_FREQ
+static ssize_t show_screen_off_freq(struct cpufreq_policy *policy, char *buf)
+{
+	return sprintf(buf, "%u\n", screen_off_max_freq);
+}
+
+static ssize_t store_screen_off_freq(struct cpufreq_policy *policy,
+	const char *buf, size_t count)
+{
+	unsigned int freq = 0;
+	int ret;
+	int index;
+
+	if (!freq_table)
+		return -EINVAL;
+
+	ret = sscanf(buf, "%u", &freq);
+	if (ret != 1)
+		return -EINVAL;
+
+	mutex_lock(&omap_cpufreq_lock);
+
+	ret = cpufreq_frequency_table_target(policy, freq_table, freq,
+		CPUFREQ_RELATION_H, &index);
+	if (ret)
+		goto out;
+
+	screen_off_max_freq = freq_table[index].frequency;
+
+	ret = count;
+
+out:
+	mutex_unlock(&omap_cpufreq_lock);
+	return ret;
+}
+
+struct freq_attr omap_cpufreq_attr_screen_off_freq = {
+	.attr = { .name = "screen_off_max_freq",
+		  .mode = 0644,
+		},
+	.show = show_screen_off_freq,
+	.store = store_screen_off_freq,
+};
+#endif
+
 static struct freq_attr *omap_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
+#ifdef CONFIG_LGE_IDLE_MAX_FREQ
+	&omap_cpufreq_attr_screen_off_freq,
+#endif
 	NULL,
 };
 
@@ -513,6 +687,13 @@ static int __init omap_cpufreq_init(void)
 		pr_warning("%s: unable to get the mpu device\n", __func__);
 		return -EINVAL;
 	}
+#ifdef CONFIG_LGE_IDLE_MAX_FREQ
+	register_early_suspend(&omap_cpu_early_suspend_handler);
+#endif
+
+#if PM_LCDOFF_MIN_POWER
+	register_early_suspend(&omap_cpu_early_suspend_handler);
+#endif
 
 	ret = cpufreq_register_driver(&omap_driver);
 	omap_cpufreq_ready = !ret;
@@ -537,6 +718,14 @@ static void __exit omap_cpufreq_exit(void)
 {
 	omap_cpufreq_cooling_exit();
 	cpufreq_unregister_driver(&omap_driver);
+#ifdef CONFIG_LGE_IDLE_MAX_FREQ
+	unregister_early_suspend(&omap_cpu_early_suspend_handler);
+#endif
+
+#if PM_LCDOFF_MIN_POWER
+	unregister_early_suspend(&omap_cpu_early_suspend_handler);
+#endif
+
 	platform_driver_unregister(&omap_cpufreq_platform_driver);
 	platform_device_unregister(&omap_cpufreq_device);
 }

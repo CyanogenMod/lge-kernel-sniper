@@ -61,22 +61,68 @@ static struct mutex set_speed_lock;
 
 /* Hi speed to bump to from lo speed when load burst (default max) */
 static u64 hispeed_freq;
+void set_hispeed_freq(u64 value)
+{
+	hispeed_freq = value;
+}
+EXPORT_SYMBOL(set_hispeed_freq);
+
+u64 get_hispeed_freq()
+{
+	return hispeed_freq;
+}
+EXPORT_SYMBOL(get_hispeed_freq);
+
 
 /* Go to hi speed when CPU load at or above this value. */
 #define DEFAULT_GO_HISPEED_LOAD 95
 static unsigned long go_hispeed_load;
+void set_go_hispeed_load(unsigned long value)
+{
+	go_hispeed_load = value;
+}
+EXPORT_SYMBOL(set_go_hispeed_load);
+
+unsigned long get_go_hispeed_load()
+{
+	return go_hispeed_load;
+}
+EXPORT_SYMBOL(get_go_hispeed_load);
 
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
 #define DEFAULT_MIN_SAMPLE_TIME 20 * USEC_PER_MSEC
 static unsigned long min_sample_time;
+void set_min_sample_time(unsigned long value)
+{
+	min_sample_time = value;
+}
+EXPORT_SYMBOL(set_min_sample_time);
+
+unsigned long get_min_sample_time()
+{
+	return min_sample_time;
+}
+EXPORT_SYMBOL(get_min_sample_time);
+
 
 /*
  * The sample rate of the timer used to increase frequency
  */
 #define DEFAULT_TIMER_RATE 20 * USEC_PER_MSEC
 static unsigned long timer_rate;
+void set_timer_rate(unsigned long value)
+{
+	timer_rate = value;
+}
+EXPORT_SYMBOL(set_timer_rate);
+
+unsigned long get_timer_rate()
+{
+	return timer_rate;
+}
+EXPORT_SYMBOL(get_timer_rate);
 
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event);

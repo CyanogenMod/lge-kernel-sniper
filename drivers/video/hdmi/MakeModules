@@ -1,0 +1,58 @@
+PACKAGE_NAME:=hdmi
+
+RULES:=compile
+
+ARCH:=arm
+CROSS_COMPILE:=arm-none-linux-gnueabi-
+VARS:= ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE)
+# VARS:= V=1 ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE)
+
+# module to be put in driver/video/hdmi
+
+LINUX_DIR=../../..
+LINUXKERNEL_SRC=$(LINUX_DIR)
+
+all: $(RULES)
+
+compile:
+	@echo "\t-----> $(PACKAGE_NAME):$@"
+	@rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+# 	@mv tda998x_version.h temp && cat temp | awk '$$2~"PATCHLEVEL" {$$3=$$3+1};{print};' >tda998x_version.h && rm temp
+	$(MAKE) -C $(LINUXKERNEL_SRC) M=`pwd` $(VARS) modules
+#	@touch $@
+
+uptx:
+	adb shell rm hdmitx.ko
+	adb shell rmmod hdmitx
+	adb push hdmitx.ko hdmitx.ko
+	adb shell insmod hdmitx.ko verbose=1
+#	adb shell insmod hdmitx.ko
+
+upcec:
+	adb shell rm hdmicec.ko
+	adb shell rmmod hdmicec
+	adb push hdmicec.ko hdmicec.ko
+	adb shell insmod hdmicec.ko verbose=1 device=4
+
+strip:
+	strip -g -I elf32-little hdmitx.ko -o hdmitx_striped.ko
+	strip -g -I elf32-little hdmicec.ko -o hdmicec_striped.ko
+
+clean:
+	@echo "\t-----> $(PACKAGE_NAME):$@"
+	@rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.* *.symvers *.order
+	@cd comps/tmdlHdmiTx/src && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmdlHdmiTx/cfg/TDA9989 && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmdlHdmiCEC/src && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmdlHdmiCEC/cfg && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmdlTDA9983/src && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmdlTDA9983/cfg && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmbslTDA9989NoHdcp/src/TDA9989n2 && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmbslTDA9984NoHdcp/src && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+	@cd comps/tmbslTDA9983/src && rm -rf *.o *.ko *.mod.c .*.cmd .tmp_versions *.c.* *.h.*
+
+	@if [ -e .compiled ]; then rm .compiled; fi
+
+# install: .install
+# .install:
+# 	cp ....

@@ -1,0 +1,47 @@
+# drivers/bj_sensors
+menu "LGE Justin/Black Sensor Drivers"
+
+comment "Sensors"
+
+config BJ_SENSORS
+	bool "Black & Justin Sensors"
+	default y
+	help
+	  Support for LGE Optimus Black & Justin Sensors
+	
+config BJ_PROXI_SENSOR 
+	bool "LGE Black & Justin Proximity Sensor Driver"
+	depends on BJ_SENSORS
+	default y
+	help
+	  Support for Proxi-sensor
+	  
+config BJ_KXTF9_SENSOR
+	bool "LGE Black & Justin Accelerometer Sensor Driver"
+	depends on BJ_SENSORS
+	default y
+	help
+	  Support for Accelerometer Sensor
+
+config BJ_COMPASS_SENSOR
+        bool "LGE Black & Justin Compass Sensor Driver"
+        depends on BJ_SENSORS
+        default y
+        help
+          This enables the Compass Sensor akm8973 Driver for the HUB.
+
+config BJ_MPU3050_SENSOR
+        bool "LGE Black & Justin Gyro Sensor Driver"
+        depends on BJ_SENSORS
+        default y
+        help
+          This enables the Gyro Sensor mpu3050 Driver for the HUB.
+
+config BJ_MOTION_SENSOR
+	bool "LGE Black & Justin Motion Sensor Driver"
+        depends on BJ_SENSORS
+        default y        
+        help
+	  Support for Motion Sensor
+		
+endmenu

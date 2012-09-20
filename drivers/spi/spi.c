@@ -942,7 +942,22 @@ static int __spi_sync(struct spi_device *spi, struct spi_message *message,
  */
 int spi_sync(struct spi_device *spi, struct spi_message *message)
 {
+#ifdef CONFIG_LGE_SPI_SLAVE
+	DECLARE_COMPLETION_ONSTACK(done);
+	int status;
+
+	message->complete = spi_complete;
+	message->context = &done;
+	status = spi_async(spi, message);
+	if (status == 0) {
+		wait_for_completion(&done);
+		status = message->status;
+	}
+	message->context = NULL;
+	return status;
+#else
 	return __spi_sync(spi, message, 0);
+#endif
 }
 EXPORT_SYMBOL_GPL(spi_sync);
 
@@ -1021,6 +1036,25 @@ int spi_bus_unlock(struct spi_master *master)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(spi_bus_unlock);
+
+int spi_sync_killable(struct spi_device *spi, struct spi_message *message)
+{
+	DECLARE_COMPLETION_ONSTACK(done);
+	int status;
+
+	message->complete = spi_complete;
+	message->context = &done;
+	status = spi_async(spi, message);
+	if (status == 0) {
+		//wait_for_completion(&done);
+		if( wait_for_completion_killable(&done) == -ERESTARTSYS )
+			printk("******************************* KILLED \n");
+		status = message->status;
+	}
+	message->context = NULL;
+	return status;
+}
+EXPORT_SYMBOL_GPL(spi_sync_killable);
 
 /* portable code must never pass more than 32 bytes */
 #define	SPI_BUFSIZ	max(32,SMP_CACHE_BYTES)

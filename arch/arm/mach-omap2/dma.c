@@ -34,6 +34,7 @@
 
 #define OMAP2_DMA_STRIDE	0x60
 
+int omap_dma_error_check; //20111102 ws.yang@lge.com add to dma error
 static u32 errata;
 static u8 dma_stride;
 

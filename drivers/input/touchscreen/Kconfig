@@ -732,6 +732,25 @@ config TOUCHSCREEN_TPS6507X
 	  To compile this driver as a module, choose M here: the
 	  module will be called tps6507x_ts.
 
+# form GB
+config TOUCHSCREEN_HUB_SYNAPTICS
+	tristate "HUB Synaptics touchscreen"
+	depends on I2C
+	help
+	  This enables support for HUB Synaptics touchscreen driver.
+
+config TOUCHSCREEN_JUSTIN_KR_SYNAPTICS
+	tristate "Justin KR Synaptics touchscreen"
+	depends on I2C
+	help
+	  This enables support for Justin Synaptics touchscreen driver.
+
+config TOUCHSCREEN_KU5900_SYNAPTICS
+	tristate "KU5900 Synaptics touchscreen"
+	depends on I2C
+	help
+	  This enables support for KU5900 Synaptics touchscreen driver.
+
 config TOUCHSCREEN_SYNTM12XX
 	tristate "Synaptic TM12xx touchscreen"
 	depends on I2C

@@ -139,26 +139,26 @@ config MACH_OMAP_2430SDP
 config MACH_OMAP3_BEAGLE
 	bool "OMAP3 BEAGLE board"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 
 config MACH_DEVKIT8000
 	bool "DEVKIT8000 board"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CUS
 
 config MACH_OMAP_LDP
 	bool "OMAP3 LDP board"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 
 config MACH_OMAP3530_LV_SOM
 	bool "OMAP3 Logic 3530 LV SOM board"
 	depends on ARCH_OMAP3
 	select OMAP_PACKAGE_CBB
-	default y
+	default n
 	help
 	 Support for the LogicPD OMAP3530 SOM Development kit
 	 for full description please see the products webpage at
@@ -168,7 +168,7 @@ config MACH_OMAP3_TORPEDO
 	bool "OMAP3 Logic 35x Torpedo board"
 	depends on ARCH_OMAP3
 	select OMAP_PACKAGE_CBB
-	default y
+	default n
 	help
 	 Support for the LogicPD OMAP35x Torpedo Development kit
 	 for full description please see the products webpage at
@@ -177,7 +177,7 @@ config MACH_OMAP3_TORPEDO
 config MACH_OVERO
 	bool "Gumstix Overo board"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 
 config MACH_OMAP3EVM
@@ -185,6 +185,29 @@ config MACH_OMAP3EVM
 	depends on ARCH_OMAP3
 	default y
 	select OMAP_PACKAGE_CBB
+
+# from GB
+config WIFI_CONTROL_FUNC
+        bool "Enable WiFi control function abstraction"
+	depends on MACH_OMAP_4430SDP || MACH_OMAP_ZOOM2 || MACH_OMAP_ZOOM3
+        select WIRELESS_EXT
+        select WEXT_CORE
+        select WEXT_PROC
+        select WEXT_PRIV
+        default Y
+        help
+           Enables Power/Reset/Carddetect function abstraction
+
+# from GB
+config TIWLAN_MMC_CONTROLLER
+        int "MMC Controller number that TI WLAN chip is connected to"
+        range 1 5
+        depends on MMC_EMBEDDED_SDIO
+        default "3"
+        help
+          Choose the number of the MMC controller that TI WLAN chip is
+          connected to. TI WLAN has SDIO host controller that will control
+          this MMC port.
 
 config MACH_OMAP3517EVM
 	bool "OMAP3517/ AM3517 EVM board"
@@ -200,7 +223,7 @@ config MACH_CRANEBOARD
 config MACH_OMAP3_PANDORA
 	bool "OMAP3 Pandora"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 	select REGULATOR_FIXED_VOLTAGE
 
@@ -237,7 +260,7 @@ config MACH_NOKIA_N8X0
 config MACH_NOKIA_RM680
 	bool "Nokia RM-680 board"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 
 config MACH_NOKIA_RX51
@@ -266,28 +289,93 @@ config MACH_OMAP_ZOOM3
 	select SERIAL_8250_CONSOLE
 	select REGULATOR_FIXED_VOLTAGE
 
+# from GB
+config MACH_LGE_OMAP3
+	bool "LGE OMAP3"
+	depends on ARCH_OMAP3
+	default y
+	select OMAP_PACKAGE_CBP
+	choice
+		prompt "Choose the LGE OMAP3 Product"
+		depends on MACH_LGE_OMAP3
+		default PRODUCT_LGE_P970
+
+		config PRODUCT_LGE_P970
+			bool "LGE BLACK for open of EU"
+
+		config PRODUCT_LGE_KU5900
+			bool "LGE BLACK for KT of KOREA"
+
+		config PRODUCT_LGE_LU6800
+			bool "LGE JUSTIN for LGU of KOREA"
+
+	endchoice
+
+config MACH_LGE_HUB
+	bool "LGE Hub Board & Hub variation Board"
+	depends on MACH_LGE_OMAP3
+	select OMAP_PACKAGE_CBP
+	choice
+		prompt "Choose the LGE Hub board revision"
+		depends on MACH_LGE_HUB
+		default MACH_LGE_HUB_REV_A
+
+		config MACH_LGE_HUB_REV_A
+	        	bool "Revision A "
+	endchoice
+
+config LGE_IDLE_MAX_FREQ
+	bool "Lower max freq during idle"
+	depends on MACH_LGE_OMAP3
+    default n
+	---help---
+	Allow lower maximum frequency when screen is off
+
+config LGE_LAB3_BOARD
+	bool "LGE LAB3 Board"
+	depends on MACH_LGE_OMAP3
+	default n
+	---help---
+		Support for LAB3 Device ( Tunning Value, GPIO, etc )
+
+# Bluetooth chanha.park@lge.com-[s]
+config BRCM_LPM
+       bool "BRCM LPM - Low Power Mode"
+       default y
+
+config BRCM_HOST_WAKE
+       bool "BT BRCM Host Wakeup"
+       default y
+       depends on BRCM_LPM
+
+config BRCM_BT_WAKE
+       bool "BRCM BT Wakeup"
+       default y
+       depends on BRCM_LPM		
+# Bluetooth chanha.park@lge.com-[e]       
+
 config MACH_CM_T35
 	bool "CompuLab CM-T35 module"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CUS
 
 config MACH_CM_T3517
 	bool "CompuLab CM-T3517 module"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 
 config MACH_IGEP0020
 	bool "IGEP v2 board"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 
 config MACH_IGEP0030
 	bool "IGEP OMAP3 module"
 	depends on ARCH_OMAP3
-	default y
+	default n
 	select OMAP_PACKAGE_CBB
 	select MACH_IGEP0020
 

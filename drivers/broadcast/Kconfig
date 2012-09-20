@@ -1,0 +1,15 @@
+#
+# Broadcast Device Driver Support
+#
+
+menu "LGE Broadcast Device Support"
+
+config LGE_BROADCAST_TDMB
+	bool "LGE broacast TDMB device driver"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800
+	default n
+	help
+	  Select this if you want to use TDMB broadcast service
+
+source "drivers/broadcast/tdmb/Kconfig"
+endmenu

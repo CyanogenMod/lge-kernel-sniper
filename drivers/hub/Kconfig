@@ -1,0 +1,100 @@
+# drivers/hub/Kconfig
+menu "LGE Hub board drivers"
+
+config LGE_MTC_ETA
+        bool "Support LGE MTC_ETA Event (Key, Touch) Logging"
+        default n
+        depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+        help
+         LGE MTC/ETA
+
+comment "Audio"
+
+config HUB_AMP_WM9093
+	bool "AUDIO_AMP_WM9093"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+	default y
+	help
+	  Support for WM9093 AUD AMP driver
+
+config HUB_HEADSET_DET
+	bool "HUB HEADSET DETECTION"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+	default y
+	help
+	  Support for headset detection
+
+
+comment "External Power and USB Switch"
+
+config HUB_MUIC
+	bool "Hub TI TS5USBA33402 MUIC Driver"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB && !LGE_LAB3_BOARD
+	default y
+	---help---
+		Support for TS5USBA33402 MUIC Driver
+
+config LGE_OMAP3_EXT_PWR
+	bool "LGE External Power Sensing use TWL5030"
+	depends on MACH_LGE_OMAP3 && LGE_LAB3_BOARD
+	default y
+	---help---
+		Support for external power sensing without MUIC
+
+config LGE_USB_SWITCH
+	bool "LGE USB Swtich Driver ( EUSY038501 and NTJD4105CT1G)"
+	depends on MACH_LGE_OMAP3 && LGE_LAB3_BOARD
+	default y
+	---help---
+		Support for High Speed USB Switch Driver ( EUSY038501 and NTJD4105CT1G)
+
+config LGE_CHARGE_CONTROL_BATTERY_FET
+	bool "Chrging Control Using Battery FET"
+	depends on MACH_LGE_OMAP3 && LGE_LAB3_BOARD
+	default n
+	---help---
+		charging Control by battery fet, not Charger IC
+
+
+config HUB_CHARGING_IC
+	bool "Hub Charging IC Driver"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+	default y
+	---help---
+		Support for CHARGING IC Driver
+
+config KERNEL_GSM0710MUX
+	bool "Kernel mode gsm0710 multiplexer"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+	default y
+	---help---
+	  Kernel mode gsm0710 multiplexor over the spi driver
+
+config RINETWORK_DRIVER
+	bool "Raw ip network driver"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+	default y
+	---help---
+	  Support for raw ip network driver
+
+config HUB_MODEM_CONTROL
+	bool "MODEM - Hub Modem control"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+	default y
+        ---help---
+            Modem control driver
+
+config HUB_GPS_GPIO
+	bool "Broadcom GPS GPIO Controller"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_LU6800 || MACH_LGE_HUB
+	default y
+	---help---
+		Broadcom GPS GPIO control driver
+
+config BD_ADDRESS
+	bool "BD Read / Write Driver"
+	default y
+	help
+	  LGE added: It supports Bluetooth address Read / Write functionality on user mode.
+
+endmenu

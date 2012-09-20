@@ -88,6 +88,49 @@ void rtc_time_to_tm(unsigned long time, struct rtc_time *tm)
 }
 EXPORT_SYMBOL(rtc_time_to_tm);
 
+void rtc_time_to_tm_for_kor(unsigned long time, struct rtc_time *tm)
+{
+	unsigned int month, year;
+	int days;
+
+	time += 9*60*60;
+
+	days = time / 86400;
+	time -= (unsigned int) days * 86400;
+
+	/* day of the week, 1970-01-01 was a Thursday */
+	tm->tm_wday = (days + 4) % 7;
+
+	year = 1970 + days / 365;
+	days -= (year - 1970) * 365
+		+ LEAPS_THRU_END_OF(year - 1)
+		- LEAPS_THRU_END_OF(1970 - 1);
+	if (days < 0) {
+		year -= 1;
+		days += 365 + is_leap_year(year);
+	}
+	tm->tm_year = year - 1900;
+	tm->tm_yday = days + 1;
+
+	for (month = 0; month < 11; month++) {
+		int newdays;
+
+		newdays = days - rtc_month_days(month, year);
+		if (newdays < 0)
+			break;
+		days = newdays;
+	}
+	tm->tm_mon = month;
+	tm->tm_mday = days + 1;
+
+	tm->tm_hour = time / 3600;
+	time -= tm->tm_hour * 3600;
+	tm->tm_min = time / 60;
+	tm->tm_sec = time - tm->tm_min * 60;
+}
+EXPORT_SYMBOL(rtc_time_to_tm_for_kor);
+
+
 /*
  * Does the rtc_time represent a valid date/time?
  */

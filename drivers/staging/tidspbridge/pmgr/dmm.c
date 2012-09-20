@@ -308,9 +308,11 @@ int dmm_reserve_memory(struct dmm_object *dmm_mgr, u32 size,
 		node->mapped_size = 0;
 		/* Return the chunk's starting address */
 		*prsv_addr = rsv_addr;
-	} else
+	} else {
 		/*dSP chunk of given size is not available */
+                printk("pradeep ERROR dSP chunk of given size is not available \n");
 		status = -ENOMEM;
+        }
 
 	spin_unlock(&dmm_obj->dmm_lock);
 

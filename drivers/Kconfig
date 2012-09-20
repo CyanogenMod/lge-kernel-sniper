@@ -1,5 +1,8 @@
 menu "Device Drivers"
 
+# form  GB
+source "drivers/hub/Kconfig"
+
 source "drivers/base/Kconfig"
 
 source "drivers/connector/Kconfig"
@@ -98,6 +101,9 @@ source "drivers/nfc/Kconfig"
 
 source "drivers/switch/Kconfig"
 
+# from  P940 ICS
+source "drivers/muic/Kconfig"
+
 source "drivers/accessibility/Kconfig"
 
 source "drivers/infiniband/Kconfig"
@@ -135,4 +141,8 @@ source "drivers/virtio/Kconfig"
 source "drivers/rpmsg/Kconfig"
 
 source "drivers/omap_hsi/Kconfig"
+
+# -- [[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.03.29] - TDMB
+source "drivers/broadcast/Kconfig"
+# -- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.03.29] - TDMB
 endmenu

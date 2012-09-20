@@ -88,6 +88,13 @@ config BATTERY_PMU
 	help
 	  Say Y here to expose battery information on Apple machines
 	  through the generic battery class.
+# from GB
+config TWL4030_BCI_BATTERY
+	tristate "OMAP TWL4030 BCI Battery driver"
+	depends on TWL4030_CORE && TWL4030_MADC
+	help
+          Support for the OMAP TWL4030 BCI Battery driver.
+	  This driver gives support for the TWL4030 Battery Charge Interface.
 
 config TWL6030_BCI_BATTERY
 	tristate "OMAP TWL6030 BCI Battery driver"
@@ -179,6 +186,15 @@ config BATTERY_MAX17042
 	  to operate with a single lithium cell. MAX8997 and MAX8966 are
 	  multi-function devices that include fuel gauages that are compatible
 	  with MAX17042.
+
+# from GB
+config FUELGAUGE_MAX17043
+	tristate "Maxim MAX17043 Fuel Gauge"
+	depends on I2C
+	help
+	  MAX17043 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The MAX17043 is configured
+	  to operate with a single lithium cell
 
 config BATTERY_Z2
 	tristate "Z2 battery driver"

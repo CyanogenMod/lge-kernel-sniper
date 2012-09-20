@@ -86,6 +86,17 @@ static ssize_t manager_display_store(struct omap_overlay_manager *mgr,
 	}
 
 	if (dssdev) {
+
+//goochang.jeong@lge.com s/w rotation
+#if defined(CONFIG_GFX_HDMI) || defined(CONFIG_OMAP2_DSS_HDMI) 
+
+        extern int nDisabledGFX;
+		void configure_overlay_size(struct omap_dss_device *dssdev);
+
+        if( nDisabledGFX == 1 )
+            configure_overlay_size(dssdev);
+#endif
+
 		r = mgr->set_device(mgr, dssdev);
 		if (r) {
 			DSSERR("failed to set manager\n");
@@ -384,6 +395,109 @@ static ssize_t manager_cpr_coef_store(struct omap_overlay_manager *mgr,
 	return size;
 }
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB
+static ssize_t manager_dmb_coefs_show(struct omap_overlay_manager *mgr, char *buf)
+{
+	struct omap_overlay_manager_info info;
+
+	mgr->get_manager_info(mgr, &info);
+
+	//printk("[DSS Manager] show dmb_coefs\n");
+
+	return snprintf(buf, PAGE_SIZE, "%d %d %d %d %d %d %d %d %d %d %d %d %d\n", 
+	 info.dmb_coefs.direction, 
+
+	 info.dmb_coefs.ccs[0], info.dmb_coefs.ccs[1], info.dmb_coefs.ccs[2], 
+	 info.dmb_coefs.ccs[3], info.dmb_coefs.ccs[4], info.dmb_coefs.ccs[5], 
+	 info.dmb_coefs.ccs[6], info.dmb_coefs.ccs[7], info.dmb_coefs.ccs[8], 
+
+	 info.dmb_coefs.bv[0], info.dmb_coefs.bv[1], info.dmb_coefs.bv[2]);
+}
+
+static ssize_t manager_dmb_coefs_store(struct omap_overlay_manager *mgr, const char *buf, size_t size)
+{
+	struct omap_overlay_manager_info info;
+	struct omap_dss_dmb_coefs dmb_coefs;
+	int i;
+	int iResult;
+
+	// hd means argument converted as 'short' decimal
+	iResult = sscanf(buf, "%d %hd %hd %hd %hd %hd %hd %hd %hd %hd %hd %hd %hd", 
+	 &dmb_coefs.direction, 
+
+	 &dmb_coefs.ccs[0], &dmb_coefs.ccs[1], &dmb_coefs.ccs[2], 
+	 &dmb_coefs.ccs[3], &dmb_coefs.ccs[4], &dmb_coefs.ccs[5], 
+	 &dmb_coefs.ccs[6], &dmb_coefs.ccs[7], &dmb_coefs.ccs[8], 
+
+	 &dmb_coefs.bv[0], &dmb_coefs.bv[1], &dmb_coefs.bv[2]);
+
+	if(iResult != (1 + 9 + 3))
+	{
+		printk("[DSS Manager] store dmb_coefs ERROR! : invalid number of parameter\n");
+
+		return -EINVAL;
+	}
+
+	for(i = 0; i < 9; ++i)
+	{
+		if(dmb_coefs.ccs[i] < -65536 || dmb_coefs.ccs[i] > 65535)
+		{
+			printk("[DSS Manager] store dmb_coefs ERROR! : invalid range of parameters ccs\n");
+
+			return -EINVAL;
+		}
+	}
+
+	for(i = 0; i < 3; ++i)
+	{
+		if(dmb_coefs.bv[i] < -65536 || dmb_coefs.bv[i] > 65535)
+		{
+			printk("[DSS Manager] store dmb_coefs ERROR! : invalid range of parameters bv\n");
+
+			return -EINVAL;
+		}
+	}
+
+	mgr->get_manager_info(mgr, &info);
+
+	info.dmb_coefs.direction = dmb_coefs.direction;
+
+	for(i = 0; i < 9; ++i)
+	{
+		info.dmb_coefs.ccs[i] = dmb_coefs.ccs[i];
+	}
+
+	for(i = 0; i < 3; ++i)
+	{
+		info.dmb_coefs.bv[i] = dmb_coefs.bv[i];
+	}
+
+	iResult = mgr->set_manager_info(mgr, &info);
+
+	if(iResult)
+	{
+		printk("[DSS Manager] store dmb_coefs ERROR! : set_manager_info()\n");
+
+		return iResult;
+	}
+
+	iResult = mgr->apply(mgr);
+
+	if(iResult)
+	{
+		printk("[DSS Manager] store dmb_coefs ERROR! : apply()\n");
+
+		return iResult;
+	}
+
+	//printk("[DSS Manager] store dmb_coefs\n");
+	
+	return size;
+}
+#endif /* CONFIG_LGE_BROADCAST */
+//-- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
+
 struct manager_attribute {
 	struct attribute attr;
 	ssize_t (*show)(struct omap_overlay_manager *, char *);
@@ -416,6 +530,13 @@ static MANAGER_ATTR(cpr_coef, S_IRUGO|S_IWUSR,
 		manager_cpr_coef_show,
 		manager_cpr_coef_store);
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB
+static MANAGER_ATTR(dmb_coefs, S_IRUGO | S_IWUSR, 
+		manager_dmb_coefs_show, 
+		manager_dmb_coefs_store);
+#endif /* CONFIG_LGE_BROADCAST */
+//-- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
 
 static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_name.attr,
@@ -427,6 +548,13 @@ static struct attribute *manager_sysfs_attrs[] = {
 	&manager_attr_alpha_blending_enabled.attr,
 	&manager_attr_cpr_enable.attr,
 	&manager_attr_cpr_coef.attr,
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB	
+	&manager_attr_dmb_coefs.attr,
+#endif /* CONFIG_LGE_BROADCAST */
+//-- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
+
 	NULL
 };
 
@@ -589,6 +717,13 @@ struct manager_cache_data {
 
 	bool cpr_enable;
 	struct omap_dss_cpr_coefs cpr_coefs;
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB
+	struct omap_dss_dmb_coefs dmb_coefs;
+#endif /* CONFIG_LGE_BROADCAST */
+//-- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
+
 	bool skip_init;
 };
 
@@ -1265,6 +1400,122 @@ static int configure_dispc(void)
 	return r;
 }
 
+#if defined(CONFIG_OMAP2_DSS_HDMI)  // 20120521 goochang.jeong@lge.com for HDMI
+void configure_overlay_size(struct omap_dss_device *dssdev)
+{
+	struct overlay_cache_data *c;
+	struct omap_overlay *ovl;
+	int is_lcd = 0;
+	int resolution;
+	enum omap_plane plane;
+	u32 *buffer, *src;
+	u32 width, height;
+
+	plane = OMAP_DSS_GFX;
+
+	if(HDMI_DSS_DBG) printk(KERN_INFO "[hycho0] configure_overlay_size\n");
+	c = &dss_cache.overlay_cache[plane];
+	ovl = omap_dss_get_overlay(plane);
+
+	if (!strcmp("hdmi", dssdev->name)) 
+    {
+		is_lcd = 0;
+
+        #if 1  /* Software Rotation */
+        {
+        	extern u32 tmp_hdmi_buf[800*480];
+        	u32 *src, width, height;
+
+            // wooho.jeong@lge.com 2012.07.26
+            // MOD : for Kernel Reset During Gallery
+            if(c)
+            {        
+            	src = (u32 *)c->vaddr;
+            	if( src )
+            	for (width = 0; width < 800; width++)
+            		for (height = 0; height < 480; height++)
+            			tmp_hdmi_buf[width + (800 * (479 - height))] = *src++;
+
+            	ovl->info.paddr = c->paddr = __pa(tmp_hdmi_buf);
+            	ovl->info.vaddr = c->vaddr = tmp_hdmi_buf;
+            }
+            else
+            {
+                printk(KERN_ERR "%s: c is NULL\n", __func__);
+            }
+        }
+        #endif
+	}
+	else {
+		is_lcd = 1;
+//		HDMItoLCD_Configure_pass = 1;
+	}
+
+#define _1280X720P 	4 // TMDL_HDMITX_VFMT_04_1280x720p_60Hz
+#define _720X480P	2 // TMDL_HDMITX_VFMT_02_720x480p_60Hz
+
+	extern int GET_RESOLUTION();
+	resolution = GET_RESOLUTION();
+
+	extern int WHAT_MODE_IS_IT();
+	switch(WHAT_MODE_IS_IT())
+	{
+		case 0:
+
+			switch(resolution)
+			{
+				case _1280X720P:
+					ovl->info.pos_x         = c->pos_x          = is_lcd ?   0 : 240;
+					ovl->info.pos_y         = c->pos_y          = is_lcd ?   0 : 120;
+					ovl->info.width         = c->width          = is_lcd ? 480 : 800;
+					ovl->info.height        = c->height         = is_lcd ? 800 : 480;
+					ovl->info.out_width     = c->out_width      = is_lcd ? 480 : 800;
+					ovl->info.out_height    = c->out_height     = is_lcd ? 800 : 480;
+					ovl->info.screen_width  = c->screen_width   = is_lcd ? 480 : 800;
+					break;
+		
+				case _720X480P:
+					ovl->info.pos_x         = c->pos_x          = is_lcd ?   0 : 0;
+					ovl->info.pos_y         = c->pos_y          = is_lcd ?   0 : 0;
+					ovl->info.width         = c->width          = is_lcd ? 480 : 720;
+					ovl->info.height        = c->height         = is_lcd ? 800 : 480;
+					ovl->info.out_width     = c->out_width      = is_lcd ? 480 : 720;
+					ovl->info.out_height    = c->out_height     = is_lcd ? 800 : 480;
+					ovl->info.screen_width  = c->screen_width   = is_lcd ? 480 : 720;
+					break;
+						
+			}
+			break;
+
+		case 1:
+				ovl->info.pos_x 		= c->pos_x			= is_lcd ?	 0 : 0;
+				ovl->info.pos_y 		= c->pos_y			= is_lcd ?	 0 : 0;
+				ovl->info.width 		= c->width			= is_lcd ? 480 : 720;
+				ovl->info.height		= c->height 		= is_lcd ? 800 : 480;
+				ovl->info.out_width 	= c->out_width		= is_lcd ? 480 : 720;
+				ovl->info.out_height	= c->out_height 	= is_lcd ? 800 : 480;
+				ovl->info.screen_width	= c->screen_width	= is_lcd ? 480 : 720;
+			break;
+
+		case 2:
+			ovl->info.pos_x 		= c->pos_x			= is_lcd ?	 0 : 240;
+			ovl->info.pos_y 		= c->pos_y			= is_lcd ?	 0 : 120;
+			ovl->info.width 		= c->width			= is_lcd ? 480 : 800;
+			ovl->info.height		= c->height 		= is_lcd ? 800 : 480;
+			ovl->info.out_width 	= c->out_width		= is_lcd ? 480 : 800;
+			ovl->info.out_height	= c->out_height 	= is_lcd ? 800 : 480;
+			ovl->info.screen_width	= c->screen_width	= is_lcd ? 480 : 800;
+
+			break;
+	}
+
+	c->enabled = 1;
+
+	if(!is_lcd)
+	configure_overlay(plane);
+}
+#endif 
+
 /* Make the coordinates even. There are some strange problems with OMAP and
  * partial DSI update when the update widths are odd. */
 static void make_even(u16 *x, u16 *w)
@@ -1835,7 +2086,30 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 		oc->max_x_decim = ovl->info.max_x_decim;
 		oc->min_y_decim = ovl->info.min_y_decim;
 		oc->max_y_decim = ovl->info.max_y_decim;
+
+//-- [[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB
+		if((mgr->info.dmb_coefs.direction == 1) && (ovl->id > OMAP_DSS_GFX))
+		{
+			oc->cconv.ry = mgr->info.dmb_coefs.ccs[0];
+			oc->cconv.rcr = mgr->info.dmb_coefs.ccs[1];
+			oc->cconv.rcb= mgr->info.dmb_coefs.ccs[2];
+			oc->cconv.gy = mgr->info.dmb_coefs.ccs[3];
+			oc->cconv.gcr = mgr->info.dmb_coefs.ccs[4];
+			oc->cconv.gcb = mgr->info.dmb_coefs.ccs[5];
+			oc->cconv.by = mgr->info.dmb_coefs.ccs[6];
+			oc->cconv.bcr = mgr->info.dmb_coefs.ccs[7];
+			oc->cconv.bcb = mgr->info.dmb_coefs.ccs[8];
+			oc->cconv.full_range = 0;
+		}
+		else
+		{
+			oc->cconv = ovl->info.cconv;
+		}
+#else /* CONFIG_LGE_BROADCAST */
 		oc->cconv = ovl->info.cconv;
+#endif /* CONFIG_LGE_BROADCAST */
+//-- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
 
 		oc->replication =
 			dss_use_replication(dssdev, ovl->info.color_mode);
@@ -1892,6 +2166,26 @@ static int omap_dss_mgr_apply(struct omap_overlay_manager *mgr)
 	mc->alpha_enabled = mgr->info.alpha_enabled;
 	mc->cpr_coefs = mgr->info.cpr_coefs;
 	mc->cpr_enable = mgr->info.cpr_enable;
+
+//-- [[ LGE_UBIQUIX_MODIFIED_START : hskim@mnbt.co.kr [2012.06.01] - TDMB
+#ifdef CONFIG_LGE_BROADCAST_TDMB
+	mc->dmb_coefs.direction = mgr->info.dmb_coefs.direction;
+
+	mc->dmb_coefs.ccs[0] = mgr->info.dmb_coefs.ccs[0];
+	mc->dmb_coefs.ccs[1] = mgr->info.dmb_coefs.ccs[1];
+	mc->dmb_coefs.ccs[2] = mgr->info.dmb_coefs.ccs[2];
+	mc->dmb_coefs.ccs[3] = mgr->info.dmb_coefs.ccs[3];
+	mc->dmb_coefs.ccs[4] = mgr->info.dmb_coefs.ccs[4];
+	mc->dmb_coefs.ccs[5] = mgr->info.dmb_coefs.ccs[5];		
+	mc->dmb_coefs.ccs[6] = mgr->info.dmb_coefs.ccs[6];
+	mc->dmb_coefs.ccs[7] = mgr->info.dmb_coefs.ccs[7];
+	mc->dmb_coefs.ccs[8] = mgr->info.dmb_coefs.ccs[8];
+
+	mc->dmb_coefs.bv[0] = mgr->info.dmb_coefs.bv[0];
+	mc->dmb_coefs.bv[1] = mgr->info.dmb_coefs.bv[1];
+	mc->dmb_coefs.bv[2] = mgr->info.dmb_coefs.bv[2];
+#endif /* CONFIG_LGE_BROADCAST */
+//-- ]] LGE_UBIQUIX_MODIFIED_END : hskim@mnbt.co.kr [2012.06.01] - TDMB
 
 	mc->manual_upd_display =
 		dssdev->caps & OMAP_DSS_DISPLAY_CAP_MANUAL_UPDATE;

@@ -43,6 +43,9 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/asoc.h>
 
+//Audio TWL5030 Read_Write register
+#include <linux/i2c/twl.h>
+
 #define NAME_SIZE	32
 
 static DECLARE_WAIT_QUEUE_HEAD(soc_pm_waitq);
@@ -95,7 +98,7 @@ static int format_register_str(struct snd_soc_codec *codec,
 {
 	int wordsize = min_bytes_needed(codec->driver->reg_cache_size) * 2;
 	int regsize = codec->driver->reg_word_size * 2;
-	int ret;
+	int ret = 0;
 	char tmpbuf[len + 1];
 	char regbuf[regsize + 1];
 
@@ -107,7 +110,13 @@ static int format_register_str(struct snd_soc_codec *codec,
 	if (wordsize + regsize + 2 + 1 != len)
 		return -EINVAL;
 
+#if 1 //Audio TWL5030 Read_Write register
+	twl_i2c_read_u8(TWL4030_MODULE_AUDIO_VOICE, (u8*)&ret, (u8)reg);
+#else
 	ret = snd_soc_read(codec , reg);
+#endif
+	printk("[format_register_str] || reg - data =>  0x%x :: 0x%x\n",reg,ret);
+
 	if (ret < 0) {
 		memset(regbuf, 'X', regsize);
 		regbuf[regsize] = '\0';
@@ -162,12 +171,13 @@ static ssize_t soc_codec_reg_show(struct snd_soc_codec *codec, char *buf,
 	if (codec->driver->reg_cache_step)
 		step = codec->driver->reg_cache_step;
 
+//        	printk("[soc_codec_reg_show] reg_cache_size::%d\n",codec->driver->reg_cache_size);
+
 	for (i = 0; i < codec->driver->reg_cache_size; i += step) {
 		if (codec->readable_register && !codec->readable_register(codec, i))
 			continue;
 		if (codec->driver->display_register) {
-			count += codec->driver->display_register(codec, buf + count,
-							 PAGE_SIZE - count, i);
+			count += codec->driver->display_register(codec, buf + count, PAGE_SIZE - count, i);
 		} else {
 			/* only support larger than PAGE_SIZE bytes debugfs
 			 * entries for the default case */
@@ -191,11 +201,37 @@ static ssize_t codec_reg_show(struct device *dev,
 {
 	struct snd_soc_pcm_runtime *rtd =
 			container_of(dev, struct snd_soc_pcm_runtime, dev);
+//        	printk("[codec_reg_show] \n");
 
 	return soc_codec_reg_show(rtd->codec, buf, PAGE_SIZE, 0);
 }
 
+#if 1 //Audio TWL5030 Read_Write register
+ssize_t codec_reg_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+    int reg, data;
+	char *r, *d;
+	struct snd_soc_pcm_runtime *rtd =
+				container_of(dev, struct snd_soc_pcm_runtime, dev);
+
+	printk("[codec_reg_store] : %s\n", buf);
+	r= &buf[0];
+	printk("reg : %s\n", r);
+	d= &buf[5];
+	printk("data : %s\n", d);
+	reg = simple_strtoul(r, NULL, 16);
+	data = simple_strtoul(d, NULL, 16);
+	printk("reg: %x, data : %x\n", reg, data);
+	twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE, (u8)data, (u8)reg);
+
+	return count;
+}
+
+static DEVICE_ATTR(codec_reg, 0444, codec_reg_show, codec_reg_store);
+#else
 static DEVICE_ATTR(codec_reg, 0444, codec_reg_show, NULL);
+#endif
 
 static ssize_t pmdown_time_show(struct device *dev,
 				struct device_attribute *attr, char *buf)
@@ -4219,6 +4255,20 @@ found:
 	kfree(codec);
 }
 EXPORT_SYMBOL_GPL(snd_soc_unregister_codec);
+
+// prime@sdcmicro.com Added function to get the codec instance [START]
+struct snd_soc_codec *snd_soc_get_codec(const char *name) {
+	struct snd_soc_codec *codec;
+
+	list_for_each_entry(codec, &codec_list, list) {
+		if (!strcmp(codec->name, name))
+			return codec;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(snd_soc_get_codec);
+// prime@sdcmicro.com Added function to get the codec instance [END]
 
 static int __init snd_soc_init(void)
 {

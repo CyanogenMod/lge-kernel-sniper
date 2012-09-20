@@ -413,6 +413,24 @@ config LEDS_ASIC3
 	  cannot be used. This driver supports hardware blinking with an on+off
 	  period from 62ms to 125s. Say Y to enable LEDs on the HP iPAQ hx4700.
 
+# from GB
+config LEDS_BD2802_LGE
+	tristate "LGE BD2802 LED Driver"
+	default y
+	---help---
+	  If you have a led controller based on BD2802 controller chip,
+	  then say y to include a power driver for it.
+	  LGE Sniper uses this chip.
+
+config LEDS_BD2802_KU5900
+	tristate "KU5900 BD2802 LED Driver"
+	depends on PRODUCT_LGE_KU5900 || PRODUCT_LGE_P970
+	default y
+	help
+	  If you have a led controller based on BD2802 controller chip,
+	  then say y to include a power driver for it.
+	  LGE KU5900 uses this chip.
+
 config LEDS_TRIGGERS
 	bool "LED Trigger support"
 	depends on LEDS_CLASS

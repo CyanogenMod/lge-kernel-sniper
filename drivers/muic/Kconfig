@@ -1,0 +1,61 @@
+menuconfig MUIC
+	tristate "MUIC class support"
+	help
+	  Say Y here to enable MUIC class support. This allows
+	  controlling & monitoring muic related devices.
+
+if MUIC
+
+# from P940 ICS
+config MUIC_MAX14526DEEWP
+	tristate "MUIC max14526 driver"
+	help
+	  Say Y here to support max14526 muic device.
+
+config MUIC_TS5USBA33402 
+	tristate "MUIC ts5usba33402 driver"
+	help
+	  Say Y here to support ts5usba33402 muic device.
+
+config MUIC_TSU5611
+	tristate "MUIC tsu5611 driver"
+	help
+	  Say Y here to support tsu5611 muic device.
+
+config MUIC_TSU5611_INIT_BUG_FIX
+	bool "TSU5611 init bug fix"
+	help
+	  When boot up timing, CHG_TYPE must be set within TSU5611.
+	  This is chip bug of TSU5611.
+
+	  Say Y here to fix tsu5611 init bug.
+
+choice
+	prompt "revision"
+	depends on MUIC_TS5USBA33402
+	
+config MUIC_TS5USBA33402_REV_A
+	bool "MUIC ts5usba33402 revision A"
+	depends on MUIC_TS5USBA33402
+	help
+	  Say Y here to support ts5usba33402 muic device rev A.
+
+config MUIC_TS5USBA33402_REV_B
+	bool "MUIC ts5usba33402 revision B"
+	depends on MUIC_TS5USBA33402
+	help
+		Say Y here to support ts5usba33402 muic device rev B.
+endchoice
+
+config DP3T 
+	tristate "DP3T switch driver"
+	help
+	  Say Y here to support dp3t switch muic client device.
+
+config USIF 
+	tristate "USIF driver"
+	help
+	  Say Y here to support usif swtich muic cleint device.
+
+endif # MUIC
+

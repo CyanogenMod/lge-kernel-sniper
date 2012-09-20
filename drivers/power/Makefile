@@ -27,6 +27,7 @@ obj-$(CONFIG_BATTERY_BQ27x00)	+= bq27x00_battery.o
 obj-$(CONFIG_BATTERY_DA9030)	+= da9030_battery.o
 obj-$(CONFIG_BATTERY_MAX17040)	+= max17040_battery.o
 obj-$(CONFIG_BATTERY_MAX17042)	+= max17042_battery.o
+obj-$(CONFIG_FUELGAUGE_MAX17043)	+= max17043_fuelgauge.o
 obj-$(CONFIG_BATTERY_Z2)	+= z2_battery.o
 obj-$(CONFIG_BATTERY_S3C_ADC)	+= s3c_adc_battery.o
 obj-$(CONFIG_CHARGER_PCF50633)	+= pcf50633-charger.o
@@ -37,4 +38,15 @@ obj-$(CONFIG_CHARGER_MAX8903)	+= max8903_charger.o
 obj-$(CONFIG_CHARGER_TWL4030)	+= twl4030_charger.o
 obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
 obj-$(CONFIG_CHARGER_BQ2415x)	+= bq2415x_charger.o
+
+ifeq ($(CONFIG_PRODUCT_LGE_P970),y)
+obj-$(CONFIG_TWL4030_BCI_BATTERY)       += twl4030_bci_battery.o
+endif
+ifeq ($(CONFIG_PRODUCT_LGE_KU5900),y)
+obj-$(CONFIG_TWL4030_BCI_BATTERY)       += twl4030_bci_battery_ku5900.o
+endif
+ifeq ($(CONFIG_PRODUCT_LGE_LU6800),y)
+obj-$(CONFIG_TWL4030_BCI_BATTERY)       += twl4030_bci_battery_lu6800.o
+endif
+
 obj-$(CONFIG_TWL6030_BCI_BATTERY)	+= twl6030_bci_battery.o

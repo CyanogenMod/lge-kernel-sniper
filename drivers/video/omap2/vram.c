@@ -551,7 +551,13 @@ void __init omap_vram_reserve_sdram_memblock(void)
 	if (!size)
 		return;
 
+// LGE_CHANGE_S 20120215 daewung.kim@lge.com, vram memory align settings(related u-boot 5M settings)
+#if 1
 	size = ALIGN(size, SZ_2M);
+#else
+	size = ALIGN(size, SZ_1M);
+#endif 
+// LGE_CHANGE_E 20120215 daewung.kim@lge.com, vram memory align settings(related u-boot 5M settings)
 
 	if (paddr) {
 		if (paddr & ~PAGE_MASK) {
@@ -576,7 +582,13 @@ void __init omap_vram_reserve_sdram_memblock(void)
 			return;
 		}
 	} else {
-		paddr = memblock_alloc(size, SZ_2M);
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-02-15, VRAM parameter alignment adjustment
+#if 1
+		paddr = memblock_alloc(size, SZ_2M); // SZ_2M
+#else
+		paddr = memblock_alloc(size, SZ_1M); // SZ_2M -> SZ_1M
+#endif
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-02-15
 	}
 
 	memblock_free(paddr, size);

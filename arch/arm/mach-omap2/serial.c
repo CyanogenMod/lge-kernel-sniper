@@ -82,6 +82,20 @@ static struct omap_device_pm_latency omap_uart_latency[] = {
 };
 
 #ifdef CONFIG_OMAP_MUX
+#if defined(CONFIG_PRODUCT_LGE_LU6800)  // 20120725 sangki.hyun@lge.com 
+static struct omap_device_pad default_uart1_pads[] __initdata = {
+	{
+		.name	= "uart1_tx.uart1_tx",
+		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+	},
+	{
+		.name	= "uart1_rx.uart1_rx",
+		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
+	},
+};
+#else
 static struct omap_device_pad default_uart1_pads[] __initdata = {
 	{
 		.name	= "uart1_cts.uart1_cts",
@@ -102,7 +116,7 @@ static struct omap_device_pad default_uart1_pads[] __initdata = {
 		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
 	},
 };
-
+#endif
 static struct omap_device_pad default_uart2_pads[] __initdata = {
 	{
 		.name	= "uart2_cts.uart2_cts",
@@ -125,6 +139,7 @@ static struct omap_device_pad default_uart2_pads[] __initdata = {
 };
 
 static struct omap_device_pad default_uart3_pads[] __initdata = {
+#if 0 // 20120725 sangki.hyun@lge.com no nedd to
 	{
 		.name	= "uart3_cts_rctx.uart3_cts_rctx",
 		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
@@ -133,6 +148,7 @@ static struct omap_device_pad default_uart3_pads[] __initdata = {
 		.name	= "uart3_rts_sd.uart3_rts_sd",
 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
 	},
+#endif
 	{
 		.name	= "uart3_tx_irtx.uart3_tx_irtx",
 		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
@@ -145,6 +161,16 @@ static struct omap_device_pad default_uart3_pads[] __initdata = {
 	},
 };
 
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+/*
+** 2012.05.25, mannsik.chung@lge.com, LU6800 does not use UART4.
+** 	gpmc_wait2 is used for WLAN_WAKEUP,
+** 	gpmc_wait3 is used for AP_MODEM_WAKE.
+**	These are already set in bootloader.  
+*/
+static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {};
+
+#else
 static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
 	{
 		.name   = "gpmc_wait2.uart4_tx",
@@ -157,6 +183,7 @@ static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
 		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
 	},
 };
+#endif
 
 static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
 	{

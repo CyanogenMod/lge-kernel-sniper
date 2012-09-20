@@ -42,6 +42,7 @@ struct omap2_sms_regs {
 static struct omap2_sms_regs sms_context;
 
 /* SDRC_POWER register bits */
+#define SDRC_POWER_SRFRONRESET_SHIFT	7
 #define SDRC_POWER_EXTCLKDIS_SHIFT		3
 #define SDRC_POWER_PWDENA_SHIFT			2
 #define SDRC_POWER_PAGEPOLICY_SHIFT		0
@@ -96,7 +97,7 @@ int omap2_sdrc_get_params(unsigned long r,
 
 	if (!sdrc_init_params_cs0)
 		return -1;
-
+#if 1	/*[LGE_CHANGED] 20120816 pyocool.cho@lge.com  clock setting*/
 	sp0 = sdrc_init_params_cs0;
 	sp1 = sdrc_init_params_cs1;
 
@@ -111,6 +112,35 @@ int omap2_sdrc_get_params(unsigned long r,
 
 	*sdrc_cs0 = sp0;
 	*sdrc_cs1 = sp1;
+#else	//mschung's code
+	if(sdrc_init_params_cs0 == sdrc_init_params_cs1)
+	{
+		sp0 = sdrc_init_params_cs0;
+
+		while(sp0->rate && sp0->rate != r) sp0++;
+
+		if(!sp0->rate) return -1;
+		
+		*sdrc_cs0 = *sdrc_cs1 = sp0;
+	}
+	else
+	{
+		sp0 = sdrc_init_params_cs0;
+		sp1 = sdrc_init_params_cs1;
+
+		while (sp0->rate && sp0->rate != r) {
+			sp0++;
+			if (sdrc_init_params_cs1)
+				sp1++;
+		}
+
+		if (!sp0->rate)
+			return -1;
+
+		*sdrc_cs0 = sp0;
+		*sdrc_cs1 = sp1;
+	}
+#endif
 	return 0;
 }
 
@@ -160,8 +190,16 @@ void __init omap2_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
 	 * PWDENA should not be set due to 34xx erratum 1.150 - PWDENA
 	 * can cause random memory corruption
 	 */
+
+#if 0	/* [LGE_CHANGED] 20120816 pyocool.cho@lge.com from GB source*/
+ 	l = (1 << SDRC_POWER_SRFRONRESET_SHIFT) |
+		(1 << SDRC_POWER_EXTCLKDIS_SHIFT) 	|
+		(1 << SDRC_POWER_PAGEPOLICY_SHIFT) 	|
+		(1 << SDRC_POWER_PWDENA_SHIFT);
+#else	/* ICS org source */
 	l = (1 << SDRC_POWER_EXTCLKDIS_SHIFT) |
 		(1 << SDRC_POWER_PAGEPOLICY_SHIFT);
+#endif
 	sdrc_write_reg(l, SDRC_POWER);
 	omap2_sms_save_context();
 }

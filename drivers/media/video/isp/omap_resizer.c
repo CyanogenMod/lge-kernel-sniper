@@ -312,12 +312,13 @@ static int rsz_vbq_setup(struct videobuf_queue *q, unsigned int *cnt,
 		return -EINVAL;
 	}
 
+	// MMS (0621) : align videobuffer size to fix bug (QVGA, VGA capture isssue)
 	if (q->type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
-		*size = fhdl->pipe.out.image.bytesperline *
-			fhdl->pipe.out.image.height;
+		*size = ALIGN(fhdl->pipe.out.image.bytesperline *
+			fhdl->pipe.out.image.height, 4096);
 	else if (q->type == V4L2_BUF_TYPE_VIDEO_OUTPUT)
-		*size = fhdl->pipe.in.image.bytesperline *
-			fhdl->pipe.in.image.height;
+		*size = ALIGN(fhdl->pipe.in.image.bytesperline *
+			fhdl->pipe.in.image.height, 4096);
 	else
 		return -EINVAL;
 
@@ -549,10 +550,12 @@ static int rsz_release(struct inode *inode, struct file *filp)
 
 	isp_put();
 
+	// (+) ymjun [0719] : memleak patch from GB
 	if (&fhdl->src_vbq)
 		videobuf_mmap_free(&fhdl->src_vbq);
 	if (&fhdl->dst_vbq)
-		videobuf_mmap_free(&fhdl->dst_vbq);
+		videobuf_mmap_free(&fhdl->dst_vbq);	
+	// (-) ymjun [0719]  : memleak patch from GB
 
 	kfree(fhdl);
 

@@ -865,7 +865,13 @@ int twl4030_sih_setup(int module);
 #define TWL4030_VAUX4_REMAP		0x25
 #define TWL4030_VAUX4_DEDICATED		0x26
 
-static inline int twl4030charger_usb_en(int enable) { return 0; }
+// from GB	// plz refer  twl4030_bci_battery.c file
+#if defined(CONFIG_TWL4030_BCI_BATTERY) || \
+	defined(CONFIG_TWL4030_BCI_BATTERY_MODULE)
+	extern int twl4030charger_usb_en(int enable);
+#else
+	static inline int twl4030charger_usb_en(int enable) { return 0; }
+#endif
 
 /*----------------------------------------------------------------------*/
 
@@ -901,6 +907,13 @@ static inline int twl4030charger_usb_en(int enable) { return 0; }
 #define TWL4030_REG_VUSB1V5	17
 #define TWL4030_REG_VUSB1V8	18
 #define TWL4030_REG_VUSB3V1	19
+
+// from GB	// plz refer  twl4030_bci_battery.c file
+// 20100624 taehwan.kim@lge.com  To add Hub battery support[START_LGE]
+#if defined(CONFIG_MACH_LGE_HUB)
+void charger_state_update_by_other(void);
+#endif
+// 20100624 taehwan.kim@lge.com  [END_LGE]
 
 /* TWL6030 SMPS/LDO's */
 /* EXTERNAL dc-to-dc buck convertor controllable via SR */

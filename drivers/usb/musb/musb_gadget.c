@@ -1975,6 +1975,13 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver,
 		pm_runtime_put(musb->controller);
 	}
 
+	/* LGE_SJIT 2012-01-31 [dojip.kim@lge.com] update usb state */
+	if (musb->xceiv->last_event !=  USB_EVENT_NONE) {
+		atomic_notifier_call_chain(&musb->xceiv->notifier,
+				musb->xceiv->last_event, NULL);
+		pm_runtime_put(musb->controller);
+	}
+
 	return 0;
 
 err2:

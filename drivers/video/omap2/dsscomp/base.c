@@ -385,18 +385,27 @@ struct omap_overlay_manager *find_dss_mgr(int display_ix)
 	int i;
 
 	sprintf(name, "display%d", display_ix);
-	if (cpu_is_omap3630()) {
-		mgr = omap_dss_get_overlay_manager(display_ix);
-		return mgr;
-	} else {
-		for (i = 0; i < omap_dss_get_num_overlay_managers(); i++) {
-			mgr = omap_dss_get_overlay_manager(i);
-			if (mgr->device &&
-				!strcmp(name, dev_name(&mgr->device->dev)))
-				return mgr;
-		}
-		return NULL;
+
+	//goochang.jeong@lge.com TI patch for HDMI
+#if 1
+	if (cpu_is_omap3630()) {			
+	mgr = omap_dss_get_overlay_manager(display_ix); 		
+	return mgr; 	
+	} else {			
+	for (i = 0; i < omap_dss_get_num_overlay_managers(); i++) { 				
+		mgr = omap_dss_get_overlay_manager(i);					
+		if (mgr->device && !strcmp(name, dev_name(&mgr->device->dev))) 						
+			return mgr; 			
+		}			
+	return NULL;		
 	}
+#else	
+	for (i = 0; i < omap_dss_get_num_overlay_managers(); i++) { 	
+		mgr = omap_dss_get_overlay_manager(i);		
+		if (mgr->device && !strcmp(name, dev_name(&mgr->device->dev)))			
+			return mgr; }	
+		return NULL;
+#endif
 }
 
 int set_dss_mgr_info(struct dss2_mgr_info *mi, struct omapdss_ovl_cb *cb)

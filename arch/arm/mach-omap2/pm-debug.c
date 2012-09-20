@@ -37,7 +37,9 @@
 #include "cm2xxx_3xxx.h"
 #include "prm2xxx_3xxx.h"
 #include "pm.h"
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 #include "prm-regbits-34xx.h"
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 
 #define PM_DEBUG_MAX_SAVED_REGS	64
 #define PM_DEBUG_PRM_MIN	0x4A306000
@@ -52,7 +54,9 @@ u32 enable_off_mode;
 u32 sleep_while_idle;
 u32 wakeup_timer_seconds;
 u32 wakeup_timer_milliseconds;
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 u32 voltage_off_while_idle;
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 u32 omap4_device_off_counter = 0;
 
 #ifdef CONFIG_PM_ADVANCED_DEBUG
@@ -752,16 +756,18 @@ static int option_set(void *data, u64 val)
 		if (cpu_is_omap34xx())
 			omap3_pm_off_mode_enable(val);
 	}
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 	if (option == &voltage_off_while_idle) {
 		if (voltage_off_while_idle)
 			omap2_prm_set_mod_reg_bits(OMAP3430_SEL_OFF_MASK,
-						OMAP3430_GR_MOD,
-						OMAP3_PRM_VOLTCTRL_OFFSET);
+						   OMAP3430_GR_MOD,
+						   OMAP3_PRM_VOLTCTRL_OFFSET);
 		else
 			omap2_prm_clear_mod_reg_bits(OMAP3430_SEL_OFF_MASK,
-						OMAP3430_GR_MOD,
-						OMAP3_PRM_VOLTCTRL_OFFSET);
+						     OMAP3430_GR_MOD,
+						     OMAP3_PRM_VOLTCTRL_OFFSET);
 	}
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 
 	return 0;
 }
@@ -833,21 +839,23 @@ skip_reg_debufs:
 			S_IRUGO | S_IWUSR, d, &wakeup_timer_milliseconds,
 			&pm_dbg_option_fops);
 
+// LGE_CHANGE_S [daewung.kim@lge.com] 2012-04-04, Enabling voltage off in the off mode
 	/* Only enable for >= 3430 ES2.1 . Going to 0V on anything under
 	 * ES2.1 will eventually cause a crash */
 	if (omap_rev() > OMAP3430_REV_ES2_0)
 		(void) debugfs_create_file("voltage_off_while_idle",
-					   S_IRUGO | S_IWUGO, d,
+					   S_IRUGO | S_IWUSR | S_IWGRP, d,
 					   &voltage_off_while_idle,
 					   &pm_dbg_option_fops);
+// LGE_CHANGE_E [daewung.kim@lge.com] 2012-04-04
 
 #ifdef CONFIG_PM_ADVANCED_DEBUG
 	(void) debugfs_create_file("saved_reg_show",
 			S_IRUGO | S_IWUSR, d, &saved_reg_addr,
 			&pm_dbg_option_fops);
-	debugfs_create_u32("saved_reg_addr",  S_IRUGO | S_IWUGO, d,
+	debugfs_create_u32("saved_reg_addr",  S_IRUGO | S_IWUSR, d,
 				&saved_reg_addr);
-	debugfs_create_u32("saved_reg_num",  S_IRUGO | S_IWUGO, d,
+	debugfs_create_u32("saved_reg_num",  S_IRUGO | S_IWUSR, d,
 				 &saved_reg_num);
 #endif
 	pm_dbg_init_done = 1;

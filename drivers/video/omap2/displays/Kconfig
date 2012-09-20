@@ -56,8 +56,15 @@ config PANEL_TC358765
 	help
 	  Toshiba TC358765 DSI-2-LVDS chip with 1024x768 panel
 
+#  from GB
+config PANEL_HUB
+    tristate "LGE Hub Panel"
+    help
+        LCD Panel used in the LGE Hub
+
 config PANEL_SIL9022
 	tristate "HDMI interface"
 	help
 		HDMI interface used in the Zoom board
+
 endmenu

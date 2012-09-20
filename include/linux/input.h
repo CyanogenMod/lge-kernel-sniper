@@ -437,6 +437,8 @@ struct input_keymap_entry {
 
 #define KEY_WIMAX		246
 #define KEY_RFKILL		247	/* Key that controls all radios */
+// from GB
+#define KEY_HOOK                248     /* Hub */
 
 /* Code 255 is reserved for special needs of AT keyboard driver */
 
@@ -673,6 +675,9 @@ struct input_keymap_entry {
 #define KEY_CAMERA_LEFT		0x219
 #define KEY_CAMERA_RIGHT	0x21a
 
+// from GB
+#define KEY_REJECT			0x220
+
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
 #define BTN_TRIGGER_HAPPY2		0x2c1
@@ -714,6 +719,10 @@ struct input_keymap_entry {
 #define BTN_TRIGGER_HAPPY38		0x2e5
 #define BTN_TRIGGER_HAPPY39		0x2e6
 #define BTN_TRIGGER_HAPPY40		0x2e7
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.03.13] - Enable CSMG tool to clear pattern-lock. Org: 0x2e8
+#define KEY_TESTMODE_UNLOCK		0x211
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.03.13]- Enable CSMG tool to clear pattern-lock. Org: 0x2e8
 
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define KEY_MIN_INTERESTING	KEY_MUTE

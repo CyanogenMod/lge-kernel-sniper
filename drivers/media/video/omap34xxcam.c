@@ -1309,7 +1309,7 @@ static int vidioc_cropcap(struct file *file, void *_fh, struct v4l2_cropcap *a)
 
 	rval = vidioc_int_cropcap(vdev->vdev_sensor, a);
 
-	if (rval && !vdev->vdev_sensor_config.sensor_isp) {
+	if (rval) {
 		struct v4l2_format f;
 		struct v4l2_rect pixel_size;
 
@@ -1372,9 +1372,9 @@ static int vidioc_g_crop(struct file *file, void *_fh, struct v4l2_crop *a)
 
 	mutex_lock(&vdev->mutex);
 
-	if (vdev->vdev_sensor_config.sensor_isp)
-		rval = vidioc_int_g_crop(vdev->vdev_sensor, a);
-	else
+//	if (vdev->vdev_sensor_config.sensor_isp)
+//		rval = vidioc_int_g_crop(vdev->vdev_sensor, a);
+//	else
 		rval = isp_g_crop(isp, a);
 
 	mutex_unlock(&vdev->mutex);
@@ -1404,9 +1404,9 @@ static int vidioc_s_crop(struct file *file, void *_fh, struct v4l2_crop *a)
 
 	mutex_lock(&vdev->mutex);
 
-	if (vdev->vdev_sensor_config.sensor_isp)
-		rval = vidioc_int_s_crop(vdev->vdev_sensor, a);
-	else
+//	if (vdev->vdev_sensor_config.sensor_isp)
+//		rval = vidioc_int_s_crop(vdev->vdev_sensor, a);
+//	else
 		rval = isp_s_crop(isp, a);
 
 	mutex_unlock(&vdev->mutex);
@@ -1921,7 +1921,7 @@ static int omap34xxcam_release(struct file *file)
 	struct omap34xxcam_videodev *vdev = ofh->vdev;
 	struct device *isp = vdev->cam->isp;
 	int i;
-	struct videobuf_queue *q = &ofh->vbq;
+	struct videobuf_queue *q = &ofh->vbq;  //  ymjun [0719] : memleak patch from GB
 
 	mutex_lock(&vdev->mutex);
 	if (vdev->cam->streaming == file) {
@@ -1938,8 +1938,10 @@ static int omap34xxcam_release(struct file *file)
 					    OMAP34XXCAM_SLAVE_POWER_ALL);
 		isp_put();
 	}
-
-	videobuf_mmap_free(q);
+	
+	// (+)  ymjun [0719] : memleak patch from GB
+	videobuf_mmap_free(q); 
+	// (-)  ymjun [0719] : memleak patch from GB
 
 	mutex_unlock(&vdev->mutex);
 

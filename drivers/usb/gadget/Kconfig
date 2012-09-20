@@ -43,6 +43,78 @@ menuconfig USB_GADGET
 
 if USB_GADGET
 
+## LGE_SJIT_S 10/21/2011 [mohamed.khadri@lge.com] LG Gadget driver 
+config LGE_ANDROID_USB
+	boolean "LGE Android USB Gadget driver add-on"
+	depends on USB_GADGET && USB_G_ANDROID
+	help
+	   LGE USB add-on functions NMEA and Diag for Android mobile
+           ttyGS0,1,2 setup 					
+	                    usage of ttyGS*
+	   ========================================================
+	         phone        <- || ->      computer
+	   ========================================================
+	    pcsync daemon <-> ttyGS0 <-||-> modem driver(PC)
+	    serial driver <-> ttyGS1 <-||-> Diag port(PC)
+	    serial driver <-> ttyGS2 <-||-> NMEA port(PC)
+	   ========================================================
+config LGE_ANDROID_USB_PID_ENABLE
+       bool "LG Android Product ID - This will override/disable userspace mechanism"
+       depends on LGE_ANDROID_USB
+if LGE_ANDROID_USB_PID_ENABLE
+config LGE_ANDROID_USB_PID
+       hex "LG Android Product ID - This will override/disable userspace mechanism" 
+       default 0x61D7
+       help
+          Default product Id for LG Android.
+          Specifying here will disable android PID override mechanism from userspace
+          ================================================================================
+           0x61A1  -> Diag(interface 0) + NDIS(interface 1, 2) + Modem(interface 3, 4)
+                       + NMEA(interface 5) + UMS(interface 6) +  ADB(interface 7)
+           0x61A2  -> Diag(interface 0) + NDIS(interface 1, 2) + Modem(interface 3, 4)
+                       + NMEA(interface 5) + UMS(interface 6)
+           0x61A3  -> Modem(interface 0, 1)  + Diag(interface 2) + NMEA(interface 3)
+                       + UMS(interface 4) +  ADB(interface 5)
+           0x61A4  -> Modem(interface 0, 1)  + Diag(interface 2) + NMEA(interface 3)
+                       + UMS(interface 4)
+           0x61A5  -> Modem(interface 0, 1)  + Diag(interface 2) + (NMEA(interface 3))
+           0x61A6  -> UMS(interface 0) +  ADB(interface 1)
+           0x61D7  -> RNDIS(interface 0, 1) + Modem(interface 2, 3)  + Diag(interface 4)
+                       + NMEA(interface 5) + UMS(interface 6) +  ADB(interface 7)
+           0x61D8  -> RNDIS(interface 0, 1) + Modem(interface 2, 3)  + Diag(interface 4)
+                       + NMEA(interface 5) + UMS(interface 6)
+           0x61D9  -> RNDIS(interface 0, 1) + ADB(interface 2)
+           0x61DA  -> RNDIS(interface 0, 1)
+           0x618E  -> Modem(interface 0, 1)  + Diag(interface 2) + NMEA(interface 3)
+                       + UMS(interface 4) +  ADB(interface 5)
+          ================================================================================
+endif
+
+config LGE_ANDROID_USB_FUNC
+      bool "LG Android USB functions - This will override/disable userspace mechanism"
+      depends on LGE_ANDROID_USB
+      help
+          Enable LG USB Android gadget functions configuration 
+
+config LGE_ANDROID_USB_FUNC_LIST
+      string "LG Android USB functions - This will override/disable userspace mechanism"
+      depends on LGE_ANDROID_USB_FUNC
+      default "rndis,acm,gser,nmea,mass_storage,adb"
+      help
+         comma separated function list. 
+         Keep consistent with product id
+         adb             - android debug bridge
+         acm             - enable acm port for modem sync
+         nmea            - nmea serial port
+         gser            - LG diag port
+         ptp             - 
+         mtp             -
+         rndis           - 
+         mass_storage    - 
+         accessory       -   android accessory 
+
+## LGE_SJIT_E 10/21/2011 [mohamed.khadri@lge.com] LG Gadget driver
+
 config USB_GADGET_DEBUG
 	boolean "Debugging messages (DEVELOPMENT)"
 	depends on DEBUG_KERNEL
@@ -190,7 +262,7 @@ config USB_FUSB300
 
 config USB_GADGET_OMAP
 	boolean "OMAP USB Device Controller"
-	depends on ARCH_OMAP
+	depends on ARCH_OMAP 
 	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3 || MACH_OMAP_H4_OTG
 	select USB_OTG_UTILS if ARCH_OMAP
 	help

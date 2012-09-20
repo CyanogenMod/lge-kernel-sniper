@@ -288,6 +288,9 @@ struct mmc_host {
 	struct dentry		*debugfs_root;
 
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
+#define MMC_QUIRK_VDD_165_195    (1<<0)/* from GB , do not ignore MMC_VDD_165_195 */
+#define MMC_QUIRK_LENIENT_FUNC0  (1<<1)/* from GB */
+
 	struct {
 		struct sdio_cis			*cis;
 		struct sdio_cccr		*cccr;

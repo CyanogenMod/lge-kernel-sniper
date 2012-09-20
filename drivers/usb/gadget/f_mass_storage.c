@@ -297,7 +297,22 @@
 
 #include "gadget_chips.h"
 
+/* LGE_CHANGE_S 18/06/2012 [edwardk.kim@lge.com] */
+#define VENDOR_NAME_LGE	"LGE"
 
+#ifdef CONFIG_PRODUCT_LGE_KU5900
+#define PRODUCT_NAME_ANDROID    "KU5900"
+//#define PRODUCT_NAME_EXTERNAL   "KU5900 SD Card"
+#else
+#define PRODUCT_NAME_ANDROID	"LU6800"
+//#define PRODUCT_NAME_EXTERNAL 	"LU6800 SD Card"
+#endif
+
+static const char vendor_name[] = VENDOR_NAME_LGE;
+static const char product_name[] = PRODUCT_NAME_ANDROID;
+//static const char product_name_external[] = PRODUCT_NAME_EXTERNAL;
+
+/* LGE_CHANGE_E 18/06/2012 [edwardk.kim@lge.com] */
 /*------------------------------------------------------------------------*/
 
 #define FSG_DRIVER_DESC		"Mass Storage Function"
@@ -625,8 +640,18 @@ static int fsg_setup(struct usb_function *f,
 		if (ctrl->bRequestType !=
 		    (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 			break;
+
+//!![S] 2011-08-04 by pilsu.kim@lge.com :  for mode switch ( multi to single )
+#if defined(CONFIG_LGE_ANDROID_USB)
+		VDBG(fsg, "fsg->interface_number = %d \n", fsg->interface_number);
+
+		if (w_value != 0)
+			return -EDOM;
+#else
 		if (w_index != fsg->interface_number || w_value != 0)
 			return -EDOM;
+#endif
+//!![E] 2011-08-04 by pilsu.kim@lge.com : 
 
 		/*
 		 * Raise an exception to stop the current operation
@@ -640,8 +665,19 @@ static int fsg_setup(struct usb_function *f,
 		if (ctrl->bRequestType !=
 		    (USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE))
 			break;
+
+//!![S] 2011-08-04 by pilsu.kim@lge.com : for mode switch ( multi to single )
+#if defined(CONFIG_LGE_ANDROID_USB)
+		VDBG(fsg, "fsg->interface_number = %d \n",fsg->interface_number);
+
+		if (w_value != 0)
+			return -EDOM;	
+#else
 		if (w_index != fsg->interface_number || w_value != 0)
 			return -EDOM;
+#endif
+//!![E] 2011-08-04 by pilsu.kim@lge.com : 
+
 		VDBG(fsg, "get max LUN\n");
 		*(u8 *)req->buf = fsg->common->nluns - 1;
 
@@ -2187,7 +2223,14 @@ unknown_cmnd:
 		common->data_size_from_cmnd = 0;
 		sprintf(unknown, "Unknown x%02x", common->cmnd[0]);
 		reply = check_command(common, common->cmnd_size,
+/* Vanilla kernel : storage gadgets send wrong error code for unknown commands
+  * http://git.kernel.org/?p=linux/kernel/git/stable/linux-stable.git;a=commit;
+  * h=06200304e7eb237015f433bd8884975e93aba1f5 */
+#if defined(CONFIG_LGE_ANDROID_USB)
+					  DATA_DIR_UNKNOWN, ~0, 0, unknown);
+#else
 				      DATA_DIR_UNKNOWN, 0xff, 0, unknown);
+#endif
 		if (reply == 0) {
 			common->curlun->sense_data = SS_INVALID_COMMAND;
 			reply = -EINVAL;
@@ -2349,7 +2392,15 @@ static int alloc_request(struct fsg_common *common, struct usb_ep *ep,
 /* Reset interface setting and re-init endpoint state (toggle etc). */
 static int do_set_interface(struct fsg_common *common, struct fsg_dev *new_fsg)
 {
+#if !defined(CONFIG_LGE_ANDROID_USB)
+	/* Kernel panic in usb_ep_fifo_flush when USB disconnect
+	 * Orginated from Qualcom patch
+	 * https://www.codeaurora.org/gitweb/quic/la/
+	 * ?p=kernel/msm.git;a=commit;h=c56a55cfdbcad209188a0fe7120d544b519077d3
+	 */
 	const struct usb_endpoint_descriptor *d;
+#endif
+
 	struct fsg_dev *fsg;
 	int i, rc = 0;
 
@@ -2374,6 +2425,13 @@ reset:
 			}
 		}
 
+#if !defined(CONFIG_LGE_ANDROID_USB)
+		/* Kernel panic in usb_ep_fifo_flush when USB disconnect
+		 * Orginated from Qualcom patch
+		 * https://www.codeaurora.org/gitweb/quic/la/
+		 * ?p=kernel/msm.git;a=commit;h=c56a55cfdbcad209188a0fe7120d544b519077d3
+		 */
+
 		/* Disable the endpoints */
 		if (fsg->bulk_in_enabled) {
 			usb_ep_disable(fsg->bulk_in);
@@ -2383,6 +2441,7 @@ reset:
 			usb_ep_disable(fsg->bulk_out);
 			fsg->bulk_out_enabled = 0;
 		}
+#endif
 
 		common->fsg = NULL;
 		wake_up(&common->fsg_wait);
@@ -2394,6 +2453,13 @@ reset:
 
 	common->fsg = new_fsg;
 	fsg = common->fsg;
+
+#if !defined(CONFIG_LGE_ANDROID_USB)
+	/* Kernel panic in usb_ep_fifo_flush when USB disconnect
+	 * Orginated from Qualcom patch
+	 * https://www.codeaurora.org/gitweb/quic/la/
+	 * ?p=kernel/msm.git;a=commit;h=c56a55cfdbcad209188a0fe7120d544b519077d3
+	 */
 
 	/* Enable the endpoints */
 	d = fsg_ep_desc(common->gadget,
@@ -2411,6 +2477,7 @@ reset:
 	fsg->bulk_out_enabled = 1;
 	common->bulk_out_maxpacket = le16_to_cpu(d->wMaxPacketSize);
 	clear_bit(IGNORE_BULK_OUT, &fsg->atomic_bitflags);
+#endif
 
 	/* Allocate the requests */
 	for (i = 0; i < FSG_NUM_BUFFERS; ++i) {
@@ -2440,6 +2507,39 @@ reset:
 static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 {
 	struct fsg_dev *fsg = fsg_from_func(f);
+
+#if defined(CONFIG_LGE_ANDROID_USB)
+	/* Kernel panic in usb_ep_fifo_flush when USB disconnect
+	 * Orginated from Qualcom patch
+	 * https://www.codeaurora.org/gitweb/quic/la/
+	 * ?p=kernel/msm.git;a=commit;h=c56a55cfdbcad209188a0fe7120d544b519077d3
+	 */
+
+	struct fsg_common *common = fsg->common;
+	const struct usb_endpoint_descriptor *d;
+	int rc;
+
+	/* Enable the endpoints */
+	d = fsg_ep_desc(common->gadget,
+			&fsg_fs_bulk_in_desc, &fsg_hs_bulk_in_desc);
+	rc = enable_endpoint(common, fsg->bulk_in, d);
+	if (rc)
+		return rc;
+	fsg->bulk_in_enabled = 1;
+
+	d = fsg_ep_desc(common->gadget,
+			&fsg_fs_bulk_out_desc, &fsg_hs_bulk_out_desc);
+	rc = enable_endpoint(common, fsg->bulk_out, d);
+	if (rc) {
+		usb_ep_disable(fsg->bulk_in);
+		fsg->bulk_in_enabled = 0;
+		return rc;
+	}
+	fsg->bulk_out_enabled = 1;
+	common->bulk_out_maxpacket = le16_to_cpu(d->wMaxPacketSize);
+	clear_bit(IGNORE_BULK_OUT, &fsg->atomic_bitflags);
+#endif
+
 	fsg->common->new_fsg = fsg;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
 	return USB_GADGET_DELAYED_STATUS;
@@ -2448,6 +2548,27 @@ static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 static void fsg_disable(struct usb_function *f)
 {
 	struct fsg_dev *fsg = fsg_from_func(f);
+
+#if defined(CONFIG_LGE_ANDROID_USB)
+	/* Kernel panic in usb_ep_fifo_flush when USB disconnect
+	 * Orginated from Qualcom patch
+	 * https://www.codeaurora.org/gitweb/quic/la/
+	 * ?p=kernel/msm.git;a=commit;h=c56a55cfdbcad209188a0fe7120d544b519077d3
+	 */
+
+	/* Disable the endpoints */
+	if (fsg->bulk_in_enabled) {
+		usb_ep_disable(fsg->bulk_in);
+		fsg->bulk_in_enabled = 0;
+		fsg->bulk_in->driver_data = NULL;
+	}
+	if (fsg->bulk_out_enabled) {
+		usb_ep_disable(fsg->bulk_out);
+		fsg->bulk_out_enabled = 0;
+		fsg->bulk_out->driver_data = NULL;
+	}
+#endif
+
 	fsg->common->new_fsg = NULL;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
 }
@@ -2694,7 +2815,9 @@ static int fsg_main_thread(void *common_)
 static DEVICE_ATTR(ro, 0644, fsg_show_ro, fsg_store_ro);
 static DEVICE_ATTR(nofua, 0644, fsg_show_nofua, fsg_store_nofua);
 static DEVICE_ATTR(file, 0644, fsg_show_file, fsg_store_file);
-
+/* LGE_SJIT_S 1/19/2012 [mohamed.khadri@lge.com] LG Gadget driver  */
+static DEVICE_ATTR(cdrom, 0644, fsg_show_cdrom, fsg_store_cdrom);
+/* LGE_SJIT_E 1/19/2012 [mohamed.khadri@lge.com] LG Gadget driver  */
 
 /****************************** FSG COMMON ******************************/
 
@@ -2726,6 +2849,11 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	int nluns, i, rc;
 	char *pathbuf;
 
+/* LGE_CHANGE_S 18/06/2012 [edwardk.kim@lge.com] */
+	cfg->vendor_name = VENDOR_NAME_LGE;	
+	cfg->product_name =PRODUCT_NAME_ANDROID; 
+/* LGE_CHANGE_E 18/06/2012 [edwardk.kim@lge.com] */	
+	
 	/* Find out how many LUNs there should be */
 	nluns = cfg->nluns;
 	if (nluns < 1 || nluns > FSG_MAX_LUNS) {
@@ -2806,7 +2934,11 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 		rc = device_create_file(&curlun->dev, &dev_attr_nofua);
 		if (rc)
 			goto error_luns;
-
+		/* LGE_SJIT_S 1/19/2012 [mohamed.khadri@lge.com] LG Gadget driver  */
+                rc = device_create_file(&curlun->dev, &dev_attr_cdrom);
+                if (rc)
+                        goto error_luns;
+		/* LGE_SJIT_E 1/19/2012 [mohamed.khadri@lge.com] LG Gadget driver  */
 		if (lcfg->filename) {
 			rc = fsg_lun_open(curlun, lcfg->filename);
 			if (rc)
@@ -2938,6 +3070,9 @@ static void fsg_common_release(struct kref *ref)
 			device_remove_file(&lun->dev, &dev_attr_nofua);
 			device_remove_file(&lun->dev, &dev_attr_ro);
 			device_remove_file(&lun->dev, &dev_attr_file);
+			/* LGE_SJIT_S 1/19/2012 [mohamed.khadri@lge.com] LG Gadget driver  */
+			device_remove_file(&lun->dev, &dev_attr_cdrom);
+			/* LGE_SJIT_E 1/19/2012 [mohamed.khadri@lge.com] LG Gadget driver  */
 			fsg_lun_close(lun);
 			device_unregister(&lun->dev);
 		}

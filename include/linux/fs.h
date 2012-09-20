@@ -1552,7 +1552,8 @@ struct file_operations {
 	ssize_t (*aio_write) (struct kiocb *, const struct iovec *, unsigned long, loff_t);
 	int (*readdir) (struct file *, void *, filldir_t);
 	unsigned int (*poll) (struct file *, struct poll_table_struct *);
-	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+	// long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+	int (*unlocked_ioctl) (struct file *, unsigned int, unsigned long); // 20120213 taeju.park@lge.com To delete compile warning, incompatible types
 	long (*compat_ioctl) (struct file *, unsigned int, unsigned long);
 	int (*mmap) (struct file *, struct vm_area_struct *);
 	int (*open) (struct inode *, struct file *);

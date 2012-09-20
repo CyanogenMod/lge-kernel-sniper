@@ -354,8 +354,21 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	if (channels == 2 && (format == SND_SOC_DAIFMT_I2S ||
 			      format == SND_SOC_DAIFMT_LEFT_J)) {
 		/* Use dual-phase frames */
+#ifndef CONFIG_PRODUCT_LGE_KU5900
 		regs->rcr2	|= RPHASE;
 		regs->xcr2	|= XPHASE;
+#else
+		if(substream->stream)   //capture case
+		{
+			printk(KERN_ERR "[1]omap_mcbsp_dai_hw_params : substream->stream %d", substream->stream);
+			regs->rcr2      |= RPHASE;
+		}
+		else
+		{
+			printk(KERN_ERR "[2]omap_mcbsp_dai_hw_params : substream->stream %d", substream->stream);
+			regs->xcr2      |= XPHASE;
+		}
+#endif
 		/* Set 1 word per (McBSP) frame for phase1 and phase2 */
 		wpf--;
 		regs->rcr2	|= RFRLEN2(wpf - 1);
@@ -364,6 +377,19 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 
 	regs->rcr1	|= RFRLEN1(wpf - 1);
 	regs->xcr1	|= XFRLEN1(wpf - 1);
+
+#ifdef CONFIG_PRODUCT_LGE_KU5900
+	if (channels == 1 && (format == SND_SOC_DAIFMT_I2S)){
+		if(substream->stream)
+		{
+			regs->xcr2  |= XPHASE;
+			regs->rcr2  |= RFRLEN2(wpf - 1);
+			regs->xcr2  |= XFRLEN2(wpf - 1);
+		}
+		regs->rcr1  |= RFRLEN1(wpf - 1);
+		regs->xcr1  |= XFRLEN1(wpf - 1);
+	}
+#endif
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:

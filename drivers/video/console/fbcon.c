@@ -3445,6 +3445,66 @@ err:
 	return count;
 }
 
+/* LGE_CHANGE_S [skykrkrk@lge.com] 2009-12-07, Error handling */
+#ifdef CONFIG_MACH_LGE_HUB
+#include <linux/ctype.h>
+
+void lge_hub_display_message_on_screen(const char *buf)
+{
+	struct vc_data *vc = vc_cons[0].d;
+	struct fb_info *info = registered_fb[con2fb_map[vc->vc_num]];
+	struct display *p = &fb_display[vc->vc_num];
+	struct fbcon_ops *ops = info->fbcon_par;
+
+	int ypos = 0;
+	int xpos = 0;
+	// char* c = buf; // 20120213 taeju.park@lge.com To delete compile warning, buf is constant variable
+	const char* c = buf;
+
+#define MAX_XPOS 60	//font_8x16 & screen 480x800 
+#define MAX_YPOS 50
+//black, blue, green, cyan, red, magenta, gray, brown, white
+//grey, light ...
+#define FG_COLOR0 0xD	//intensive magenta
+#define FG_COLOR1 0xA	//intensive green
+#define FG_COLOR2 0xE	//intensive yellow
+#define BG_COLOR 0x1	//blue
+
+	unsigned short line_buf[MAX_XPOS];
+	int stripped_level = 0; // 20120213 taeju.park@lge.com To delete compile warning
+	
+	for (ypos=0; ypos< MAX_YPOS; ypos++) {
+		memset(line_buf, ' ', MAX_XPOS * 2);
+		// int stripped_level = 0; // 20120213 taeju.park@lge.com To delete compile warning
+		stripped_level = 0;
+		int line_color = FG_COLOR2;
+		for (xpos=0; xpos< MAX_XPOS; ) {
+			char chr = *c;
+			if (chr == 0) break; //end of text. don't increase c pointer
+			c++;
+			if (isprint(chr)) {
+				scr_writew(chr, &line_buf[xpos++]);
+				if (stripped_level == 0 && xpos == 3) {
+					if (line_buf[0] == '<' && isdigit(line_buf[1]) && line_buf[2] == '>') {
+						scr_writew(' ', &line_buf[0]);
+						scr_writew(' ', &line_buf[1]);
+						scr_writew(' ', &line_buf[2]);
+						xpos = 0;
+						stripped_level = 1;
+//						line_color = line_buf[1] - '0' + 8;
+					}
+				}
+			}
+			if (chr == '\n') break; //line feed. increase ypos
+		}
+		ops->putcs(vc, info, line_buf, MAX_XPOS, real_y(p, ypos), 0, line_color, BG_COLOR);
+	}
+	ops->update_start(info);
+}
+EXPORT_SYMBOL(lge_hub_display_message_on_screen);
+#endif //CONFIG_MACH_LGE_HUB
+/* LGE_CHANGE_E [skykrkrk@lge.com] 2009-12-07, Error handling */
+
 static struct device_attribute device_attrs[] = {
 	__ATTR(rotate, S_IRUGO|S_IWUSR, show_rotate, store_rotate),
 	__ATTR(rotate_all, S_IWUSR, NULL, store_rotate_all),

@@ -9,3 +9,19 @@ config VIDEO_OMAP2_VOUT
 	default n
 	---help---
 	  V4L2 Display driver support for OMAP2/3 based boards.
+
+#from GB
+config OMAP2_VRFB
+	bool
+	depends on ARCH_OMAP2 || ARCH_OMAP3
+	default y if VIDEO_OMAP2_VOUT
+	help
+	  VRFB used in V4L2 in OMAP2,3
+
+config OMAP3_ISP_RESIZER
+	bool
+	depends on ARCH_OMAP3
+	default y if VIDEO_OMAP2_VOUT
+	help
+	  ISP resizer used in V4L2 in OMAP3
+

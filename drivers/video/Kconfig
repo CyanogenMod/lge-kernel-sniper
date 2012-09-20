@@ -2408,4 +2408,6 @@ if FB || SGI_NEWPORT_CONSOLE
 	source "drivers/video/logo/Kconfig"
 endif
 
+#LGE_CHANGE [HDMI]
+	source "drivers/video/hdmi/Kconfig"
 endmenu

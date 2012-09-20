@@ -339,6 +339,10 @@ static void musb_otg_notifier_work(struct work_struct *data_notifier_work)
 				pm_runtime_put_autosuspend(musb->controller);
 			}
 
+		/* LGE_SJIT 2012-01-26 [dojip.kim@lge.com]
+		 * musb should be enabled before accessing register
+		 */
+		pm_runtime_get_sync(musb->controller);
 		if (data->interface_type == MUSB_INTERFACE_UTMI) {
 			omap2430_musb_set_vbus(musb, 0);
 			if (musb->xceiv->set_vbus)
@@ -348,6 +352,12 @@ static void musb_otg_notifier_work(struct work_struct *data_notifier_work)
 		val = musb_readl(musb->mregs, OTG_INTERFSEL);
 		val |= ULPI_12PIN;
 		musb_writel(musb->mregs, OTG_INTERFSEL, val);
+		/* LGE_SJIT 2012-01-26 [dojip.kim@lge.com]
+		 * musb should be enabled before accessing register
+		 */
+		pm_runtime_mark_last_busy(musb->controller);
+		pm_runtime_put_autosuspend(musb->controller);
+
 		break;
 	default:
 		dev_dbg(musb->controller, "ID float\n");
@@ -406,6 +416,12 @@ static int omap2430_musb_init(struct musb *musb)
 		dev_dbg(musb->controller, "notification register failed\n");
 
 	setup_timer(&musb_idle_timer, musb_do_idle, (unsigned long) musb);
+
+	/* LGE_SJIT 2012-01-31 [dojip.kim@lge.com] update usb state */
+	if (musb->xceiv->last_event !=  USB_EVENT_NONE) {
+		atomic_notifier_call_chain(&musb->xceiv->notifier,
+				musb->xceiv->last_event, NULL);
+	}
 
 	return 0;
 

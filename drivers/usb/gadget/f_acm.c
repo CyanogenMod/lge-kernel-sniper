@@ -96,10 +96,15 @@ static inline struct f_acm *port_to_acm(struct gserial *p)
 /*-------------------------------------------------------------------------*/
 
 /* notification endpoint uses smallish and infrequent fixed-size messages */
-
+/* LGE_SJIT_S 10/21/2011 [mohamed.khadri@lge.com] LG Gadget driver  */
 #define GS_LOG2_NOTIFY_INTERVAL		5	/* 1 << 5 == 32 msec */
-#define GS_NOTIFY_MAXPACKET		10	/* notification + 2 bytes */
-
+#if defined(CONFIG_LGE_ANDROID_USB)
+/* LGE host Drvier Notify Size Fix */
+#define GS_NOTIFY_MAXPACKET		16	/* notification + 2 bytes */
+#else
+#define GS_NOTIFY_MAXPACKET             10      /* notification + 2 bytes */
+#endif
+/* LGE_SJIT_E 10/21/2011 [mohamed.khadri@lge.com] LG Gadget driver  */
 /* interface and class descriptors: */
 
 static struct usb_interface_assoc_descriptor

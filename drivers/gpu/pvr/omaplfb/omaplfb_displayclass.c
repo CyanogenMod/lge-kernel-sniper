@@ -992,6 +992,22 @@ static IMG_BOOL ProcessFlipV2(IMG_HANDLE hCmdCookie,
 						  dsscomp_proxy_cmdcomplete,
 						  (void *)hCmdCookie);
 
+#ifdef CONFIG_OMAP2_DSS_HDMI //porting natting for new ddk for HDMI S/W rotation : TI - shawn
+	{
+	    extern int hdmi_update_l4(u32 paddr, u16 x, u16 y, u16 w, u16 h);
+	    extern int is_hdmi_enabled(void);
+//		unsigned long fb_offset;
+//		struct fb_info * framebuffer = psDevInfo->psLINFBInfo;
+		
+	    if ( is_hdmi_enabled() )
+	    {
+			//printk("asMemInfo[k].uiAddr = (IMG_UINTPTR_T) virtAddr = 0x%X\n",asMemInfo[k].uiAddr);
+	        hdmi_update_l4( asMemInfo[0].uiAddr /* apsTilerPAs[0]->mem[0] */,
+							  0, 0, psDssData->ovls[0].cfg.width, psDssData->ovls[0].cfg.height);
+	    }
+	}
+#endif
+
 	for(i = 0; i < k; i++)
 	{
 		if (cpu_is_omap44xx()) {

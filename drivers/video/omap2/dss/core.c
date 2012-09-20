@@ -58,7 +58,8 @@ static int omap_dss_register_device(struct omap_dss_device *);
 static void omap_dss_unregister_device(struct omap_dss_device *);
 
 /* REGULATORS */
-
+// LGE_CHANGE ICS
+#if 0
 struct regulator *dss_get_vdds_dsi(void)
 {
 	struct regulator *reg;
@@ -86,7 +87,7 @@ struct regulator *dss_get_vdds_sdi(void)
 
 	return reg;
 }
-
+#endif
 #if defined(CONFIG_DEBUG_FS) && defined(CONFIG_OMAP2_DSS_DEBUG_SUPPORT)
 static int dss_debug_show(struct seq_file *s, void *unused)
 {
@@ -212,7 +213,11 @@ static int omap_dss_probe(struct platform_device *pdev)
 		goto err_dsi;
 	}
 
+#if defined(CONFIG_OMAP2_DSS_HDMI) 
+        r = hdmi_panel_init();
+#else
 	r = hdmi_init_platform_driver();
+#endif
 	if (r) {
 		DSSERR("Failed to initialize hdmi\n");
 		goto err_hdmi;
@@ -221,9 +226,6 @@ static int omap_dss_probe(struct platform_device *pdev)
 	r = dss_initialize_debugfs();
 	if (r)
 		goto err_debugfs;
-
-	if (cpu_is_omap3630())
-		hpd_panel_init();
 
 	for (i = 0; i < pdata->num_devices; ++i) {
 		struct omap_dss_device *dssdev = pdata->devices[i];
@@ -246,12 +248,13 @@ static int omap_dss_probe(struct platform_device *pdev)
 	return 0;
 
 err_register:
-	if (cpu_is_omap3630())
-		hpd_panel_exit();
-
 	dss_uninitialize_debugfs();
 err_debugfs:
+#if defined(CONFIG_OMAP2_DSS_HDMI)
+	hdmi_panel_exit();
+#else
 	hdmi_uninit_platform_driver();
+#endif
 err_hdmi:
 	dsi_uninit_platform_driver();
 err_dsi:
@@ -271,9 +274,6 @@ static int omap_dss_remove(struct platform_device *pdev)
 {
 	struct omap_dss_board_info *pdata = pdev->dev.platform_data;
 	int i;
-
-	if (cpu_is_omap3630())
-		hpd_panel_exit();
 
 	dss_uninitialize_debugfs();
 
@@ -444,7 +444,7 @@ static void omap_dss_driver_disable(struct omap_dss_device *dssdev)
 
 static int omap_dss_driver_enable(struct omap_dss_device *dssdev)
 {
-	int r = dssdev->driver->enable_orig(dssdev);
+	int r = dssdev->driver->enable_orig(dssdev);			// ->hub_enable();
 	if (!r && dssdev->state == OMAP_DSS_DISPLAY_ACTIVE)
 		blocking_notifier_call_chain(&dssdev->state_notifiers,
 					OMAP_DSS_DISPLAY_ACTIVE, dssdev);

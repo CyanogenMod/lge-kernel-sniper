@@ -96,9 +96,17 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 				 * RFC1122 says that the limit is 100 sec.
 				 * 15 is ~13-30min depending on RTO.
 				 */
-
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+    /* Description by heeyeon.nah@lge.com 2012-04-20
+    The tcp_syn_retries variable tells the kernel how many times to try to retransmit 
+    the initial SYN packet for an active TCP connection attempt.
+    */
+#define TCP_SYN_RETRIES	4	/* number of times to retry active opening a
+				 * connection: ~180sec is RFC minimum	*/
+#else
 #define TCP_SYN_RETRIES	 5	/* number of times to retry active opening a
 				 * connection: ~180sec is RFC minimum	*/
+#endif
 
 #define TCP_SYNACK_RETRIES 5	/* number of times to retry passive opening a
 				 * connection: ~180sec is RFC minimum	*/
@@ -122,7 +130,12 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 #endif
 #define TCP_RTO_MAX	((unsigned)(120*HZ))
 #define TCP_RTO_MIN	((unsigned)(HZ/5))
+
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+#define TCP_TIMEOUT_INIT ((unsigned)(1*HZ))	/* RFC 1122 initial RTO value	*/
+#else
 #define TCP_TIMEOUT_INIT ((unsigned)(3*HZ))	/* RFC 1122 initial RTO value	*/
+#endif
 
 #define TCP_RESOURCE_PROBE_INTERVAL ((unsigned)(HZ/2U)) /* Maximal interval between probes
 					                 * for local resources.

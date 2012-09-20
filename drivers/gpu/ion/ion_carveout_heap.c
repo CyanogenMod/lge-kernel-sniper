@@ -27,11 +27,19 @@
 
 #include <asm/mach/map.h>
 
+#include "../arch/arm/mach-omap2/omap_ion.h"
+#include <linux/sched.h>
+#include <linux/signal.h>
+
 struct ion_carveout_heap {
 	struct ion_heap heap;
 	struct gen_pool *pool;
 	ion_phys_addr_t base;
 };
+
+// rt5604@mnbt.co.kr 2012.08.06 to prevent system reboot due to ION Memory short for camera & video application during ART test ->
+long mnTotalIonMemory = OMAP3_ION_HEAP_CARVEOUT_INPUT_SIZE;
+// rt5604@mnbt.co.kr 2012.08.06 to prevent system reboot due to ION Memory short for camera & video application during ART test <-
 
 ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
 				      unsigned long size,
@@ -41,8 +49,36 @@ ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
 		container_of(heap, struct ion_carveout_heap, heap);
 	unsigned long offset = gen_pool_alloc(carveout_heap->pool, size);
 
-	if (!offset)
+
+	// rt5604@mnbt.co.kr 2012.08.06 to prevent system reboot due to ION Memory short for camera & video application during ART test ->
+	if (strncmp("omap3_carveout", heap->name, 14) == 0) {
+		if (offset) mnTotalIonMemory -= size;
+		printk(KERN_DEBUG "rt5604: ---> ion_carveout_allocate:offset=0x%08lx, size=%ld.%03ldMB, Total=%ld.%03ldMB\n", offset, 
+			size/(1024*1024), (size%(1024*1024))/1024,
+			mnTotalIonMemory/(1024*1024), (mnTotalIonMemory%(1024*1024))/1024);
+		if (mnTotalIonMemory < OMAP3_ION_HEAP_CARVEOUT_INPUT_SIZE/10) {	// 10%
+			// Kill mediaserver to prevent hang-up during ART test
+			struct task_struct *p, *pmediaserver = NULL;
+			for_each_process(p) {
+				printk("rt5604: ---> ion_carveout_allocate: process:%d:%s\n",p->pid,p->comm);
+				if(!strncmp(p->comm,"mediaserver", 11)) {
+					pmediaserver = p;
+				}
+				if (pmediaserver) break;
+			}
+			
+			if(pmediaserver) {
+				printk("rt5604: ---> ion_carveout_allocate: KILL %s (pid=%d)!!!\n", pmediaserver->comm, pmediaserver->pid);
+				force_sig(SIGKILL, pmediaserver);
+			}
+		}
+	}
+	// rt5604@mnbt.co.kr 2012.08.06 to prevent system reboot due to ION Memory short for camera & video application during ART test <-
+	
+	if (!offset) {
+		printk(KERN_DEBUG ">>>:ion_carveout_allocate:Allocation FAILURE!!!\n");
 		return ION_CARVEOUT_ALLOCATE_FAIL;
+	}
 
 	return offset;
 }
@@ -53,9 +89,22 @@ void ion_carveout_free(struct ion_heap *heap, ion_phys_addr_t addr,
 	struct ion_carveout_heap *carveout_heap =
 		container_of(heap, struct ion_carveout_heap, heap);
 
-	if (addr == ION_CARVEOUT_ALLOCATE_FAIL)
+	if (addr == ION_CARVEOUT_ALLOCATE_FAIL) {
+		printk(KERN_DEBUG ">>>:ion_carveout_free: FREE ERROR because of wrong addr, 0x%08lx\n", addr);
 		return;
+	}
+
 	gen_pool_free(carveout_heap->pool, addr, size);
+	
+	// rt5604@mnbt.co.kr 2012.08.06 to prevent system reboot due to ION Memory short for camera & video application during ART test ->
+	if (strncmp("omap3_carveout", heap->name, 14) == 0) {
+		mnTotalIonMemory += size;
+
+		printk(KERN_DEBUG "ion_carveout_free    :addr  =0x%08lx, size=%ld.%03ldMB, Total=%ld.%03ldMB\n", addr, 
+			size/(1024*1024), (size%(1024*1024))/1024,
+			mnTotalIonMemory/(1024*1024), (mnTotalIonMemory%(1024*1024))/1024);
+	}
+	// rt5604@mnbt.co.kr 2012.08.06 to prevent system reboot due to ION Memory short for camera & video application during ART test <-
 }
 
 static int ion_carveout_heap_phys(struct ion_heap *heap,
@@ -133,6 +182,7 @@ struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)
 {
 	struct ion_carveout_heap *carveout_heap;
 
+	printk(">>>>:ion_carveout_heap_create\n");
 	carveout_heap = kzalloc(sizeof(struct ion_carveout_heap), GFP_KERNEL);
 	if (!carveout_heap)
 		return ERR_PTR(-ENOMEM);
@@ -156,6 +206,7 @@ void ion_carveout_heap_destroy(struct ion_heap *heap)
 	struct ion_carveout_heap *carveout_heap =
 	     container_of(heap, struct  ion_carveout_heap, heap);
 
+	printk(">>>>:ion_carveout_heap_destroy\n");
 	gen_pool_destroy(carveout_heap->pool);
 	kfree(carveout_heap);
 	carveout_heap = NULL;

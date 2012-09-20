@@ -27,3 +27,12 @@ config FB_OMAP2_NUM_FBS
 	help
 	  Select the number of framebuffers created. OMAP2/3 has 3 overlays
 	  so normally this would be 3.
+
+# from GB
+config GAMMA_TUNING
+	bool "gamma setting"
+	default y
+	help
+	  Select the number of framebuffers created. OMAP2/3 has 3 overlays
+	  so normally this would be 3.
+

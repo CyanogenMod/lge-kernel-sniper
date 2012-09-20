@@ -21,7 +21,6 @@
 #include <mach/tiler.h>
 #include <asm/mach/map.h>
 #include <asm/page.h>
-
 #ifdef CONFIG_OMAP2_VRFB
 
 #include <plat/vrfb.h>
@@ -281,6 +280,16 @@ int omap_setup_vrfb_buffer(struct dss2_ovl_info *ovl_info)
 				&ion_vrfb_t[i].vrfb_context,
 				ovl_info->cfg.rotation);
 		ion_vrfb_t[i].ismapped = 1;
+	}
+
+	if (ovl_info->cfg.rotation & 1)	{
+#if 0		//goochang.jeong@lge.com  ti patch for HDMI
+		ovl_info->cfg.win.w =
+			(ovl_info->cfg.win.h * ovl_info->cfg.win.h) /
+			ovl_info->cfg.win.w;
+#else
+		ovl_info->cfg.win.w = (ovl_info->cfg.win.w * ovl_info->cfg.win.h) / ovl_info->cfg.win.h;
+#endif
 	}
 
 	ovl_info->cfg.stride =  VRFB_LINE_LENGTH * 2;

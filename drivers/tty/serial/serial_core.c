@@ -175,7 +175,7 @@ static int uart_startup(struct tty_struct *tty, struct uart_state *state, int in
 	if (retval == 0) {
 		if (uart_console(uport) && uport->cons->cflag) {
 			tty->termios->c_cflag = uport->cons->cflag;
-			uport->cons->cflag = 0;
+			//uport->cons->cflag = 0;	/*[LGE_CHANGE] 2012-08-08 pyocool.cho@lge.com "for uart resume bug"
 		}
 		/*
 		 * Initialise the hardware port settings.

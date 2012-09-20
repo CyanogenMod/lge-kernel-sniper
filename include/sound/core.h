@@ -43,7 +43,7 @@
 #ifdef CONFIG_PCI
 struct pci_dev;
 #endif
-
+//iwlee_temp #define CONFIG_SND_VERBOSE_PRINTK
 /* device allocation stuff */
 
 #define SNDRV_DEV_TYPE_RANGE_SIZE		0x1000
@@ -133,7 +133,12 @@ struct snd_card {
 	int free_on_last_close;		/* free in context of file_release */
 	wait_queue_head_t shutdown_sleep;
 	struct device *dev;		/* device assigned to this card */
+
+// LGE_CHANGE_S
+#ifndef CONFIG_SYSFS_DEPRECATED
 	struct device *card_dev;	/* cardX object for sysfs */
+#endif
+// LGE_CHANGE_E
 
 #ifdef CONFIG_PM
 	unsigned int power_state;	/* power state */
@@ -194,7 +199,13 @@ struct snd_minor {
 /* return a device pointer linked to each sound device as a parent */
 static inline struct device *snd_card_get_device_link(struct snd_card *card)
 {
+// LGE_CHANGE_S
+#ifdef CONFIG_SYSFS_DEPRECATED
+	return card ? card->dev : NULL;
+#else
 	return card ? card->card_dev : NULL;
+#endif
+// LGE_CHANGE_E
 }
 
 /* sound.c */

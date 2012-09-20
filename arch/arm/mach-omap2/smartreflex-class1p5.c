@@ -31,6 +31,10 @@
 #include "voltage.h"
 #include "dvfs.h"
 
+/* S[, 2012.08.10, mannsik.chung@lge.com, Use nominal volt in MPU_OPP50(300MHz). */
+#include "omap3_voltages.h"
+/* E], 2012.08.10, mannsik.chung@lge.com, Use nominal volt in MPU_OPP50(300MHz). */
+
 #define MAX_VDDS		3
 #define SR1P5_SAMPLING_DELAY_MS	1
 #define SR1P5_STABLE_SAMPLES	10
@@ -314,6 +318,18 @@ done_calib:
 			 __func__, voltdm->name, volt_data->volt_calibrated);
 		voltdm_scale(voltdm, volt_data);
 	}
+
+	/* S[, 2012.08.10, mannsik.chung@lge.com, Use nominal volt in MPU_OPP50(300MHz). */
+	if (volt_data->volt_nominal == OMAP3630_VDD_MPU_OPP50_UV && 
+		!strcmp(voltdm->name, "mpu_iva"))
+		volt_data->volt_calibrated = volt_data->volt_nominal;
+	/* E], 2012.08.10, mannsik.chung@lge.com, Use nominal volt in MPU_OPP50(300MHz). */
+
+	/* S[, 2012.08.28, mannsik.chung@lge.com, Use nominal volt in CORE_OPP50. */
+	if (volt_data->volt_nominal == OMAP3630_VDD_CORE_OPP50_UV &&
+			!strcmp(voltdm->name, "core"))
+		volt_data->volt_calibrated = volt_data->volt_nominal;
+	/* E], 2012.08.28, mannsik.chung@lge.com, Use nominal volt in CORE_OPP50. */
 
 	pr_info("%s: %s: Calibration complete: Voltage Nominal=%d"
 		"Calib=%d margin=%d\n",

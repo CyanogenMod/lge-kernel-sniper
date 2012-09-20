@@ -44,9 +44,9 @@
 
 #include <linux/debugfs.h>
 
-#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
-#include "dsscomp_ispresizer.h"
-#endif
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO  
+#include "dsscomp_ispresizer.h"  
+#endif  
 
 static DECLARE_WAIT_QUEUE_HEAD(waitq);
 static DEFINE_MUTEX(wait_mtx);
@@ -548,15 +548,15 @@ static int dsscomp_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, cdev);
 
-#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO
-	ret = create_isprsz_sysfs(pdev);
-
-	if (ret) {
-		pr_err("dsscomp: failed to create sysfs entries"
-			"for ISP resizer.\n");
-	}
-
-#endif
+#ifdef CONFIG_OMAP3_ISP_RESIZER_ON_720P_VIDEO  
+	ret = create_isprsz_sysfs(pdev);  
+	  
+	if (ret) {  
+		pr_err("dsscomp: failed to create sysfs entries"  
+				"for ISP resizer.\n");  
+	}  
+  
+#endif 
 
 	pr_info("dsscomp: initializing.\n");
 

@@ -67,8 +67,21 @@ static void omap_prcm_arch_reset(char mode, const char *cmd)
 
 		prcm_offs = WKUP_MOD;
 	} else if (cpu_is_omap34xx()) {
+		u32 l;
 		prcm_offs = OMAP3430_GR_MOD;
+/* LGE_CHANGE_S from GB, more reset info. to bootloader */
+#if defined(CONFIG_MACH_LGE_OMAP3)
+		{
+			extern char reset_mode;
+			// yoolje.cho@lge.com : applying from 2.6.32 to 2.6.35
+			//l = ('B' << 24) | ('M' << 16) | (reset_mode << 8) | mode;
+			l = ('B' << 24) | ('M' << 16) | (reset_mode << 8) | (cmd ? (u8)*cmd : 0);
+		}
+		omap_writel(l, OMAP343X_SCRATCHPAD + 4);
+#else
 		omap3_ctrl_write_boot_mode((cmd ? (u8)*cmd : 0));
+#endif
+/* LGE_CHANGE_E from GB, more reset info. to bootloader */
 	} else if (cpu_is_omap44xx()) {
 		omap4_prm_global_warm_sw_reset(); /* never returns */
 	} else {

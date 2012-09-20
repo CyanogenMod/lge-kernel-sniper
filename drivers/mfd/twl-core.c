@@ -59,7 +59,7 @@
 
 #define DRIVER_NAME			"twl"
 
-#if defined(CONFIG_KEYBOARD_TWL4030) || defined(CONFIG_KEYBOARD_TWL4030_MODULE)
+#if defined(CONFIG_KEYBOARD_TWL4030) || defined(CONFIG_KEYBOARD_TWL4030_MODULE) || defined(CONFIG_KEYBOARD_TWL4030_JUSTIN_KR)
 #define twl_has_keypad()	true
 #else
 #define twl_has_keypad()	false
@@ -123,10 +123,17 @@
 #define twl_has_codec()	false
 #endif
 
+//LGE_CHANGE_S  DEJA from GB ICS porting
+//#if defined(CONFIG_CHARGER_TWL4030) || \
+//	defined(CONFIG_CHARGER_TWL4030_MODULE) || \
+//	defined(CONFIG_TWL6030_BCI_BATTERY) || \
+//	defined(CONFIG_TWL6030_BCI_BATTERY_MODULE)
 #if defined(CONFIG_CHARGER_TWL4030) || \
 	defined(CONFIG_CHARGER_TWL4030_MODULE) || \
 	defined(CONFIG_TWL6030_BCI_BATTERY) || \
+	defined(CONFIG_TWL4030_BCI_BATTERY) || \
 	defined(CONFIG_TWL6030_BCI_BATTERY_MODULE)
+//LGE_CHANGE_E  DEJA from GB ICS porting
 #define twl_has_bci()	true
 #else
 #define twl_has_bci()	false
@@ -1116,10 +1123,16 @@ add_children(struct twl4030_platform_data *pdata, unsigned long features)
 
 	}
 
-/* Removed (features & TWL6030_CLASS) condition check */
+/* LGE_CHANGE_S [daewung.kim@lge.com] 2012-03-21, Black use twl4030_bci, thus remove TWL6030_CLASS condition check */
+#if 0
 	if (twl_has_bci() && pdata->bci &&
 			(!(features & (TPS_SUBSET | TWL5031)) ||
 					(features & TWL6030_CLASS))) {
+#else
+    if (twl_has_bci() && pdata->bci &&
+                !(features & (TPS_SUBSET | TWL5031))) {
+#endif
+/* LGE_CHANGE_E [daewung.kim@lge.com] 2012-03-21 */
 		child = add_child(3, "twl4030_bci",
 				pdata->bci, sizeof(*pdata->bci), false,
 				/* irq0 = CHG_PRES, irq1 = BCI */
@@ -1364,6 +1377,8 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 			goto fail;
 	}
 
+// kibum.lee@lge.com ICS error fix -> omap_i2c omap_i2c.1: controller timed out
+#if 0
 	/* Disable TWL4030/TWL5030 I2C Pull-up on I2C1 and I2C4(SR) interface.
 	 * Program I2C_SCL_CTRL_PU(bit 0)=0, I2C_SDA_CTRL_PU (bit 2)=0,
 	 * SR_I2C_SCL_CTRL_PU(bit 4)=0 and SR_I2C_SDA_CTRL_PU(bit 6)=0.
@@ -1375,13 +1390,34 @@ twl_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		I2C_SDA_CTRL_PU | I2C_SCL_CTRL_PU);
 		twl_i2c_write_u8(TWL4030_MODULE_INTBR, temp, REG_GPPUPDCTR1);
 	}
-
+#endif
+// kibum.lee@lge.com ICS error fix -> omap_i2c omap_i2c.1: controller timed out
+	
 	status = add_children(pdata, id->driver_data);
 fail:
 	if (status < 0)
 		twl_remove(client);
 	return status;
 }
+
+// LGE kibum.lee@lge.com from GB code
+void twl_rewrite_starton_condition(u8 condition)
+{
+	u8 val = 0;
+
+	twl_i2c_read_u8(TWL4030_MODULE_PM_MASTER, &val, 0x00);
+	printk("[Start on condition] Before: CFG_P1_TRANSITION - 0x%x\n", val);
+
+	if(val != condition)
+	{
+		unprotect_pm_master();
+		twl_i2c_write_u8(TWL4030_MODULE_PM_MASTER, condition, 0);
+		twl_i2c_write_u8(TWL4030_MODULE_PM_MASTER, condition, 1);
+		twl_i2c_write_u8(TWL4030_MODULE_PM_MASTER, condition, 2);
+		protect_pm_master();
+	}
+}
+// LGE kibum.lee@lge.com from GB code
 
 static const struct i2c_device_id twl_ids[] = {
 	{ "twl4030", TWL4030_VAUX2 },	/* "Triton 2" */

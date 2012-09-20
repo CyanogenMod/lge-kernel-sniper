@@ -403,6 +403,16 @@ config SENSORS_AK8975
 	  If you say yes here you get support for Asahi Kasei's
 	  orientation sensor AK8975.
 
+#+++LG_BRCM_BTDRV chanha.park@lge.com
+config LBEE9QMB_RFKILL
+	tristate "Bluetooth power control driver for Murata lbee9qmb"
+	depends on RFKILL
+	default n
+	---help---
+	 Creates an rfkill entry in sysfs for power control of
+	 Murata lbee9qmbc Bluetooth+WiFi chips.
+#---	  
+
 config EP93XX_PWM
 	tristate "EP93xx PWM support"
 	depends on ARCH_EP93XX
@@ -528,6 +538,24 @@ config APANIC_PLABEL
 	 If your platform uses a different flash partition label for storing
  	 crashdumps, enter it here.
 
+# from GB
+# LGE_CHANGE_S, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
+config GP2AP_PROXIMITY
+	bool "GP2AP_PROXIMITY driver"
+	default y
+	---help---
+	 If you say yes here you get support for the 
+	 Sharp GP2AP Proximity Driver.
+# LGE_CHANGE_E, hyun.seungjin@lge.com, 2011-02-23, Move directory from driver/hub to misc
+
+# prime@sdcmicro.com Merge from 2.6.32 [START]
+	config TSPDRV
+	bool "Immersion Corporation Vibrator Driver(TSPDRV)"
+	default y
+	---help---
+	 TouchSense Kernel Module(Immersion Corporation)
+# prime@sdcmicro.com Merge from 2.6.32 [END]
+
 config OMAP_DIE_TEMP_SENSOR
         bool "OMAP On-Die temp sensor support"
         depends on OMAP_TEMP_SENSOR
@@ -539,6 +567,11 @@ config TWL6040_VIB
 	bool "TWL6040 Vibrator"
 	depends on TWL6040_CODEC && ANDROID_TIMED_OUTPUT
 	default n
+
+#Description: Enable modem watcher
+config LGE_MODEM_WATCHER
+	bool "LGE Modem Watcher"
+	depends on MACH_LGE
 
 config OMAP4_DUTY_CYCLE
 	tristate "Control OPP_NITRO usage based on duty cycle strategy"
@@ -556,5 +589,12 @@ source "drivers/misc/ti-st/Kconfig"
 source "drivers/misc/lis3lv02d/Kconfig"
 source "drivers/misc/carma/Kconfig"
 source "drivers/misc/gc-core/Kconfig"
+# from GB
+# LGE_CHANGE_S, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
+source "drivers/misc/mpu3050/Kconfig"
+# LGE_CHANGE_E, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
+
+# Black & Justin sensor drivers is added.
+source "drivers/misc/bj_sensors/Kconfig"
 
 endif # MISC_DEVICES

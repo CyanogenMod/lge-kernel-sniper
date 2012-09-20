@@ -51,6 +51,12 @@ static void warn_no_thread(unsigned int irq, struct irqaction *action)
 	       "but no thread function available.", irq, action->name);
 }
 
+// LGE_UPDATE_S
+#if defined(CONFIG_WAKE_IRQ_PRINT)
+extern void wakeup_irq_record_one(unsigned int irq);
+#endif
+// LGE_UPDATE_E
+
 static void irq_wake_thread(struct irq_desc *desc, struct irqaction *action)
 {
 	/*
@@ -123,6 +129,11 @@ handle_irq_event_percpu(struct irq_desc *desc, struct irqaction *action)
 		irqreturn_t res;
 
 		trace_irq_handler_entry(irq, action);
+// LGE_UPDATE_S
+#if defined(CONFIG_WAKE_IRQ_PRINT)
+		wakeup_irq_record_one(irq);
+#endif
+// LGE_UPDATE_E
 		res = action->handler(irq, action->dev_id);
 		trace_irq_handler_exit(irq, action, res);
 

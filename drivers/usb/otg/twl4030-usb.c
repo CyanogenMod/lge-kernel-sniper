@@ -143,6 +143,10 @@
 #define PMBR1				0x0D
 #define GPIO_USB_4PIN_ULPI_2430C	(3 << 0)
 
+/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */
+void vbus_irq_muic_handler(int state);
+/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
+
 struct twl4030_usb {
 	struct otg_transceiver	otg;
 	struct device		*dev;
@@ -173,7 +177,7 @@ struct twl4030_usb {
 static int twl4030_i2c_write_u8_verify(struct twl4030_usb *twl,
 		u8 module, u8 data, u8 address)
 {
-	u8 check;
+	u8 check = 0;
 
 	if ((twl_i2c_write_u8(module, data, address) >= 0) &&
 	    (twl_i2c_read_u8(module, &check, address) >= 0) &&
@@ -211,7 +215,7 @@ static inline int twl4030_usb_write(struct twl4030_usb *twl,
 
 static inline int twl4030_readb(struct twl4030_usb *twl, u8 module, u8 address)
 {
-	u8 data;
+	u8 data = 0;
 	int ret = 0;
 
 	ret = twl_i2c_read_u8(module, &data, address);
@@ -369,8 +373,10 @@ static void __twl4030_phy_power(struct twl4030_usb *twl, int on)
 static void twl4030_phy_power(struct twl4030_usb *twl, int on)
 {
 	if (on) {
+#if 0	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
 		regulator_enable(twl->usb3v1);
 		regulator_enable(twl->usb1v8);
+#endif
 		/*
 		 * Disabling usb3v1 regulator (= writing 0 to VUSB3V1_DEV_GRP
 		 * in twl4030) resets the VUSB_DEDICATED2 register. This reset
@@ -380,6 +386,9 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
 		 */
 		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0,
 							VUSB_DEDICATED2);
+#if 1	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
+		regulator_enable(twl->usb1v8);
+#endif
 		regulator_enable(twl->usb1v5);
 		__twl4030_phy_power(twl, 1);
 		twl4030_usb_write(twl, PHY_CLK_CTRL,
@@ -390,7 +399,13 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
 		__twl4030_phy_power(twl, 0);
 		regulator_disable(twl->usb1v5);
 		regulator_disable(twl->usb1v8);
+#if 1	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
+		/* Put VUSB3V1 regulator in sleep mode */
+		twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x08,
+				                        VUSB_DEDICATED2);
+#else
 		regulator_disable(twl->usb3v1);
+#endif
 	}
 }
 
@@ -417,9 +432,12 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
 {
 	if (!twl->asleep)
 		return;
+//kibum.lee@lge.com M4 supplemental patch, USB:Adding usb status in runtime resume
 	/* Check the link status before enabling */
 	if (twl4030_usb_linkstat(twl) == USB_EVENT_NONE)
 		return;
+//kibum.lee@lge.com M4 supplemental patch, USB:Adding usb status in runtime resume
+
 	__twl4030_phy_resume(twl);
 	twl->asleep = 0;
 	dev_dbg(twl->dev, "%s\n", __func__);
@@ -442,12 +460,17 @@ static int twl4030_usb_ldo_init(struct twl4030_usb *twl)
 	/* input to VUSB3V1 LDO is from VBAT, not VBUS */
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x14, VUSB_DEDICATED1);
 
+#if 1	/* LGE_CHANGE [HEAVEN: newcomet@lge.com] on 2009-10-14, for <25.12 USB interrupt fix> */
+	/* Turn on 3.1V regulator */
+	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0x20, VUSB3V1_DEV_GRP);
+#else
 	/* Initialize 3.1V regulator */
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0, VUSB3V1_DEV_GRP);
 
 	twl->usb3v1 = regulator_get(twl->dev, "usb3v1");
 	if (IS_ERR(twl->usb3v1))
 		return -ENODEV;
+#endif
 
 	twl_i2c_write_u8(TWL4030_MODULE_PM_RECEIVER, 0, VUSB3V1_TYPE);
 
@@ -506,6 +529,11 @@ static irqreturn_t twl4030_usb_irq(int irq, void *_twl)
 	int status;
 
 	status = twl4030_usb_linkstat(twl);
+#if defined (CONFIG_PRODUCT_LGE_LU6800)
+	/* LGE_CHANGE_START 2011-03-16 kenneth.kang@lge.com patch for Adb offline set and Mass Storage Driver detecting fail */
+	vbus_irq_muic_handler(status); //20110123 taehwan.kim@lge.com To support illegal charger (ex any charger)
+	/* LGE_CHANGE_END 2011-03-16 kenneth.kang@lge.com */
+#endif
 	if (status >= 0) {
 		/* FIXME add a set_power() method so that B-devices can
 		 * configure the charger appropriately.  It's not always

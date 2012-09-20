@@ -27,6 +27,13 @@ static enum {
 	FB_STATE_DRAWING_OK,
 } fb_state;
 
+// prime@sdcmicro.com Temporary - Exports the SurfaceFlinger DRAW state [START]
+int get_fb_state(void)
+{
+	return fb_state;
+}
+// prime@sdcmicro.com Temporary - Exports the SurfaceFlinger DRAW state [END]
+
 /* tell userspace to stop drawing, wait for it to stop */
 static void stop_drawing_early_suspend(struct early_suspend *h)
 {

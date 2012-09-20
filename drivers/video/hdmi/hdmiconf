@@ -1,0 +1,11 @@
+#!/system/bin/sh
+
+# HDMI Insert module
+
+# insmod hdmitx.ko "verbose=1"
+# insmod hdmicec.ko "verbose=1" "device=4"
+
+insmod hdmitx.ko verbose=1
+insmod hdmicec.ko device=4 verbose=1
+chmod 0777 /dev/hdmitx
+chmod 0777 /dev/hdmicec

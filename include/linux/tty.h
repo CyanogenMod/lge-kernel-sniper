@@ -49,10 +49,11 @@
 #define N_V253		19	/* Codec control over voice modem */
 #define N_CAIF		20      /* CAIF protocol for talking to modems */
 #define N_GSM0710	21	/* GSM 0710 Mux */
-#define N_TI_WL		22	/* for TI's WL BT, FM, GPS combo chips */
+#define N_TI_WL		22	/* Texas Instruments WiLink shared transport */
 #define N_TRACESINK	23	/* Trace data routing for MIPI P1149.7 */
 #define N_TRACEROUTER	24	/* Trace data routing for MIPI P1149.7 */
-
+#define N_RIN		25 /*LGE_SJIT 2011-09-15 [zening.chen@lge.com] ldisk index for rindrv.c driver*/
+#define N_TS2710	26 /* [LGE_IPC] 2012_01_31. ldisc for ts0710_mux */
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as
  * a c_cc[] character, but indicates that a particular special character
@@ -294,8 +295,11 @@ struct tty_struct {
 	void *driver_data;
 	struct list_head tty_files;
 
+#if defined(CONFIG_MACH_LGE)
+#define N_TTY_BUF_SIZE 32768
+#else
 #define N_TTY_BUF_SIZE 4096
-
+#endif
 	/*
 	 * The following is data for the N_TTY line discipline.  For
 	 * historical reasons, this is included in the tty structure.

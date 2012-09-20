@@ -80,7 +80,7 @@ static struct twl4030_ins wrst_seq[] __initdata = {
  * Reset RC.
  * Reenable twl4030.
  */
-	{MSG_SINGULAR(DEV_GRP_NULL, RES_NRES_PWRON, RES_STATE_OFF), 2},
+	{MSG_SINGULAR(DEV_GRP_NULL, RES_NRES_PWRON, RES_STATE_OFF), 2}, 	/* kibum.lee@lge.com M4 supplemental patch, No Recovery From Warm Reset While In Off Mode */
 	{MSG_SINGULAR(DEV_GRP_NULL, RES_RESET, RES_STATE_OFF), 2},
 	{MSG_SINGULAR(DEV_GRP_NULL, RES_MAIN_REF, RES_STATE_WRST), 2},
 	{MSG_BROADCAST(DEV_GRP_NULL, RES_GRP_ALL, RES_TYPE_R0, RES_TYPE2_R2,
@@ -91,7 +91,7 @@ static struct twl4030_ins wrst_seq[] __initdata = {
 	{MSG_BROADCAST(DEV_GRP_NULL, RES_GRP_RC, RES_TYPE_ALL, RES_TYPE2_R0,
 							RES_STATE_WRST), 2},
 	{MSG_SINGULAR(DEV_GRP_NULL, RES_RESET, RES_STATE_ACTIVE), 2},
-	{MSG_SINGULAR(DEV_GRP_NULL, RES_NRES_PWRON, RES_STATE_ACTIVE), 2},
+	{MSG_SINGULAR(DEV_GRP_NULL, RES_NRES_PWRON, RES_STATE_ACTIVE), 2}, 	/* kibum.lee@lge.com M4 supplemental patch, No Recovery From Warm Reset While In Off Mode */
 };
 
 static struct twl4030_script wrst_script __initdata = {
@@ -142,7 +142,9 @@ static struct twl4030_power_data twl4030_generic_script __initdata = {
 	.resource_config = twl4030_rconfig,
 };
 
-void twl4030_get_scripts(struct twl4030_power_data *t2scripts_data)
+// [kibum.lee@lge.com] Section mismatch WARNING fix
+//void twl4030_get_scripts(struct twl4030_power_data *t2scripts_data)
+void __init twl4030_get_scripts(struct twl4030_power_data *t2scripts_data)
 {
 	t2scripts_data->scripts = twl4030_generic_script.scripts;
 	t2scripts_data->num = twl4030_generic_script.num;

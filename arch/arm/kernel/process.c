@@ -157,7 +157,7 @@ void arm_machine_restart(char mode, const char *cmd)
 	/*
 	 * Now call the architecture specific reboot code.
 	 */
-	arch_reset(mode, cmd);
+	arch_reset(mode, cmd);		// omap_prcm_arch_reset(); 	// kibum.lee@lge.com
 
 	/*
 	 * Whoops - the architecture was unable to reboot.
@@ -223,8 +223,8 @@ void cpu_idle(void)
 
 	/* endless idle loop with no priority at all */
 	while (1) {
-		idle_notifier_call_chain(IDLE_START);
 		tick_nohz_stop_sched_tick(1);
+		idle_notifier_call_chain(IDLE_START);
 		while (!need_resched()) {
 #ifdef CONFIG_HOTPLUG_CPU
 			if (cpu_is_offline(smp_processor_id()))
@@ -285,13 +285,13 @@ void machine_power_off(void)
 {
 	machine_shutdown();
 	if (pm_power_off)
-		pm_power_off();
+		pm_power_off();						// twl4030_poweroff() kibum.lee@lge.com
 }
 
 void machine_restart(char *cmd)
 {
 	machine_shutdown();
-	arm_pm_restart(reboot_mode, cmd);
+	arm_pm_restart(reboot_mode, cmd);		// arm_machine_restart() kibum.lee@lge.com
 }
 
 /*
@@ -424,8 +424,9 @@ void __show_regs(struct pt_regs *regs)
 		printk("Control: %08x%s\n", ctrl, buf);
 	}
 #endif
-
+#if 0 //sunggyun.yu@lge.com for infinite data abort
 	show_extra_register_data(regs, 128);
+#endif
 }
 
 void show_regs(struct pt_regs * regs)

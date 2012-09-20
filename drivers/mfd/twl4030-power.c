@@ -31,6 +31,9 @@
 
 #include <asm/mach-types.h>
 
+//LGE_CHANGE kibum.lee@lge.com
+#include <linux/notifier.h>
+
 #include <../../mach-omap2/smartreflex.h>
 
 static u8 twl4030_start_script_address = 0x2b;
@@ -129,6 +132,33 @@ static u8 res_config_addrs[] = {
 	[RES_RESET]	= 0x91,
 	[RES_MAIN_REF]	= 0x94,
 };
+
+// LGE_CHANGE_S from GB kibum.lee@lge.com
+/*
+ * PRCM on OMAP3 will drive SYS_OFFMODE low during DPLL3 warm reset.
+ * This causes Gaia sleep script to execute, usually killing VDD1 and
+ * VDD2 while code is running.  WA is to disable the sleep script
+ * before warm reset.
+ */
+extern int register_reboot_notifier(struct notifier_block *nb);
+static int twl4030_prepare_for_reboot(struct notifier_block *this,
+		unsigned long cmd, void *p)
+{
+	int err;
+
+	err = twl4030_remove_script(TWL4030_SLEEP_SCRIPT);
+	if (err)
+		pr_err("TWL4030: error trying to disable sleep script!\n");
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block twl4030_reboot_notifier = {
+		.notifier_call = twl4030_prepare_for_reboot,
+		.next = NULL,
+		.priority = 0
+};
+// LGE_CHANGE_E from GB kibum.lee@lge.com
 
 static int __init twl4030_write_script_byte(u8 address, u8 byte)
 {
@@ -581,6 +611,13 @@ void __init twl4030_power_init(struct twl4030_power_data *twl4030_scripts)
 			TWL4030_PM_MASTER_PROTECT_KEY);
 	if (err)
 		pr_err("TWL4030 Unable to relock registers\n");
+
+// LGE_CHANGE_S from GB kibum.lee@lge.com
+	err = register_reboot_notifier(&twl4030_reboot_notifier);
+	if (err)
+		pr_err("TWL4030 Failed to register reboot notifier\n");
+// LGE_CHANGE_E from GB kibum.lee@lge.com
+
 	return;
 
 unlock:

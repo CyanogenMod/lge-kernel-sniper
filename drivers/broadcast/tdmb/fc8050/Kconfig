@@ -1,0 +1,11 @@
+#
+# FC8050_DEVICE subsystem configuration
+#
+
+#menu "FC8050 support"
+
+config LGE_BROADCAST_FC8050
+	bool "fc8050 device support"
+	default n
+  
+#endmenu

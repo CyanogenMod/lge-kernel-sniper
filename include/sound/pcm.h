@@ -367,6 +367,7 @@ struct snd_pcm_group {		/* keep linked substreams */
 struct pid;
 
 struct snd_pcm_substream {
+	int use256FS;			// LGE_CHANGE
 	struct snd_pcm *pcm;
 	struct snd_pcm_str *pstr;
 	void *private_data;		/* copied from pcm->private_data */

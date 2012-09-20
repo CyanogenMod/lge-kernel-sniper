@@ -30,7 +30,7 @@
 #include <linux/semaphore.h>
 #include <linux/seq_file.h>
 #include <linux/platform_device.h>
-#include <linux/regulator/consumer.h>
+//#include <linux/regulator/consumer.h> /* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator*/
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <linux/sched.h>
@@ -286,7 +286,9 @@ struct dsi_data {
 	struct dsi_clock_info current_cinfo;
 
 	bool vdds_dsi_enabled;
-	struct regulator *vdds_dsi_reg;
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+	//struct regulator *vdds_dsi_reg;
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */
 
 	struct {
 		enum dsi_vc_mode mode;
@@ -1049,6 +1051,31 @@ static u32 dsi_get_errors(struct platform_device *dsidev)
 	return e;
 }
 
+#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+static void dsi_vc_enable_bta_irq(struct platform_device *dsidev,
+	int channel)
+{
+	u32 l;
+	
+	dsi_write_reg(dsidev, DSI_VC_IRQSTATUS(channel), DSI_VC_IRQ_BTA);
+
+	l = dsi_read_reg(dsidev, DSI_VC_IRQENABLE(channel));
+	l |= DSI_VC_IRQ_BTA;
+	dsi_write_reg(dsidev, DSI_VC_IRQENABLE(channel), l);
+}
+
+static void dsi_vc_disable_bta_irq(struct platform_device *dsidev,
+	int channel)
+{
+	u32 l;
+
+	l = dsi_read_reg(dsidev, DSI_VC_IRQENABLE(channel));
+	l &= ~DSI_VC_IRQ_BTA;
+	dsi_write_reg(dsidev, DSI_VC_IRQENABLE(channel), l);
+}
+
+#endif
+
 int dsi_runtime_get(struct platform_device *dsidev)
 {
 	int r;
@@ -1657,7 +1684,8 @@ int dsi_pll_init(struct platform_device *dsidev, bool enable_hsclk,
 	enum dsi_pll_power_state pwstate;
 
 	DSSDBG("PLL init\n");
-
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (dsi->vdds_dsi_reg == NULL) {
 		struct regulator *vdds_dsi;
 
@@ -1670,20 +1698,23 @@ int dsi_pll_init(struct platform_device *dsidev, bool enable_hsclk,
 
 		dsi->vdds_dsi_reg = vdds_dsi;
 	}
-
+#endif
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */
 	dsi_enable_pll_clock(dsidev, 1);
 	/*
 	 * Note: SCP CLK is not required on OMAP3, but it is required on OMAP4.
 	 */
 	dsi_enable_scp_clk(dsidev);
-
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (!dsi->vdds_dsi_enabled) {
 		r = regulator_enable(dsi->vdds_dsi_reg);
 		if (r)
 			goto err0;
 		dsi->vdds_dsi_enabled = true;
 	}
-
+#endif
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */
 	/* XXX PLL does not come out of reset without this... */
 	dispc_pck_free_enable(1);
 
@@ -1691,7 +1722,12 @@ int dsi_pll_init(struct platform_device *dsidev, bool enable_hsclk,
 		DSSERR("PLL not coming out of reset.\n");
 		r = -ENODEV;
 		dispc_pck_free_enable(0);
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+#if 0
 		goto err1;
+#endif
+		goto err0;
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */	
 	}
 
 	/* XXX ... but if left on, we get problems when planes do not
@@ -1719,16 +1755,25 @@ int dsi_pll_init(struct platform_device *dsidev, bool enable_hsclk,
 	r = dsi_pll_power(dsidev, pwstate);
 
 	if (r)
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+#if 0
 		goto err1;
+#endif
+		goto err0;
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */
 
 	DSSDBG("PLL init done\n");
 
 	return 0;
 err1:
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (dsi->vdds_dsi_enabled) {
 		regulator_disable(dsi->vdds_dsi_reg);
 		dsi->vdds_dsi_enabled = false;
 	}
+#endif
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */
 err0:
 	dsi_disable_scp_clk(dsidev);
 	dsi_enable_pll_clock(dsidev, 0);
@@ -1741,12 +1786,16 @@ void dsi_pll_uninit(struct platform_device *dsidev, bool disconnect_lanes)
 
 	dsi->pll_locked = 0;
 	dsi_pll_power(dsidev, DSI_PLL_POWER_OFF);
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
 	if (disconnect_lanes) {
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 		WARN_ON(!dsi->vdds_dsi_enabled);
 		regulator_disable(dsi->vdds_dsi_reg);
 		dsi->vdds_dsi_enabled = false;
+#endif
 	}
 
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */
 	dsi_disable_scp_clk(dsidev);
 	dsi_enable_pll_clock(dsidev, 0);
 
@@ -2737,7 +2786,7 @@ static int dsi_sync_vc(struct platform_device *dsidev, int channel)
 
 	WARN_ON(!dsi_bus_is_locked(dsidev));
 
-	WARN_ON(in_interrupt());
+	//WARN_ON(in_interrupt());	 LGE_CHANGE kibum.lee@lge.com, temp comment
 
 	if (!dsi_vc_is_enabled(dsidev, channel))
 		return 0;
@@ -2759,6 +2808,10 @@ static int dsi_vc_enable(struct platform_device *dsidev, int channel,
 			channel, enable);
 
 	enable = enable ? 1 : 0;
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+		if(channel != 0)
+			return 0;
+#endif
 
 	REG_FLD_MOD(dsidev, DSI_VC_CTRL(channel), enable, 0, 0);
 
@@ -2997,8 +3050,14 @@ static int dsi_vc_send_bta(struct platform_device *dsidev, int channel)
 
 int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 {
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+		return 0;  //KS_DEBUG
+#endif
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	DECLARE_COMPLETION_ONSTACK(completion);
+#if defined(CONFIG_PRODUCT_LGE_KU5900) // 20120727 sangki.hyun@lge.com MP3 Playing
+	DECLARE_COMPLETION_ONSTACK(bta_completion);
+#endif
 	int r = 0, i = 0;
 	u32 err;
 
@@ -3007,11 +3066,21 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 	if (r)
 		goto err1;
 
+#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+	r = dsi_register_isr_vc(dsidev, channel, dsi_completion_handler, &bta_completion,
+			DSI_VC_IRQ_BTA);
+	if (r)
+		goto err1;
+
+	dsi_vc_enable_bta_irq(dsidev, channel);
+#endif
+
 	r = dsi_vc_send_bta(dsidev, channel);
 	if (r)
 		goto err1;
 
 	/* wait for BTA ACK */
+#if !defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
 	while (i < 500) {
 		if (REG_GET(dsidev, DSI_VC_IRQSTATUS(channel), 5, 5)) {
 			DSSDBG("BTA recieved\n");
@@ -3024,6 +3093,15 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 
 	if (i >= 500)
 		DSSERR("sending BTA failed\n");
+#else
+	if (wait_for_completion_timeout(&bta_completion,
+				msecs_to_jiffies(500)) == 0) {
+		DSSERR("Failed to receive BTA\n");
+		r = -EIO;
+		goto err1;
+	}
+
+#endif
 
 	err = dsi_get_errors(dsidev);
 	if (err) {
@@ -3032,6 +3110,11 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 	}
 
 err1:
+#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+	dsi_vc_disable_bta_irq(dsidev, channel);
+	dsi_unregister_isr_vc(dsidev, channel, dsi_completion_handler, &bta_completion,
+			DSI_VC_IRQ_BTA);
+#endif
 	dsi_unregister_isr(dsidev, dsi_completion_handler, &completion,
 			DSI_IRQ_ERROR_MASK);
 	return 0;
@@ -3224,6 +3307,7 @@ int dsi_vc_dcs_write(struct omap_dss_device *dssdev, int channel, u8 *data,
 	if (r)
 		goto err;
 
+#if !defined (CONFIG_PRODUCT_LGE_LU6800)
 	/* RX_FIFO_NOT_EMPTY */
 	if (REG_GET(dsidev, DSI_VC_CTRL(channel), 20, 20)) {
 		DSSERR("rx fifo not empty after write, dumping data:\n");
@@ -3231,7 +3315,7 @@ int dsi_vc_dcs_write(struct omap_dss_device *dssdev, int channel, u8 *data,
 		r = -EIO;
 		goto err;
 	}
-
+#endif
 	return 0;
 err:
 	DSSERR("dsi_vc_dcs_write(ch %d, cmd 0x%02x, len %d) failed\n",
@@ -3663,6 +3747,84 @@ err:
 	return r;
 }
 
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+/* 20100623 kyungtae.oh@lge.com hub panel init [LGE_START] */
+int dsi_vc_generic_write(struct omap_dss_device *dssdev, int channel, u8 cmd, u8 *data, int len)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+    int r;
+
+    r = dsi_vc_send_long(dsidev, channel, cmd, data, len, 0);
+    if (r)
+        return r;
+    
+    r = dsi_vc_send_bta_sync(dssdev, channel);
+    return r;
+}
+EXPORT_SYMBOL(dsi_vc_generic_write);
+
+int dsi_vc_generic_write_short(struct omap_dss_device *dssdev, int channel, u8 cmd, u8 *data, int len)
+{
+	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+    int r;
+
+    if( len == 1) {
+        r = dsi_vc_send_short(dsidev, channel, cmd, data[0], 0);
+    } else {
+        r = dsi_vc_send_short(dsidev, channel, cmd, data[0] | (data[1] << 8), 0);
+    }
+    if (r)
+        return r;
+       
+    r = dsi_vc_send_bta_sync(dssdev, channel);
+        return r;
+}
+EXPORT_SYMBOL(dsi_vc_generic_write_short);
+/* 20100623 kyungtae.oh@lge.com hub panel init [LGE_END] */
+
+/* LGE_CHANGE_S sunggyun.yu@lge.com */
+int dsi_vc_write(struct omap_dss_device *dssdev, int channel, u8 cmd, u8 *data, int len)
+{
+	int r = -1;
+
+#if 1
+	switch (cmd) {
+	case 0x03:
+	case 0x13:
+	case 0x23:
+		r = dsi_vc_generic_write_short(dssdev, channel, cmd, data, len);
+		break;
+	case 0x29:
+		r = dsi_vc_generic_write(dssdev, channel, cmd, data, len);
+		break;
+	case 0x05:
+	case 0x15:
+	case 0x39:
+		r = dsi_vc_dcs_write(dssdev, channel, data, len);
+		break;
+	default:
+		printk("wrong dsi vc write cmd!");
+	}
+#else
+	if (len < 3) {
+		if (len == 1)
+			r = dsi_vc_send_short(ix, channel, cmd, data[0], 0);
+		else
+			r = dsi_vc_send_short(ix, channel, cmd, data[0] | (data[1] << 8), 0);
+	}			
+	else
+		r = dsi_vc_send_long(ix, channel, cmd, data, len, 0);
+
+	if (r)
+		return r;
+
+	r = dsi_vc_send_bta_sync(ix, channel);
+#endif
+	return r;
+}
+EXPORT_SYMBOL(dsi_vc_write);
+/* LGE_CHANGE_S sunggyun.yu@lge.com */
+#endif
 static void dsi_set_lp_rx_timeout(struct platform_device *dsidev,
 		unsigned ticks, bool x4, bool x16, bool to)
 {
@@ -4303,6 +4465,11 @@ static void dsi_update_screen_dispc(struct omap_dss_device *dssdev,
 
 	dsi_perf_mark_start(dsidev);
 
+// LG GB code, TODO item.
+#if 0
+	r = schedule_delayed_work(&dsi->framedone_timeout_work,
+		msecs_to_jiffies(1000));
+#endif
 	r = schedule_delayed_work(&dsi->framedone_timeout_work,
 		msecs_to_jiffies(250));
 	BUG_ON(r == 0);
@@ -4427,6 +4594,32 @@ int omap_dsi_update(struct omap_dss_device *dssdev,
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	struct dsi_data *dsi = dsi_get_dsidrv_data(dsidev);
 
+    // wooho.jeong@lge.com 2012.07.26
+    // MOD : for Kernel Reset During Gallery
+    if(! dsidev)
+    {
+        printk(KERN_ERR "%s: dsidev is NULL\n", __func__);
+        return -EINVAL;
+    }
+    
+    if(! dsi)
+    {
+        printk(KERN_ERR "%s: dsi is NULL\n", __func__);
+        return -EINVAL;
+    }   
+
+    if(! dssdev)
+    {
+        printk(KERN_ERR "%s: dssdev is NULL\n", __func__);
+        return -EINVAL;
+    }   
+
+    if(! dssdev->manager)
+    {
+        printk(KERN_ERR "%s: dssdev->manager is NULL\n", __func__);
+        return -EINVAL;
+    }     
+    
 	dsi->update_channel = channel;
 
 	/* OMAP DSS cannot send updates of odd widths.
@@ -4472,6 +4665,7 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 		DISPC_IRQ_FRAMEDONE : DISPC_IRQ_FRAMEDONE2;
 
 	if (dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
+		dispc_set_pol_freq(OMAP_DSS_CHANNEL_LCD,0,0,0);  // goochang.jeong@lge.com switch hdmi to lcd
 		r = omap_dispc_register_isr(dsi_framedone_irq_callback, (void *) dssdev,
 					    irq);
 		if (r) {
@@ -4496,12 +4690,24 @@ static int dsi_display_init_dispc(struct omap_dss_device *dssdev)
 
 	if(dssdev->phy.dsi.type == OMAP_DSS_DSI_TYPE_CMD_MODE) {
 		struct omap_video_timings timings = {
+#if !defined(CONFIG_PRODUCT_LGE_LU6800)
 			.hsw		= 1,
 			.hfp		= 1,
 			.hbp		= 1,
 			.vsw		= 1,
 			.vfp		= 0,
 			.vbp		= 0,
+#else
+			.hsw		= 51,
+			.hfp		= 14,
+			.hbp		= 19,
+			.vsw		= 8,
+			.vfp		= 0,
+			.vbp		= 22,
+			.x_res		= 480,
+			.y_res		= 800,
+			.pixel_clock    = 23800,
+#endif
 		};
 
 		dispc_set_lcd_timings(dssdev->manager->id, &timings);
@@ -4697,6 +4903,17 @@ static int _dsi_wait_reset(struct platform_device *dsidev)
 	return 0;
 }
 
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+void dsi_phy_config_4_bta(struct omap_dss_device *dssdev)
+{
+  //u32 regv;
+  struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
+  
+  //regv=dsi_read_reg(DSI_DSIPHY_CFG1);
+  REG_FLD_MOD(dsidev, DSI_DSIPHY_CFG1, 0x00, 31, 24);
+}
+#endif
+
 int omapdss_dsi_display_enable(struct omap_dss_device *dssdev)
 {
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
@@ -4819,7 +5036,8 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 	} else {
 		dssdev->caps = 0;
 	}
-
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (dsi->vdds_dsi_reg == NULL) {
 		struct regulator *vdds_dsi;
 
@@ -4832,7 +5050,8 @@ int dsi_init_display(struct omap_dss_device *dssdev)
 
 		dsi->vdds_dsi_reg = vdds_dsi;
 	}
-
+#endif
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_END] */
 	if (dsi_get_num_data_lanes_dssdev(dssdev) > dsi->num_data_lanes) {
 		DSSERR("DSI%d can't support more than %d data lanes\n",
 			dsi_module + 1, dsi->num_data_lanes);
@@ -5089,7 +5308,8 @@ static int omap_dsi1hw_remove(struct platform_device *dsidev)
 	pm_runtime_disable(&dsidev->dev);
 
 	dsi_put_clocks(dsidev);
-
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
+#if !defined(CONFIG_MACH_LGE_OMAP3)
 	if (dsi->vdds_dsi_reg != NULL) {
 		if (dsi->vdds_dsi_enabled) {
 			regulator_disable(dsi->vdds_dsi_reg);
@@ -5099,7 +5319,8 @@ static int omap_dsi1hw_remove(struct platform_device *dsidev)
 		regulator_put(dsi->vdds_dsi_reg);
 		dsi->vdds_dsi_reg = NULL;
 	}
-
+#endif
+/* 20120217 kyungtae.oh@lge.com, Do not Use vdds regulator[LGE_START] */
 	free_irq(dsi->irq, dsi->pdev);
 	iounmap(dsi->base);
 
@@ -5137,4 +5358,127 @@ void dsi_videomode_panel_preinit(struct omap_dss_device *dssdev)
 	msleep(1);
 }
 EXPORT_SYMBOL(dsi_videomode_panel_preinit);
+
+#if defined(CONFIG_OMAP2_DSS_HDMI)
+extern unsigned char IS_HDMI_ENABLED;
+int is_hdmi_enabled(void)
+{
+	return IS_HDMI_ENABLED;
+}
+
+u32 tmp_hdmi_buf[800*480]; // == 2011.05.30 === hycho@ubiquix.com
+u32 tmp1_hdmi_buf[800*480];
+static u32 ba_chk_cnt=0;
+extern void dispc_go(enum omap_channel channel);
+
+int hdmi_update_l4(u32 paddr, u16 x, u16 y, u16 w, u16 h)
+{
+    	extern int dsi_update_screen_l4_cmd(int lcd_ix, u32 src, int x, int y, int w, int h);
+    	//static int Updating = 0, Timeout = 0;
+    	u32 width, height, *dst;
+
+    	u32 __iomem *src;
+
+    	if ( !paddr ) return;
+
+    	//src = paddr;
+    	//dst = tmp_hdmi_buf;
+	
+	extern int WHAT_MODE_IS_IT();
+//	printk("hdmi_update_l4\n");
+	switch(WHAT_MODE_IS_IT())
+	{
+		case 0:
+			// Image gallery mode
+			//printk("      -->> IMAGE GALLERY MODE Rotate - src:%X -> dst:%X \n", src, dst);			   
+
+			switch( ((ba_chk_cnt++)%6) )
+			{
+				case 0:				   
+					dst = tmp_hdmi_buf;
+					src = paddr;
+					
+			    		for (width = 0; width < 800; width++)
+			        		for (height = 0; height < 480; height++)
+			            			dst[width + (800 * (479 - height))] = (*(src++));
+
+					#if 0
+				    	omap_writel( __pa(dst), 0x48050480); // BA address write
+				    	omap_writel( __pa(dst), 0x48050484); // BA address write
+				    	omap_writel( __pa(dst), 0x480504BC); // BA address write
+				    	omap_writel( __pa(dst), 0x480504C0); // BA address write	   
+
+					dispc_go(0);		
+					#endif					
+					
+				break;
+
+				case 1:							
+					break;
+
+				case 2:	
+					dst = tmp_hdmi_buf;
+					omap_writel( __pa(dst), 0x48050480); // BA address write
+				    omap_writel( __pa(dst), 0x48050484); // BA address write
+				    omap_writel( __pa(dst), 0x480504BC); // BA address write
+				    omap_writel( __pa(dst), 0x480504C0); // BA address write			    
+
+					dispc_go(0);					
+		
+				    //printk(KERN_ERR "<< hdmi ba %x %x", omap_readl(0x48050480),omap_readl(0x48050440));					
+					break;
+
+				case 3:				   
+					dst = tmp1_hdmi_buf;
+					src = paddr;
+					
+			    		for (width = 0; width < 800; width++)
+			        		for (height = 0; height < 480; height++)
+			            			dst[width + (800 * (479 - height))] = (*(src++));
+
+					#if 0
+				    	omap_writel( __pa(dst), 0x48050480); // BA address write
+				    	omap_writel( __pa(dst), 0x48050484); // BA address write
+				    	omap_writel( __pa(dst), 0x480504BC); // BA address write
+				    	omap_writel( __pa(dst), 0x480504C0); // BA address write		
+
+					dispc_go(0);	
+					#endif					
+				break;
+
+				case 4:							
+					break;
+
+				case 5:	
+					dst = tmp1_hdmi_buf;
+		
+			    	omap_writel( __pa(dst), 0x48050480); // BA address write
+			    	omap_writel( __pa(dst), 0x48050484); // BA address write
+			    	omap_writel( __pa(dst), 0x480504BC); // BA address write
+			    	omap_writel( __pa(dst), 0x480504C0); // BA address write		
+
+					dispc_go(0);
+			
+				    //printk(KERN_ERR "<< hdmi ba1 %x %x", omap_readl(0x48050480), ba_chk_cnt);					
+					ba_chk_cnt = 0;
+					break;
+			} // case ba_chk_cnt				
+					
+			break;
+
+		case 1:
+			// Video mode
+			break;
+
+		case 2:
+			// Normal mode
+			break;
+			
+	}
+
+
+}
+EXPORT_SYMBOL(is_hdmi_enabled);
+EXPORT_SYMBOL(hdmi_update_l4);
+#endif
 

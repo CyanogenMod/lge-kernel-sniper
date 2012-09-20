@@ -628,6 +628,10 @@ out:
  */
 static int mmc_sdio_suspend(struct mmc_host *host)
 {
+/* LGE_CHANGE_S, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
+#if defined(CONFIG_MACH_LGE_HUB)
+	return 0;
+#else
 	int i, err = 0;
 
 	for (i = 0; i < host->card->sdio_funcs; i++) {
@@ -658,10 +662,16 @@ static int mmc_sdio_suspend(struct mmc_host *host)
 	}
 
 	return err;
+#endif
+/* LGE_CHANGE_E, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
 }
 
 static int mmc_sdio_resume(struct mmc_host *host)
 {
+/* LGE_CHANGE_S, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
+#if defined(CONFIG_MACH_LGE_HUB) 
+	return 0;
+#else
 	int i, err = 0;
 
 	BUG_ON(!host);
@@ -706,6 +716,8 @@ static int mmc_sdio_resume(struct mmc_host *host)
 	}
 
 	return err;
+#endif
+/* LGE_CHANGE_E, [bill.jung@lge.com], 2010-11-26, <Don't operate anything. For WLAN host wake up function.> */
 }
 
 static int mmc_sdio_power_restore(struct mmc_host *host)

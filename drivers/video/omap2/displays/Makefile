@@ -9,3 +9,8 @@ obj-$(CONFIG_PANEL_TPO_TD043MTEA1) += panel-tpo-td043mtea1.o
 obj-$(CONFIG_PANEL_ACX565AKM) += panel-acx565akm.o
 
 obj-$(CONFIG_PANEL_TC358765) += panel-tc358765.o
+ifeq ($(CONFIG_PRODUCT_LGE_LU6800),y)
+obj-$(CONFIG_PANEL_HUB) += panel-justin.o
+else
+obj-$(CONFIG_PANEL_HUB) += panel-hub.o #20100624 kyungtae.oh hub panel driver
+endif

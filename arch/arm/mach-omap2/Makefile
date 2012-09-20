@@ -257,6 +257,33 @@ obj-$(CONFIG_MACH_OMAP_ZOOM3)		+= board-zoom.o \
 					   hsmmc.o \
 					   board-zoom-debugboard.o \
 					   omapxx_apps_brd_id.o
+ifeq ($(CONFIG_PRODUCT_LGE_LU6800),y)
+obj-$(CONFIG_MACH_LGE_HUB)		+= board-justin.o \
+					   board-justin-peripherals.o \
+					   board-justin-mmc.o \
+					   board-justin-debug.o \
+					   board-justin-panel.o \
+					   board-hub-wifi.o \
+					   omapxx_apps_brd_id.o \
+					   board-justin-camera.o
+#					   board-justin-ers.o
+else
+obj-$(CONFIG_MACH_LGE_HUB)		+= board-hub.o \
+					   board-hub-peripherals.o \
+					   board-hub-mmc.o \
+					   board-hub-debug.o \
+					   board-hub-panel.o \
+					   board-hub-wifi.o \
+					   omapxx_apps_brd_id.o \
+					   board-hub-camera.o
+#					   board-hub-ers.o \
+
+endif
+# LGE_CHANGE_S, bae.cheolhwan@lge.com, 2011-03-26, Modify for AT%FBOOT & AT%SWVCHECK.
+#110111 dongjin.sim@lge.com %SWV AP [START]
+#obj-$(CONFIG_MACH_LGE_HUB)		+= lge_emmc_direct_access.o					   
+#110111 dongjin.sim@lge.com %SWV AP [END]
+# LGE_CHANGE_E, bae.cheolhwan@lge.com, 2011-03-26, Modify for AT%FBOOT & AT%SWVCHECK.
 obj-$(CONFIG_MACH_OMAP_3630SDP)		+= board-3630sdp.o \
 					   board-zoom-peripherals.o \
 					   board-zoom-display.o \
@@ -340,4 +367,4 @@ ifeq ($(CONFIG_OMAP_REBOOT_REASON),y)
 obj-$(CONFIG_ARCH_OMAP4)		+= omap4-reboot-reason.o
 endif
 
-obj-$(CONFIG_OMAP_RAM_CONSOLE)		+= omap_ram_console.o
+obj-$(CONFIG_ANDROID_RAM_CONSOLE)		+= omap_ram_console.o

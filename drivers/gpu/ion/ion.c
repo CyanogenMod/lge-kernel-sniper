@@ -199,6 +199,7 @@ static struct ion_handle *ion_handle_create(struct ion_client *client,
 	return handle;
 }
 
+/* Client lock must be locked when calling */
 static void ion_handle_destroy(struct kref *kref)
 {
 	struct ion_handle *handle = container_of(kref, struct ion_handle, ref);
@@ -206,10 +207,8 @@ static void ion_handle_destroy(struct kref *kref)
 	   if (handle->map_cnt) unmap
 	 */
 	ion_buffer_put(handle->buffer);
-	mutex_lock(&handle->client->lock);
 	if (!RB_EMPTY_NODE(&handle->node))
 		rb_erase(&handle->node, &handle->client->handles);
-	mutex_unlock(&handle->client->lock);
 	kfree(handle);
 }
 
@@ -343,13 +342,13 @@ void ion_free(struct ion_client *client, struct ion_handle *handle)
 
 	mutex_lock(&client->lock);
 	valid_handle = ion_handle_validate(client, handle);
-	mutex_unlock(&client->lock);
-
 	if (!valid_handle) {
+		mutex_unlock(&client->lock);
 		WARN("%s: invalid handle passed to free.\n", __func__);
 		return;
 	}
 	ion_handle_put(handle);
+	mutex_unlock(&client->lock);
 }
 EXPORT_SYMBOL(ion_free);
 
@@ -831,7 +830,9 @@ static void ion_vma_close(struct vm_area_struct *vma)
 		 atomic_read(&client->ref.refcount),
 		 atomic_read(&handle->ref.refcount),
 		 atomic_read(&buffer->ref.refcount));
+	mutex_lock(&client->lock);
 	ion_handle_put(handle);
+	mutex_unlock(&client->lock);
 	ion_client_put(client);
 	pr_debug("%s: %d client_cnt %d handle_cnt %d alloc_cnt %d\n",
 		 __func__, __LINE__,
@@ -909,7 +910,9 @@ static int ion_share_mmap(struct file *file, struct vm_area_struct *vma)
 
 err1:
 	/* drop the reference to the handle */
+	mutex_lock(&client->lock);
 	ion_handle_put(handle);
+	mutex_unlock(&client->lock);
 err:
 	/* drop the reference to the client */
 	ion_client_put(client);

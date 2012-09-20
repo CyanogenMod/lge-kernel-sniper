@@ -33,8 +33,40 @@
 #include <linux/gpio.h>
 #include <linux/platform_device.h>
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - For kzalloc (Justin feature)
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+#include <linux/slab.h>
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- For kzalloc (Justin feature)
+
 #include <linux/i2c/twl.h>
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - Justin Feature is added from justin_froyo #2.
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+// LGE_JUSTIN_S 201115 kyoungmo.kang@lge.com, justin test ver
+#if 1 
+#define JUSTIN_LEDOFF_TEST
+#endif 
+// LGE_JUSTIN_E 201115 kyoungmo.kang@lge.com, justin test ver
+
+
+// LGE_JUSTIN_S 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) ) 
+#include <linux/hrtimer.h>
+
+#define LED_A 0
+#define LED_B 1
+#define LED_ON 0
+#define LED_OFF 1
+#endif 
+// LGE_JUSTIN_E 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+
+
+// LGE_B_DOM_S 20101215 nttaejun.cho@lge.com, Touch key Led on/off
+#include <linux/earlysuspend.h>
+#include <linux/delay.h>
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- Justin Feature is added from justin_froyo #2.
 
 /*
  * The GPIO "subchip" supports 18 GPIOs which can be configured as
@@ -72,6 +104,36 @@ static DEFINE_MUTEX(gpio_lock);
 /* store usage of each GPIO. - each bit represents one GPIO */
 static unsigned int gpio_usage_count;
 
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - Touch key Led on/off(Justin feature)
+// LGE_JUSTIN_S 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+#if (defined(CONFIG_PRODUCT_LGE_LU6800) )
+struct work_struct *gwork_struct_val; 
+#endif 
+// LGE_JUSTIN_E 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+
+
+// LGE_B_DOM_S 20101215 nttaejun.cho@lge.com, Touch key Led on/off
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) && defined(JUSTIN_LEDOFF_TEST) )
+static void twl4030_early_suspend(struct early_suspend *handler); 	
+static void twl4030_late_resume(struct early_suspend *handler);		
+
+struct twl4030_data {
+	struct input_dev *input_dev;
+	struct early_suspend early_suspend;
+
+// LGE_JUSTIN_S 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+//	struct hrtimer touchkey_timer_twl;	
+	struct work_struct  touchkey_work_twl;
+//	struct workqueue_struct	 	*touchkey_wq_twl;
+// LGE_JUSTIN_E 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+
+//	struct hrtimer timer;
+	unsigned long delay;
+};
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- Touch key Led on/off(Justin feature)
+
 /*----------------------------------------------------------------------*/
 
 /*
@@ -106,6 +168,13 @@ static inline int gpio_twl4030_write(u8 address, u8 data)
 
 #define PWMxON_LENGTH		BIT(7)
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - KEYLED off 5 seconds(Justin feature)
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) )
+u8 key_led_flag_twl =0;
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- KEYLED off 5 seconds(Justin feature)
+
+
 /*----------------------------------------------------------------------*/
 
 /*
@@ -136,7 +205,10 @@ static void twl4030_led_set_value(int led, int value)
 	if (led)
 		mask <<= 1;
 
+	printk("[%s]-[%d] mutex_lock[IN]!\n", __func__, __LINE__);
 	mutex_lock(&gpio_lock);
+	printk("[%s]-[%d] mutex_lock[OUT]!\n", __func__, __LINE__);
+
 	if (value)
 		cached_leden &= ~mask;
 	else
@@ -144,7 +216,36 @@ static void twl4030_led_set_value(int led, int value)
 	status = twl_i2c_write_u8(TWL4030_MODULE_LED, cached_leden,
 			TWL4030_LED_LEDEN);
 	mutex_unlock(&gpio_lock);
+	printk("[%s]-[%d] mutex_unlock!\n", __func__, __LINE__);
 }
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - Justin Feature is added from justin_froyo #5.
+// LGE_B_DOM_S 20110104 nttaejun.cho@lge.com, Touch key Led on/off
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) && defined(JUSTIN_LEDOFF_TEST) )
+static  void twl4030_ledB_set_value(int led, int value)
+{
+	u8 mask = LEDEN_LEDBON | LEDEN_LEDBPWM;
+	int status;
+
+	if (led)
+		mask <<= 1;
+
+	printk("[%s]-[%d] mutex_lock[IN]!\n", __func__, __LINE__);
+	mutex_lock(&gpio_lock);
+	printk("[%s]-[%d] mutex_lock[OUT]!\n", __func__, __LINE__);
+	if (value)
+		cached_leden &= ~mask;
+	else
+		cached_leden |= mask;
+	status = twl_i2c_write_u8(TWL4030_MODULE_LED, cached_leden,
+			TWL4030_LED_LEDEN);
+	mutex_unlock(&gpio_lock);
+	printk("[%s]-[%d] mutex_unlock!\n", __func__, __LINE__);
+} 
+#endif
+// LGE_B_DOM_E 20110104 nttaejun.cho@lge.com, Touch key Led on/off
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- Justin Feature is added from justin_froyo #5.
+
 
 static int twl4030_set_gpio_direction(int gpio, int is_input)
 {
@@ -154,7 +255,9 @@ static int twl4030_set_gpio_direction(int gpio, int is_input)
 	u8 base = REG_GPIODATADIR1 + d_bnk;
 	int ret = 0;
 
+	printk("[%s]-[%d] mutex_lock[IN]!\n", __func__, __LINE__);
 	mutex_lock(&gpio_lock);
+	printk("[%s]-[%d] mutex_lock[OUT]!\n", __func__, __LINE__);
 	ret = gpio_twl4030_read(base);
 	if (ret >= 0) {
 		if (is_input)
@@ -165,6 +268,7 @@ static int twl4030_set_gpio_direction(int gpio, int is_input)
 		ret = gpio_twl4030_write(base, reg);
 	}
 	mutex_unlock(&gpio_lock);
+	printk("[%s]-[%d] mutex_unlock!\n", __func__, __LINE__);
 	return ret;
 }
 
@@ -207,7 +311,9 @@ static int twl_request(struct gpio_chip *chip, unsigned offset)
 {
 	int status = 0;
 
+	printk("[%s]-[%d] mutex_lock[IN]!\n", __func__, __LINE__);
 	mutex_lock(&gpio_lock);
+	printk("[%s]-[%d] mutex_lock[OUT]!\n", __func__, __LINE__);
 
 	/* Support the two LED outputs as output-only GPIOs. */
 	if (offset >= TWL4030_GPIO_MAX) {
@@ -266,6 +372,7 @@ static int twl_request(struct gpio_chip *chip, unsigned offset)
 
 done:
 	mutex_unlock(&gpio_lock);
+	printk("[%s]-[%d] mutex_unlock!\n", __func__, __LINE__);
 	return status;
 }
 
@@ -276,7 +383,9 @@ static void twl_free(struct gpio_chip *chip, unsigned offset)
 		return;
 	}
 
+	printk("[%s]-[%d] mutex_lock[IN]!\n", __func__, __LINE__);
 	mutex_lock(&gpio_lock);
+	printk("[%s]-[%d] mutex_lock[OUT]!\n", __func__, __LINE__);
 
 	gpio_usage_count &= ~BIT(offset);
 
@@ -285,6 +394,7 @@ static void twl_free(struct gpio_chip *chip, unsigned offset)
 		gpio_twl4030_write(REG_GPIO_CTRL, 0x0);
 
 	mutex_unlock(&gpio_lock);
+	printk("[%s]-[%d] mutex_unlock!\n", __func__, __LINE__);
 }
 
 static int twl_direction_in(struct gpio_chip *chip, unsigned offset)
@@ -392,10 +502,162 @@ static int __devinit gpio_twl4030_debounce(u32 debounce, u8 mmc_cd)
 
 static int gpio_twl4030_remove(struct platform_device *pdev);
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - Justin feature is added from justin_froyo. #6
+// LGE_JUSTIN_S 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) && defined(JUSTIN_LEDOFF_TEST) )
+
+void keyled_touch_on(void)
+{
+	struct twl4030_data *twl_data = container_of(gwork_struct_val, struct twl4030_data, touchkey_work_twl);
+
+
+	//printk(" #### kkm key led ON_timer update  ##### ");
+    if(0 == key_led_flag_twl)
+    {
+		/* Be Here insert !  key led on */
+		key_led_flag_twl = 1;	    
+		twl4030_led_set_value(LED_B, LED_ON);
+		//printk(" #### kkm key led ON Driver ##### ");
+    }
+
+//    hrtimer_start(&twl_data->touchkey_timer_twl, ktime_set(5, 0), HRTIMER_MODE_REL); /*5 sec */
+
+}
+
+#if 0
+static void keyled_touchkey_work_func(struct work_struct *work)
+{	
+	/* Be Here insert ! key led off */
+	key_led_flag_twl = 0;
+    twl4030_led_set_value(LED_B, LED_OFF);
+	//printk(" #### kkm key led OFF  ##### ");
+}
+
+static enum hrtimer_restart keyled_touchkey_timer_func(struct hrtimer *timer)
+{
+	struct twl4030_data *twl_data = container_of(gwork_struct_val, struct twl4030_data, touchkey_work_twl);
+
+	queue_work(twl_data->touchkey_wq_twl, &twl_data->touchkey_work_twl);
+
+}
+#endif
+
+EXPORT_SYMBOL(keyled_touch_on);
+#endif 
+// LGE_JUSTIN_E 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+
+
+
+
+// LGE_B_DOM_S 20101215 nttaejun.cho@lge.com, Touch key Led on/off
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) && defined(JUSTIN_LEDOFF_TEST))
+#define LEDBON_   0
+#define LEDBOFF_  1 
+
+static void twl4030_early_suspend(struct early_suspend *h)
+{
+	struct twl4030_data *twl_data;  
+
+	twl_data = container_of(h, struct twl4030_data, early_suspend);
+
+// LGE_JUSTIN_S 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+//	hrtimer_cancel(&twl_data->touchkey_timer_twl);
+// LGE_JUSTIN_E 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+
+
+//	twl4030_ledB_set_value(0, LEDBOFF_);
+//	twl4030_led_set_value(LED_B, LED_OFF);
+//	printk("[#######] akm8973_early_suspend() \n");
+}
+
+
+static void twl4030_late_resume(struct early_suspend *h)
+{
+	struct twl4030_data *twl_data;
+
+	twl_data = container_of(h, struct twl4030_data, early_suspend);
+
+// LGE_JUSTIN_S 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+//	hrtimer_start(&twl_data->touchkey_timer_twl, ktime_set(5, 1), HRTIMER_MODE_REL); /*5 sec */
+// LGE_JUSTIN_E 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+
+
+//	twl4030_ledB_set_value(0, LEDBON_);
+
+//	printk("[#######] akm8973_late_resume() \n");	
+}
+#endif
+// LGE_B_DOM_E 20101215 nttaejun.cho@lge.com, Touch key Led on/off
+
+// LGE_JUSTIN_S 20110128 nttaejun.cho@lge.com, Led on/off
+#define TWL4030_LED_ON		255
+#define TWL4030_LED_OFF		0
+
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) )
+static ssize_t twl4030_led_onoff_store(struct device *dev, struct device_attribute *attr, char *buf, size_t count)
+{
+	int    val;
+
+	sscanf(buf, "%d", &val);
+
+	printk("[ %s ]-(%d) [IN / val = %d]\n",__func__, __LINE__, val);
+	  
+	if (val == TWL4030_LED_ON) 
+	{
+		printk("[%s] TWL4030_LED_ON!\n",__func__);
+		twl4030_ledB_set_value(0, LEDBON_);
+	} 
+	else if (val == TWL4030_LED_OFF)
+	{
+		printk("[%s] TWL4030_LED_OFF!\n",__func__);
+		twl4030_ledB_set_value(0, LEDBOFF_);
+		twl4030_led_set_value(LED_B, LED_OFF);
+	}
+	else
+	{
+		printk("[%s] on/off error, value = %d\n",__func__, val);
+		return -1;
+	}
+
+	return count;
+}
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.10.12] - Sysfs access permission is modified.
+//static DEVICE_ATTR(led_onoff, 0666, NULL, twl4030_led_onoff_store);
+static DEVICE_ATTR(led_onoff, 0664, NULL, twl4030_led_onoff_store);
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.10.12]- Sysfs access permission is modified.
+
+static struct attribute *twl4030_led_attributes[] = {
+	&dev_attr_led_onoff.attr,
+	NULL
+};
+
+static const struct attribute_group twl4030_led_group = {
+	.attrs = twl4030_led_attributes,
+};
+#endif
+// LGE_JUSTIN_E 20110128 nttaejun.cho@lge.com, Led on/off
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- Justin feature is added from justin_froyo. #6
+
 static int __devinit gpio_twl4030_probe(struct platform_device *pdev)
 {
 	struct twl4030_gpio_platform_data *pdata = pdev->dev.platform_data;
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - Led on/off
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) )
+	struct device *dev = &pdev->dev;
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- Led on/off
+
 	int ret;
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - Led on/off
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) && defined(JUSTIN_LEDOFF_TEST))
+	struct twl4030_data *twl_data;
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- Led on/off
+
+	printk("[SHYUN] [%s] - [%d] [IN]\n", __func__, __LINE__);
 
 	/* maybe setup IRQs */
 	if (pdata->irq_base) {
@@ -456,6 +718,68 @@ no_irqs:
 			dev_dbg(&pdev->dev, "setup --> %d\n", status);
 	}
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.07.13] - Touch key Led on/off
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) && defined(JUSTIN_LEDOFF_TEST) )
+//	twl4030_ledB_set_value(0, LEDBON_);
+//    printk("#*#*#* kkm_lde_on #*#*#\n"); 
+
+	twl_data = kzalloc(sizeof(struct twl4030_data), GFP_KERNEL);
+	if (!twl_data) {
+		return -ENOMEM;
+	}
+
+	twl_data->input_dev = input_allocate_device();
+
+	if (!twl_data->input_dev) {
+		printk(KERN_ERR
+		       "hub_akm8973_probe: Failed to allocate input device\n");
+		return -ENOMEM;
+	}
+
+	twl_data->input_dev->name = "ledonoff";
+
+// LGE_JUSTIN_S 20110128 nttaejun.cho@lge.com, Led on/off
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) )
+	//	init. sysfs	 
+  if (sysfs_create_group(&dev->kobj, &twl4030_led_group))
+  {
+	    printk("[twl4030_gpio] sysfs_create_group FAIL \n");
+	    return -ENOMEM;
+  }
+#endif
+// LGE_JUSTIN_E 20110128 nttaejun.cho@lge.com, Led on/off
+
+// LGE_JUSTIN_S 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+#if 0
+#if ( defined(CONFIG_PRODUCT_LGE_LU6800) && defined(JUSTIN_LEDOFF_TEST) ) 
+
+    INIT_WORK(&twl_data->touchkey_work_twl, keyled_touchkey_work_func);
+	gwork_struct_val = &twl_data->touchkey_work_twl;
+	twl_data->touchkey_wq_twl = create_singlethread_workqueue("touchkey_wq_twl");
+	if (!twl_data->touchkey_wq_twl)
+		return -ENOMEM;
+
+//	hrtimer_init(&twl_data->touchkey_timer_twl, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+//	twl_data->touchkey_timer_twl.function = keyled_touchkey_timer_func;
+
+//    hrtimer_start(&twl_data->touchkey_timer_twl, ktime_set(10, 0), HRTIMER_MODE_REL); /*After 10 sec key led off*/
+
+	
+#endif 
+#endif
+// LGE_JUSTIN_E 201114 kyoungmo.kang@lge.com, KEYLED off 5 seconds
+
+#if 0	
+	twl_data->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN;
+	twl_data->early_suspend.suspend = twl4030_early_suspend;
+	twl_data->early_suspend.resume = twl4030_late_resume;
+	register_early_suspend(&twl_data->early_suspend);
+#endif	
+
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.07.13]- Touch key Led on/off
+
+	printk("[SHYUN] [%s] - [%d] [OUT][ret = %d]\n", __func__, __LINE__, ret);
 	return ret;
 }
 

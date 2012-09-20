@@ -197,13 +197,15 @@ static struct isp_reg isp_reg_list[] = {
  */
 #define REQ_EXP_MULTIPLIER 32
 static struct isp_freq_devider isp_ratio_factor[] = {
-	{  0, 32768, 0 * REQ_EXP_MULTIPLIER, 0 * REQ_EXP_MULTIPLIER },
-	{  2, 16384, 1 * REQ_EXP_MULTIPLIER, 1 * REQ_EXP_MULTIPLIER },
-	{  6,  8192, 2 * REQ_EXP_MULTIPLIER, 2 * REQ_EXP_MULTIPLIER },
-	{ 14,  4096, 3 * REQ_EXP_MULTIPLIER, 3 * REQ_EXP_MULTIPLIER },
-	{ 30,  2048, 4 * REQ_EXP_MULTIPLIER, 4 * REQ_EXP_MULTIPLIER }
+	{  0, 22938, 0 * REQ_EXP_MULTIPLIER, 0 * REQ_EXP_MULTIPLIER },
+	{  2, 11470, 1 * REQ_EXP_MULTIPLIER, 1 * REQ_EXP_MULTIPLIER },
+	{  6,  5734, 2 * REQ_EXP_MULTIPLIER, 2 * REQ_EXP_MULTIPLIER },
+	{ 14,  2868, 3 * REQ_EXP_MULTIPLIER, 3 * REQ_EXP_MULTIPLIER },
+	{ 30,  1434, 4 * REQ_EXP_MULTIPLIER, 4 * REQ_EXP_MULTIPLIER }
 };
 
+
+#if 0 // removed by MMS
 /**
  * isp_validate_errata_i421 - Check errata i421
  **/
@@ -237,6 +239,7 @@ static int isp_validate_errata_i421(struct device *dev,
 
 	return 0;
 }
+#endif
 
 /**
  * isp_get_upscale_ratio - Return ratio releated to the current crop.
@@ -457,6 +460,10 @@ static void isp_adjust_bandwidth(struct device *dev)
 
 		/* Calculate devider and clamp result between 0 and 64 */
 		if (l3_ick && pixelclk) {
+
+			if (pixelclk == 0)
+				pixelclk = l3_ick / 2;
+
 			div = clamp_t(unsigned long, l3_ick / pixelclk, 2,
 				      (ISPCCDC_FMTCFG_VPIF_FRQ_MASK >>
 				      ISPCCDC_FMTCFG_VPIF_FRQ_SHIFT) + 1);
@@ -495,6 +502,9 @@ static void isp_enable_interrupts(struct device *dev)
 	if (CCDC_PREV_RESZ_CAPTURE(isp))
 		irq0enable |= IRQ0ENABLE_PRV_DONE_IRQ | IRQ0ENABLE_RSZ_DONE_IRQ;
 
+	if (CCDC_RESZ_CAPTURE(isp))
+		irq0enable |= IRQ0ENABLE_RSZ_DONE_IRQ;
+
 	isp_reg_writel(dev, -1, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0STATUS);
 	isp_complete_reset = 0;
 
@@ -525,6 +535,9 @@ static void isp_disable_interrupts(struct device *dev)
 	if (CCDC_PREV_RESZ_CAPTURE(isp))
 		irq0enable &= ~(IRQ0ENABLE_PRV_DONE_IRQ
 			| IRQ0ENABLE_RSZ_DONE_IRQ);
+
+	if (CCDC_RESZ_CAPTURE(isp))
+		irq0enable &= ~(IRQ0ENABLE_RSZ_DONE_IRQ);
 
 	isp_reg_and(dev, OMAP3_ISP_IOMEM_MAIN, ISP_IRQ0ENABLE, irq0enable);
 }
@@ -841,7 +854,7 @@ int isp_configure_interface(struct device *dev,
 	ispccdc_set_raw_offset(&isp->isp_ccdc, config->raw_fmt_in);
 
 	isp->mclk = config->cam_mclk;
-	isp_enable_mclk(dev);
+	//isp_enable_mclk(dev);  // removed by MMS
 
 	isp_adjust_bandwidth(dev);
 
@@ -969,6 +982,15 @@ static irqreturn_t isp_isr(int irq, void *_pdev)
 			 * For some reason resizer is always busy after boot up
 			 * do not check resizer busy now.
 			 */
+			if (CCDC_RESZ_CAPTURE(isp)){
+				bufs->wait_hs_vs = 0;
+				ispresizer_config_shadow_registers(&isp->isp_res);
+				ispresizer_enable(&isp->isp_res, 1);
+				ispccdc_enable(&isp->isp_ccdc, 1);
+				
+			}
+
+			if (!(CCDC_RESZ_CAPTURE(isp))){
 			if ((isp->pipeline.modules & OMAP_ISP_RESIZER) &&
 			     !ispresizer_busy(&isp->isp_res) &&
 			     !ispresizer_is_enabled(&isp->isp_res)) {
@@ -983,6 +1005,7 @@ static irqreturn_t isp_isr(int irq, void *_pdev)
 					&isp->isp_prev);
 				isppreview_enable(&isp->isp_prev, 1);
 			}
+		}
 		}
 	default:
 		/*
@@ -1073,13 +1096,33 @@ static irqreturn_t isp_isr(int irq, void *_pdev)
 		 * If CCDC is writing to memory stop CCDC here
 		 * preventig to write to any of our buffers.
 		 */
-		if (CCDC_CAPTURE(isp) || isp->config->u.csi.use_mem_read)
+		if ((CCDC_CAPTURE(isp) || isp->config->u.csi.use_mem_read || CCDC_RESZ_CAPTURE(isp)) && ispccdc_busy(&isp->isp_ccdc))
 			ispccdc_enable(&isp->isp_ccdc, 0);
 	}
 
 	if (irqstatus & CCDC_VD0) {
 		if (CCDC_CAPTURE(isp))
 			isp_buf_process(dev, bufs);
+
+		if(CCDC_RESZ_CAPTURE(isp)) {
+			/* 20120628 jungyeal@lge.com resizer busy patch from mms  [START] */
+			int resizer_busy;
+			if (isp_wait(dev, ispccdc_busy, 0, 5000, &isp->isp_ccdc)) {
+				dev_info(dev, "\n\n ccdc won't become idle!\n\n");
+			}
+			resizer_busy = ispresizer_busy(&isp->isp_res);
+			if (!resizer_busy)
+				isp_buf_process(dev, bufs);
+			//else
+			//	printk("resizer busy 2.\n");
+			
+			if (!ISP_BUFS_IS_EMPTY(bufs) && !resizer_busy) { 
+				ispresizer_config_shadow_registers(&isp->isp_res);
+				ispresizer_enable(&isp->isp_res, 1);
+				ispccdc_enable(&isp->isp_ccdc, 1);
+			}
+			/* 20120628 jungyeal@lge.com resizer busy patch from mms [END] */
+		} 
 
 		/* Enabling configured statistic modules */
 		if (!(irqstatus & H3A_AWB_DONE))
@@ -1365,7 +1408,7 @@ static int __isp_disable_modules(struct device *dev, int suspend)
 {
 	struct isp_device *isp = dev_get_drvdata(dev);
 	unsigned long timeout = jiffies + ISP_STOP_TIMEOUT;
-	int reset = 0;
+	int reset = 1; // 0703 MMS patch : To fix VT preview issue in the AAT
 
 	/* We need to disble the first LSC module */
 	timeout = jiffies + ISP_STOP_TIMEOUT;
@@ -1379,8 +1422,11 @@ static int __isp_disable_modules(struct device *dev, int suspend)
 	}
 	/* We can disable lsc now, If an error ocured during
 	 * stopping of the LSC sw reset the isp */
-	if (ispccdc_enable_lsc(&isp->isp_ccdc, 0) < 0)
+	if (ispccdc_enable_lsc(&isp->isp_ccdc, 0) < 0){
+
 		reset = 1;
+	}
+
 	/*
 	 * We need to stop all the modules after CCDC or they'll
 	 * never stop since they may not get a full frame from CCDC.
@@ -1549,7 +1595,7 @@ static void isp_set_buf(struct device *dev, struct isp_buf *buf)
 		isp_csi2_ctx_config_ping_addr(&isp->isp_csi2, 0, buf->isp_addr);
 		isp_csi2_ctx_config_pong_addr(&isp->isp_csi2, 0, buf->isp_addr);
 		isp_csi2_ctx_update(&isp->isp_csi2, 0, false);
-	} else if (CCDC_PREV_RESZ_CAPTURE(isp))
+	} else if (CCDC_PREV_RESZ_CAPTURE(isp) || CCDC_RESZ_CAPTURE(isp))
 		ispresizer_set_outaddr(&isp->isp_res, buf->isp_addr);
 	else if (CCDC_PREV_CAPTURE(isp))
 		isppreview_set_outaddr(&isp->isp_prev, buf->isp_addr);
@@ -1598,12 +1644,14 @@ static int isp_try_pipeline(struct device *dev,
 			pipe->ccdc_in = CCDC_RAW_GBRG;
 		pipe->ccdc_out = CCDC_OTHERS_VP;
 		pipe->prv.in.path = PRV_RAW_CCDC;
+		/* removed by MMS
 		if ((pix_output->width == 1280) &&
 		    (pix_output->height == 720)) {
 			pipe->modules = OMAP_ISP_PREVIEW |
 					OMAP_ISP_CCDC;
 			pipe->prv.out.path = PREVIEW_MEM;
 		} else {
+		*/
 			pipe->modules = OMAP_ISP_PREVIEW |
 					OMAP_ISP_RESIZER |
 					OMAP_ISP_CCDC;
@@ -1614,7 +1662,9 @@ static int isp_try_pipeline(struct device *dev,
 				pipe->prv.out.path = PREVIEW_RSZ;
 				pipe->rsz.in.path = RSZ_OTFLY_YUV;
 			}
+		/* removed by MMS
 		}
+		*/
 	} else {
 		pipe->modules = OMAP_ISP_CCDC;
 		if (pix_input->pixelformat == V4L2_PIX_FMT_SGRBG10 ||
@@ -1634,8 +1684,9 @@ static int isp_try_pipeline(struct device *dev,
 				pipe->ccdc_in = CCDC_RAW_GBRG;
 		} else if (pix_input->pixelformat == V4L2_PIX_FMT_YUYV ||
 			   pix_input->pixelformat == V4L2_PIX_FMT_UYVY) {
+			pipe->modules = OMAP_ISP_RESIZER | OMAP_ISP_CCDC;
 			pipe->ccdc_in = CCDC_YUV_SYNC;
-			pipe->ccdc_out = CCDC_OTHERS_MEM;
+			pipe->ccdc_out = CCDC_YUV_RSZ;
 		} else
 			return -EINVAL;
 	}
@@ -1709,13 +1760,39 @@ static int isp_try_pipeline(struct device *dev,
 		}
 		pix_output->width = pipe->prv.out.crop.width;
 		pix_output->height = pipe->prv.out.crop.height;
+
+		/*
+		 * Ugly fix for 720 hack which using "ISP Resizer".
+		 * The code will be removed after 720p implementation cleanup.
+		 */
+		if (pix_output->width == 1280 && pix_output->height == 720 &&
+		    pipe->prv.out.path == PREVIEW_MEM)
+			pipe->prv.out.image.width = pipe->prv.out.crop.width;
+		pix_output->bytesperline =
+			pipe->prv.out.image.width * ISP_BYTES_PER_PIXEL;
+	}
+#if 0
 		pix_output->bytesperline = pipe->prv.out.image.width *
 					   ISP_BYTES_PER_PIXEL;
+
 	}
+#endif
 
 	if (pipe->modules & OMAP_ISP_RESIZER) {
+
+		if (CCDC_RESZ_CAPTURE(isp))
+			pipe->rsz.in.path = RSZ_OTFLY_YUV;
+
+		pipe->rsz.in.image.width = pix_output->width;
+		pipe->rsz.in.image.height = pix_output->height;
+		pipe->rsz.in.image.pixelformat = pix_output->pixelformat;
+		pipe->rsz.in.crop.left = pipe->rsz.in.crop.top = 0;
+		pipe->rsz.in.crop.width = pipe->rsz.in.image.width;
+		pipe->rsz.in.crop.height = pipe->rsz.in.image.height;
+
 		pipe->rsz.out.image.width = wanted_width;
 		pipe->rsz.out.image.height = wanted_height;
+#if 0
 
 		if (pipe->rsz.in.path == RSZ_OTFLY_YUV) {
 			pipe->rsz.in.image.width =
@@ -1732,7 +1809,7 @@ static int isp_try_pipeline(struct device *dev,
 		pipe->rsz.in.crop.left = pipe->rsz.in.crop.top = 0;
 		pipe->rsz.in.crop.width = pipe->prv.out.crop.width;
 		pipe->rsz.in.crop.height = pipe->prv.out.crop.height;
-
+#endif
 		rval = ispresizer_try_pipeline(&isp->isp_res, &pipe->rsz);
 		if (rval) {
 			dev_dbg(dev, "The dimensions %dx%d are not"
@@ -1939,7 +2016,7 @@ static void isp_buf_process(struct device *dev, struct isp_bufs *bufs)
 			ispccdc_enable(&isp->isp_ccdc, 1);
 	} else {
 		/* Tell ISP not to write any of our buffers. */
-		if (CCDC_CAPTURE(isp))
+		if (CCDC_CAPTURE(isp) || CCDC_RESZ_CAPTURE(isp))
 			isp_disable_interrupts(dev);
 		if (isp->pipeline.modules == OMAP_ISP_CSIARX) {
 			isp_csi2_ctx_config_enabled(&isp->isp_csi2, 0, false);
@@ -2054,8 +2131,10 @@ int isp_buf_queue(struct device *dev, struct videobuf_buffer *vb,
 				isp_csi_lcm_readport_enable(&isp->isp_csi, 1);
 			}
 		} else {
+			if (!CCDC_RESZ_CAPTURE(isp)){
 			if (isp->pipeline.modules & OMAP_ISP_CCDC)
 				ispccdc_enable(&isp->isp_ccdc, 1);
+			}
 
 		if (isp->pipeline.modules == OMAP_ISP_CSIARX) {
 			isp_csi2_irq_ctx_set(&isp->isp_csi2, 1);
@@ -2391,18 +2470,20 @@ int isp_handle_private(struct device *dev, struct mutex *vdev_mutex, int cmd,
 	case VIDIOC_PRIVATE_ISP_AEWB_CFG: {
 		struct isph3a_aewb_config *params;
 		params = (struct isph3a_aewb_config *)arg;
-
 		mutex_lock(vdev_mutex);
 		rval = isph3a_aewb_config(&isp->isp_h3a, params);
 		mutex_unlock(vdev_mutex);
+
+		/* removed by MMS 
 		if (rval)
 			return rval;
 
-		/* Check errata i421 */
+		// Check errata i421 
 		if (isp->isp_af.enabled && params && params->aewb_enable) {
 			rval = isp_validate_errata_i421(dev, params,
 					&isp->isp_af.config.paxel_config);
 		}
+		*/
 	}
 		break;
 	case VIDIOC_PRIVATE_ISP_AEWB_REQ: {
@@ -2428,19 +2509,20 @@ int isp_handle_private(struct device *dev, struct mutex *vdev_mutex, int cmd,
 	case VIDIOC_PRIVATE_ISP_AF_CFG: {
 		struct af_configuration *params;
 		params = (struct af_configuration *)arg;
-
 		mutex_lock(vdev_mutex);
 		rval = isp_af_config(&isp->isp_af, params);
 		mutex_unlock(vdev_mutex);
+		/* removed by MMS 
 		if (rval)
 			return rval;
 
-		/* Check errata i421 */
+		// Check errata i421 
 		if (isp->isp_h3a.enabled && params && params->af_config) {
 			rval = isp_validate_errata_i421(dev,
 					&isp->isp_h3a.aewb_config_local,
 					&params->paxel_config);
 		}
+		*/
 	}
 		break;
 	case VIDIOC_PRIVATE_ISP_AF_REQ: {
@@ -2949,7 +3031,6 @@ static int isp_remove(struct platform_device *pdev)
 	}
 
 	omap3isp_pdev = NULL;
-
 	kfree(isp);
 
 	return 0;

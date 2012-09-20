@@ -34,6 +34,14 @@
 #include <linux/i2c/twl.h>
 #include <linux/slab.h>
 
+// 20100727 jh.koo@lge.com for CP reset Pop up [START_LGE]
+#include <asm/gpio.h>
+#include <linux/delay.h>
+#include "../mux.h"
+// 20100727 jh.koo@lge.com for CP reset Pop up [END_LGE]
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [START_LGE]
+#include <linux/wakelock.h>
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [END_LGE]
 
 /*
  * The TWL4030 family chips include a keypad controller that supports
@@ -58,6 +66,21 @@
 #define TWL4030_ROW_SHIFT	4
 #define TWL4030_KEYMAP_SIZE	(TWL4030_MAX_ROWS << TWL4030_ROW_SHIFT)
 
+// 20100727 jh.koo@lge.com for CP reset Pop up [START_LGE]
+#define CP_DOWN_INT		176
+// 20100727 jh.koo@lge.com for CP reset Pop up [END_LGE]
+// 20100831 jh.koo@lge.com for TEST MODE [START_LGE]
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_Start*/
+#define GKPD_BUF_MAX		20		
+static unsigned int test_mode = 0;
+static int test_code, gkpd_last_index = 0;
+//static int gkpd_state; // 20120213 taeju.park@lge.com To delete compile warning, unused variable.
+static unsigned char gkpd_value[GKPD_BUF_MAX+1];
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_End*/
+
+static struct wake_lock key_wake_lock;
+// 20100831 jh.koo@lge.com for TEST MODE [END_LGE]
+
 struct twl4030_keypad {
 	unsigned short	keymap[TWL4030_KEYMAP_SIZE];
 	u16		kp_state[TWL4030_MAX_ROWS];
@@ -68,7 +91,6 @@ struct twl4030_keypad {
 	struct device *dbg_dev;
 	struct input_dev *input;
 };
-
 /*----------------------------------------------------------------------*/
 
 /* arbitrary prescaler value 0..7 */
@@ -132,8 +154,108 @@ struct twl4030_keypad {
 #define KEYP_EDR_MIS_FALLING		0x40
 #define KEYP_EDR_MIS_RISING		0x80
 
+// [START_LGE]
+int key_row;
+int key_col;
+int key_pressed;
+// [END_LGE]
 
 /*----------------------------------------------------------------------*/
+
+// 20100831 jh.koo@lge.com for TEST MODE [START_LGE]
+int get_test_mode(void)
+{
+	return test_mode;
+}
+EXPORT_SYMBOL(get_test_mode);
+
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_Start*/
+#if 1// 20101226 changhyun.han@lge.com for GKPD command HARD key map, refer to feature phone models.
+typedef struct
+{
+	char         out;
+	unsigned char in;
+
+} Conv;
+
+ Conv GKPD_table[]=
+ {
+ #if 0
+	 {'#',  UTA_KBD_KEY_HASH}
+	,{'*',  UTA_KBD_KEY_STAR}
+	,{'0',  UTA_KBD_KEY_0}
+	,{'1',  UTA_KBD_KEY_1}
+	,{'2',  UTA_KBD_KEY_2}
+	,{'3',  UTA_KBD_KEY_3}
+	,{'4',  UTA_KBD_KEY_4}
+	,{'5',  UTA_KBD_KEY_5}
+	,{'6',  UTA_KBD_KEY_6}
+	,{'7',  UTA_KBD_KEY_7}
+	,{'8',  UTA_KBD_KEY_8}
+	,{'9',  UTA_KBD_KEY_9}
+	,{'^',  UTA_KBD_KEY_UP}
+	,{'V',  UTA_KBD_KEY_DOWN}
+	,{'L',  UTA_KBD_KEY_LEFT}
+	,{'R',  UTA_KBD_KEY_RIGHT}
+	,{'E',  UTA_KBD_KEY_ONOFF}
+	,{'[',  UTA_KBD_KEY_LSO}
+	,{']',  UTA_KBD_KEY_RSO}
+	,{'S',  UTA_KBD_KEY_DIAL}
+	,{'Y',  UTA_KBD_KEY_CLEAR}
+	,{'O',  UTA_KBD_KEY_OK} // Key_Reassign winneck test 080717
+    ,{'U',  UTA_KBD_KEY_VOL_UP}
+	,{'M',  UTA_KBD_CUSTOMER_KEY_1}
+#endif	
+	{'D',  KEY_VOLUMEDOWN}
+	,{'A',  KEY_VOLUMEUP}
+	 ,{'F',  KEY_KPJPCOMMA}
+	,{'H',  KEY_HOOK} 
+	,{0, 0}
+};
+
+int gkpd_KeyConvert(int key)
+{
+	u16 indexCount = 40;
+	int i = 0;
+	
+	while ((i < indexCount) && (key != 0xFF))
+	{
+		if (GKPD_table[i].in == key)
+			return GKPD_table[i].out;
+		i++;
+	}
+	return key;
+}
+#endif
+
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_End*/
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_Start*/
+void write_gkpd_value(int value)
+{
+	int i;
+	int con ;
+
+	con=gkpd_KeyConvert(value);// 20101226 changhyun.han@lge.com for GKPD command HARD key map, refer to feature phone models.
+	value = con;
+
+	//printk(KERN_INFO "[GKPD] Input : %c , Index : %d\n",value,gkpd_last_index);
+
+	if (gkpd_last_index == GKPD_BUF_MAX) {
+		gkpd_value[gkpd_last_index] = value;
+		for ( i = 0; i < GKPD_BUF_MAX ; i++) {
+			gkpd_value[i] = gkpd_value[i + 1];
+		}			
+		gkpd_value[gkpd_last_index] = '\n';
+	}
+	else {
+		gkpd_value[gkpd_last_index] = value;
+		gkpd_value[gkpd_last_index + 1] = '\n';
+		gkpd_last_index++;
+	}		
+}
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_End*/
+EXPORT_SYMBOL(write_gkpd_value);
+// 20100831 jh.koo@lge.com for TEST MODE [END_LGE]
 
 static int twl4030_kpread(struct twl4030_keypad *kp,
 		u8 *data, u32 reg, u8 num_bytes)
@@ -209,12 +331,14 @@ static void twl4030_kp_scan(struct twl4030_keypad *kp, bool release_all)
 	u16 new_state[TWL4030_MAX_ROWS];
 	int col, row;
 
-	if (release_all)
+	if (release_all){
+		key_pressed = key_col = key_row = 0; //20100918 ks.kwon@lge.com for key detection in muic.
 		memset(new_state, 0, sizeof(new_state));
-	else {
+	}else {
 		/* check for any changes */
 		int ret = twl4030_read_kp_matrix_state(kp, new_state);
 
+		key_pressed = 1;
 		if (ret < 0)	/* panic ... */
 			return;
 
@@ -241,11 +365,22 @@ static void twl4030_kp_scan(struct twl4030_keypad *kp, bool release_all)
 				"press" : "release");
 
 			code = MATRIX_SCAN_CODE(row, col, TWL4030_ROW_SHIFT);
+// 20100831 jh.koo@lge.com for TEST MODE [START_LGE]
+			test_code = code;
+// 20100831 jh.koo@lge.com for TEST MODE [END_LGE]
 			input_event(input, EV_MSC, MSC_SCAN, code);
 			input_report_key(input, kp->keymap[code],
 					 new_state[row] & (1 << col));
 		}
 		kp->kp_state[row] = new_state[row];
+		//20100918 ks.kwon@lge.com for key detection in muic. 
+		if(key_pressed){
+			key_row = row;
+			key_col = col;
+		} else {
+			key_row = 0;
+			key_col = 0;
+		}
 	}
 	input_sync(input);
 }
@@ -267,7 +402,16 @@ static irqreturn_t do_kp_irq(int irq, void *_kp)
 	if (ret >= 0 && (reg & KEYP_IMR1_KP))
 		twl4030_kp_scan(kp, false);
 	else
+	{
 		twl4030_kp_scan(kp, true);
+
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_08_Oct_2011_Start*/
+// 20100831 jh.koo@lge.com for TEST MODE [START_LGE]
+		if(test_mode == 1)	
+			write_gkpd_value(kp->keymap[test_code]);	
+// 20100831 jh.koo@lge.com for TEST MODE [END_LGE]	
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_08_Oct_2011_Start*/
+	}
 
 	return IRQ_HANDLED;
 }
@@ -325,32 +469,137 @@ static int __devinit twl4030_kp_program(struct twl4030_keypad *kp)
 	return 0;
 }
 
+// 20100727 jh.koo@lge.com for CP reset Pop up [START_LGE]
+extern void hub_reboot_device(void);
+extern char reset_mode;
+extern int hidden_reset_enabled;
+//LGE_TELECA_JAVA_RIL_RECOVERY_264  -START
+//20110329, ramesh.chandrasekaran@teleca.com, RIL RECOVERY
+//Description: ISR for modem restart handling
+extern void modem_restart(void);
+static irqreturn_t hub_cp_int_handler(int irq, void *_kp)
+{
+	struct twl4030_keypad *kp = _kp;
+
+    pr_err("modem crash!\n");
+#if 0 //20110317,suchul.lee@lge.com Request_Kill_RILD [START]
+	if (hidden_reset_enabled) {
+#if 0 //2011-02-19, for ril recovery
+		reset_mode = 'h';
+		hub_reboot_device();
+#else
+        //modem_restart();
+#endif
+	} else {
+		input_report_key(kp->input, KEY_PROG3, 1);
+		mdelay(10);
+		input_report_key(kp->input, KEY_PROG3, 0);
+		input_sync(kp->input);
+	}
+#else
+    input_report_key(kp->input, KEY_PROG3, 1);
+    mdelay(10);
+    input_report_key(kp->input, KEY_PROG3, 0);
+    input_sync(kp->input);
+#endif //20110317,suchul.lee@lge.com Request_Kill_RILD [END]
+	
+	return IRQ_HANDLED;
+}
+// 20100727 jh.koo@lge.com for CP reset Pop up [END_LGE]
+//LGE_TELECA_JAVA_RIL_RECOVERY_264  -END
+
 /*
  * Registers keypad device with input subsystem
  * and configures TWL4030 keypad registers
  */
+
+// 20100831 jh.koo@lge.com for TEST MODE [START_LGE]
+static ssize_t hub_keypad_test_mode_show(struct device *dev,  struct device_attribute *attr,  char *buf)
+{
+	int i;
+	int r = 0;
+	for(i = 0; i < gkpd_last_index; i++)
+	{
+		printk(KERN_WARNING"[!] %s() code value : %d\n", __func__, gkpd_value[i]);
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_Start*/
+		r += sprintf(buf+r, "%c", gkpd_value[i]);
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_end*/
+#if 0		
+		if(i == gkpd_last_index - 1) 
+			r += sprintf(buf+r, "%2x\n", gkpd_value[i]);
+		else
+			r += sprintf(buf+r, "%2x, ", gkpd_value[i]);
+#endif
+	}
+//	r += sprintf(buf+r, "%d", '\n');
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_Start*/
+	gkpd_last_index = 0;
+	memset(gkpd_value, 0, sizeof(gkpd_value));
+/*LGSI_GKPD_AT_CMD_snehal.shinde@lge.com_27_Aug_2011_end*/
+	return r;
+//	return (ssize_t)(&gkpd_value);
+#if 0
+	return sprintf(buf, "%d\n", gkpd_value);
+#else
+#endif
+}
+
+static ssize_t hub_keypad_test_mode_store(struct device *dev,  struct device_attribute *attr,  const char *buf, size_t count)
+{
+//	int val;
+    int ret;
+	int i;
+
+//	val = simple_strtoul(buf, NULL, 10);
+    ret = sscanf(buf, "%d", &test_mode);
+
+	if(test_mode == 1) {
+
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [START_LGE]		
+		wake_lock(&key_wake_lock);
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [END_LGE]
+
+		for(i = 0; i < gkpd_last_index; i++)
+			gkpd_value[i] = 0;
+
+		gkpd_last_index = 0;
+	}
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [START_LGE]	
+	else if(test_mode == 0) {
+		wake_unlock(&key_wake_lock);
+	}
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [END_LGE]	
+//	test_mode = ret;
+
+	return ret;
+}
+static DEVICE_ATTR(key_test_mode, 0664, hub_keypad_test_mode_show, hub_keypad_test_mode_store);
+// 20100831 jh.koo@lge.com for TEST MODE [END_LGE]
+
 static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 {
+// 20100727 jh.koo@lge.com for CP reset Pop up [START_LGE]
+	int ret = 0;
+	omap_mux_init_gpio(CP_DOWN_INT, OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+// 20100727 jh.koo@lge.com for CP reset Pop up [END_LGE]	
+	
 	struct twl4030_keypad_data *pdata = pdev->dev.platform_data;
-	const struct matrix_keymap_data *keymap_data;
+	const struct matrix_keymap_data *keymap_data = pdata->keymap_data;
 	struct twl4030_keypad *kp;
 	struct input_dev *input;
 	u8 reg;
 	int error;
 
-	if (!pdata || !pdata->rows || !pdata->cols || !pdata->keymap_data ||
+	if (!pdata || !pdata->rows || !pdata->cols ||
 	    pdata->rows > TWL4030_MAX_ROWS || pdata->cols > TWL4030_MAX_COLS) {
 		dev_err(&pdev->dev, "Invalid platform_data\n");
 		return -EINVAL;
 	}
 
-	keymap_data = pdata->keymap_data;
-
 	kp = kzalloc(sizeof(*kp), GFP_KERNEL);
 	input = input_allocate_device();
 	if (!kp || !input) {
-		error = -ENOMEM;
-		goto err1;
+		return -ENOMEM;
 	}
 
 	/* Get the debug Device */
@@ -360,7 +609,6 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 	kp->n_rows = pdata->rows;
 	kp->n_cols = pdata->cols;
 	kp->irq = platform_get_irq(pdev, 0);
-
 	/* setup input device */
 	__set_bit(EV_KEY, input->evbit);
 
@@ -370,8 +618,8 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 
 	input_set_capability(input, EV_MSC, MSC_SCAN);
 
-	input->name		= "twl4030-keypad";
-	input->phys		= "twl4030-keypad/input0";
+	input->name		= "TWL4030_Keypad";
+	input->phys		= "TWL4030_Keypad/input0";
 	input->dev.parent	= &pdev->dev;
 
 	input->id.bustype	= BUS_HOST;
@@ -418,6 +666,45 @@ static int __devinit twl4030_kp_probe(struct platform_device *pdev)
 		goto err3;
 	}
 
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [START_LGE]
+	wake_lock_init(&key_wake_lock, WAKE_LOCK_SUSPEND, "TWL4030_Keypad");
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [END_LGE]
+
+// 20100727 jh.koo@lge.com for CP reset Pop up [START_LGE]
+	ret = gpio_request(CP_DOWN_INT, "cp int gpio");
+
+	if(ret < 0) {
+			printk(KERN_WARNING"%s() can't get hub GPIO\n", __func__);
+			kzfree(kp);
+			return -ENOSYS;
+		}
+	
+	ret = gpio_direction_input(CP_DOWN_INT);
+
+	ret = request_irq(gpio_to_irq(CP_DOWN_INT), hub_cp_int_handler, IRQF_TRIGGER_FALLING /*| IRQF_TRIGGER_RISING*/, "CP_INT", kp);
+	if (ret < 0){
+			printk(KERN_INFO "[CP Reset] GPIO 176 IRQ line set up failed!\n");
+			free_irq(gpio_to_irq(CP_DOWN_INT), kp);
+			return -ENOSYS;
+		}	
+		/* Make the interrupt on wake up OMAP which is in suspend mode */
+		ret = enable_irq_wake(gpio_to_irq(CP_DOWN_INT));
+		if(ret < 0){
+			printk(KERN_INFO "[CP Reset] GPIO 176 CP Switching wake up source setting failed!\n");
+			disable_irq_wake(gpio_to_irq(CP_DOWN_INT));
+			return -ENOSYS;
+		}
+//	omap_mux_init_gpio(CP_DOWN_INT, OMAP_PIN_INPUT_PULLUP | OMAP_PIN_OFF_WAKEUPENABLE);
+// 20100727 jh.koo@lge.com for CP reset Pop up [END_LGE]
+// 20100831 jh.koo@lge.com for TEST MODE [START_LGE]
+	ret = device_create_file(&pdev->dev, &dev_attr_key_test_mode);
+	if (ret) {
+		printk( "Hub-keypad: keypad_probe: Fail\n");
+		device_remove_file(&pdev->dev, &dev_attr_key_test_mode);
+		return ret;
+	}
+// 20100831 jh.koo@lge.com for TEST MODE [END_LGE]
+
 	platform_set_drvdata(pdev, kp);
 	return 0;
 
@@ -442,6 +729,9 @@ static int __devexit twl4030_kp_remove(struct platform_device *pdev)
 	input_unregister_device(kp->input);
 	platform_set_drvdata(pdev, NULL);
 	kfree(kp);
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [START_LGE]
+	wake_lock_destroy(&key_wake_lock);
+// 20101109 jh.koo@lge.com wake lock for Test Mode of Key [END_LGE]
 
 	return 0;
 }

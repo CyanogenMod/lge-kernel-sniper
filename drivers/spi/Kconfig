@@ -447,7 +447,53 @@ config SPI_DW_MMIO
 # being probably the most widely used ones.
 #
 comment "SPI Protocol Masters"
+# from GB
+config LGE_SPI
+	tristate "LGE SPI"
+	depends on ARCH_OMAP24XX || ARCH_OMAP3 || ARCH_OMAP4
+	help
+	Enable this to support LGE SPI
 
+#--[[ LGE_UBIQUIX_MODIFIED_START : scchoi@ubiquix.com [2011.06.24] - Modied illegal depend.
+config LGE_SPI_MASTER
+	bool "LGE SPI Master"
+	depends on ((ARCH_OMAP24XX || ARCH_OMAP3 || ARCH_OMAP4) && LGE_SPI)
+	default y
+	help
+	Enable this to support LGE SPI Master
+#--]] LGE_UBIQUIX_MODIFIED_END : scchoi@ubiquix.com [2011.06.24] - Modied illegal depend.
+
+config LGE_SPI_SLAVE
+	bool "LGE SPI SLAVE"
+	depends on ((ARCH_OMAP24XX || ARCH_OMAP3 || ARCH_OMAP4) && LGE_SPI && !LGE_SPI_MASTER)
+	default y
+	help
+	Enable this to support LGE SPI Slave
+
+#// LGE_UPDATE_S eungbo.shim@lge.com 2010/08/07 OMAP3-IFX Changed Master For A-Project
+#config LGE_SPI_MODE_SLAVE
+#	tristate "LGE SPI Slave Mode"
+#	depends on ARCH_OMAP24XX || ARCH_OMAP3 || ARCH_OMAP4
+#	help
+#	Enable this to support slave mode LGE SPI
+#// LGE_UPDATE_E eungbo.shim@lge.com 2010/08/07 OMAP3-IFX Changed Master For A-Project
+
+#// LGE_DOM_UPDATE_S hayun.kim 2010/06/30 {
+config SPI_TDMB
+	tristate "SPI LG2102 from LG SIC"
+	depends on ARCH_OMAP24XX || ARCH_OMAP34XX
+	help
+	Enable this driver to support LG SIC2102 RFBB chipset
+#// LGE_DOM_UPDATE_E hayun.kim 2010/06/30 }
+
+#//--[[ LGE_UBIQUIX_MODIFIED_START : [scchoi@ubiquix.com] - Merged MDM6600 driver(based on justin)
+config SPI_MDM6600
+	bool "MDM 6600 Modem interface"
+	depends on LGE_SPI_SLAVE
+	help
+	Enable this to use MDM 6600 Modem.
+#//--[[ LGE_UBIQUIX_MODIFIED_END : [scchoi@ubiquix.com] - Merged MDM6600 driver(based on justin)
+	
 config SPI_SPIDEV
 	tristate "User mode SPI device driver support"
 	depends on EXPERIMENTAL

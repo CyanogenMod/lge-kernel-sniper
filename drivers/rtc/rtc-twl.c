@@ -133,6 +133,16 @@ static const u8 twl6030_rtc_reg_map[] = {
 
 /*----------------------------------------------------------------------*/
 static u8  *rtc_reg_map;
+//20101104 taehwan.kim@lge.com temporary rtc wakeup module [START_LGE]
+#define TEMP_TRICKLE_MONITOR 1
+#if TEMP_TRICKLE_MONITOR
+#define MONITOR_INTERVAL 240
+#define RESERVED_ALARM_BUFFER 120
+unsigned char reserved_alarm_data[ALL_TIME_REGS + 1] = { 0 };
+int set_trickle_alarm = 0;
+#endif
+
+//20101104 taehwan.kim@lge.com temporary rtc wakeup module [END_LGE]
 
 /*
  * Supports 1 byte read from TWL RTC register.
@@ -212,6 +222,104 @@ static int twl_rtc_alarm_irq_enable(struct device *dev, unsigned enabled)
 
 	return ret;
 }
+
+//20101104 taehwan.kim@lge.com temporary RTC wakeup module [START_LGE]
+#if TEMP_TRICKLE_MONITOR 
+int set_trickle_charge_monitor(int enable)
+{
+	int ret;
+	unsigned char val, retval;
+
+	if (enable == 1)
+	{
+		unsigned char rtc_data[ALL_TIME_REGS + 1] = { 0 };
+
+		u8 save_control = 0;
+		struct rtc_time tm;
+		u8 rd_data, wr_data;
+		unsigned char alarm_data[ALL_TIME_REGS + 1];
+		unsigned long time_value, reseved_alarm_value = 0;
+		ret = twl_rtc_read_u8(&save_control, REG_RTC_CTRL_REG);
+		if (ret < 0)
+			return ret;
+		save_control |= BIT_RTC_CTRL_REG_GET_TIME_M;
+
+		ret = twl_rtc_write_u8(save_control, REG_RTC_CTRL_REG);
+		if (ret < 0)
+			return ret;
+#ifndef CONFIG_ARCH_OMAP4
+		ret = twl_i2c_read(TWL_MODULE_RTC, rtc_data,
+				(rtc_reg_map[REG_SECONDS_REG]), ALL_TIME_REGS);
+#else
+		ret = twl_rtc_read(rtc_data, REG_SECONDS_REG, ALL_TIME_REGS);
+#endif
+		if (ret < 0) {
+			printk ("rtc_read_time error %d\n", ret);
+			return ret;
+		}
+		tm.tm_sec = bcd2bin(rtc_data[0]);
+		tm.tm_min = bcd2bin(rtc_data[1]);
+		tm.tm_hour = bcd2bin(rtc_data[2]);
+		tm.tm_mday = bcd2bin(rtc_data[3]);
+		tm.tm_mon = bcd2bin(rtc_data[4]) - 1;
+		tm.tm_year = bcd2bin(rtc_data[5]) + 100;
+		time_value = mktime(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+		printk("[RTC] Current Time H %d, M %d time = %ld \n",tm.tm_hour, tm.tm_min, time_value);
+		time_value += MONITOR_INTERVAL;
+
+		rtc_time_to_tm(time_value, &tm);
+
+		alarm_data[1] = bin2bcd(tm.tm_sec);
+		alarm_data[2] = bin2bcd(tm.tm_min);
+		alarm_data[3] = bin2bcd(tm.tm_hour);
+		alarm_data[4] = bin2bcd(tm.tm_mday);
+		alarm_data[5] = bin2bcd(tm.tm_mon + 1);
+		alarm_data[6] = bin2bcd(tm.tm_year - 100);
+		printk("[RTC] Set Time H %d, M %d time = %ld \n",tm.tm_hour, tm.tm_min, time_value);
+
+		if (rtc_irq_bits & BIT_RTC_INTERRUPTS_REG_IT_ALARM_M) {
+#ifndef CONFIG_ARCH_OMAP4
+			ret = twl_i2c_read(TWL_MODULE_RTC, reserved_alarm_data,
+					(rtc_reg_map[REG_ALARM_SECONDS_REG]), ALL_TIME_REGS);
+#else
+			ret = twl_rtc_read(reserved_alarm_data, REG_ALARM_SECONDS_REG, ALL_TIME_REGS);
+#endif
+			if (ret < 0) {
+				printk("rtc_read_alarm error %d\n", ret);
+				return ret;
+			}
+			tm.tm_sec = bcd2bin(reserved_alarm_data[0]);
+			tm.tm_min = bcd2bin(reserved_alarm_data[1]);
+			tm.tm_hour = bcd2bin(reserved_alarm_data[2]);
+			tm.tm_mday = bcd2bin(reserved_alarm_data[3]);
+			tm.tm_mon = bcd2bin(reserved_alarm_data[4]) - 1;
+			tm.tm_year = bcd2bin(reserved_alarm_data[5]) + 100;
+			reseved_alarm_value = mktime(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+			printk("[RTC] Reserved Time H %d, M %d time = %ld \n",tm.tm_hour, tm.tm_min, reseved_alarm_value);
+
+		}
+        ret = twl_rtc_read_u8(&rd_data, REG_RTC_STATUS_REG);
+		wr_data = rd_data & ~(BIT_RTC_STATUS_REG_ALARM_M);
+		twl_rtc_write_u8(wr_data, REG_RTC_STATUS_REG);
+
+		if ((reseved_alarm_value > time_value+RESERVED_ALARM_BUFFER)||(reseved_alarm_value < time_value-MONITOR_INTERVAL-1))
+		{
+			ret = twl_i2c_write(TWL_MODULE_RTC, alarm_data,
+					(rtc_reg_map[REG_ALARM_SECONDS_REG]), ALL_TIME_REGS);
+			ret = set_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
+			set_trickle_alarm = 1;
+		}
+	}
+	else
+	{
+		ret = mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(set_trickle_charge_monitor);
+#endif
+//20101104 taehwan.kim@lge.com temporary RTC wakeup module [END_LGE]
 
 /*
  * Gets current TWL RTC time and date parameters.

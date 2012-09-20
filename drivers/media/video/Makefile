@@ -73,6 +73,13 @@ obj-$(CONFIG_VIDEO_M5MOLS)	+= m5mols/
 
 obj-$(CONFIG_VIDEO_IMX046) += imx046.o
 obj-$(CONFIG_VIDEO_LV8093) += lv8093.o
+#//--[[ LGE_UBIQUIX_MODIFIED_START : ymjun@mnbt.co.kr [2012.03.27] - CAM from GB
+obj-$(CONFIG_VIDEO_IMX072)   += imx072.o
+obj-$(CONFIG_VIDEO_IMX072)   += dw9716.o
+obj-$(CONFIG_VIDEO_IMX072)   += rt8515.o
+obj-$(CONFIG_VIDEO_YACD5B1S) += yacd5b1s.o
+obj-$(CONFIG_VIDEO_MT9V113)	 += mt9v113.o
+#//--]] LGE_UBIQUIX_MODIFIED_END : ymjun@mnbt.co.kr [2012.03.27] - CAM from GB
 obj-y += isp/
 obj-$(CONFIG_VIDEO_OMAP3) += omap34xxcam.o
 obj-$(CONFIG_SOC_CAMERA_IMX074)		+= imx074.o

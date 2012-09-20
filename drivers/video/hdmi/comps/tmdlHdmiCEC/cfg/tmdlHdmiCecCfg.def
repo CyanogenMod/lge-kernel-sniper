@@ -1,0 +1,16 @@
+LIBRARY tmdlHdmiCecCfg
+EXPORTS tmdlHdmiCecCfgGetConfig @1
+tmdlHdmiTxIWTaskCreate
+tmdlHdmiTxIWTaskDestroy
+tmdlHdmiTxIWTaskStart
+tmdlHdmiTxIWWait
+tmdlHdmiTxIWQueueCreate
+tmdlHdmiTxIWQueueDestroy
+tmdlHdmiTxIWQueueSend
+tmdlHdmiTxIWQueueReceive
+tmdlHdmiTxIWSemaphoreCreate
+tmdlHdmiTxIWSemaphoreDestroy
+tmdlHdmiTxIWSemaphoreP
+tmdlHdmiTxIWSemaphoreV
+tmdlHdmiTxIWDisableInterrupts
+tmdlHdmiTxIWEnableInterrupts

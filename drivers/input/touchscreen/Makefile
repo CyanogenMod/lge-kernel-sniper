@@ -63,3 +63,6 @@ obj-$(CONFIG_TOUCHSCREEN_W90X900)	+= w90p910_ts.o
 obj-$(CONFIG_TOUCHSCREEN_TPS6507X)	+= tps6507x-ts.o
 obj-$(CONFIG_TOUCHSCREEN_SYNTM12XX)	+= syntm12xx.o
 obj-$(CONFIG_TOUCHSCREEN_QUANTUM_OBP)	+= qtouch_obp_ts.o
+obj-$(CONFIG_TOUCHSCREEN_HUB_SYNAPTICS) += hub_synaptics_ts.o
+obj-$(CONFIG_TOUCHSCREEN_JUSTIN_KR_SYNAPTICS) += justin_kr_synaptics_ts.o justin_kr_synaptics_keytouch.o
+obj-$(CONFIG_TOUCHSCREEN_KU5900_SYNAPTICS) += ku5900_synaptics_ts.o

@@ -79,7 +79,7 @@
 #define DISPC_CONTROL		OMAP2_L4_IO_ADDRESS(OMAP34XX_DISPC_BASE + 0x040)
 #define DISPC_IRQSTATUS		OMAP2_L4_IO_ADDRESS(OMAP34XX_DISPC_BASE + 0x018)
 #define DISPC_LCD_EN		(1 << 0)
-#define DISPC_VSYNC_ST		(1 << 1)
+#define DISPC_VSYNC_ST		(1 << 0) // LGE_CHANGE [daewung.kim@lge.com] Change VSYNC_ST -> FRAME_DONE
 #define CM_DSS_FCLK_ST		(1 << 0)
 
 /*
@@ -186,7 +186,9 @@ wait_vsync_set:
 	ldr	r12, [r11]
 	and	r12, r12, #DISPC_VSYNC_ST
 	cmp	r12, #DISPC_VSYNC_ST
+#if 0	/*[LGE_CHANGE] pyocool.cho@lge.com power on off lockup issue */
 	blne	wait_vsync_set		@ wait for vsync to be set.
+#endif
 configure_dpll:
 	cmp	r3, #1			@ if increasing SDRC clk rate,
 	bleq	configure_sdrc		@ program the SDRC regs early (for RFR)
