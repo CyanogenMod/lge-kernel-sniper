@@ -749,12 +749,14 @@ static struct synaptics_i2c_rmi_platform_data hub_ts_synaptics_platform_data[] =
 // 20100619 jh.koo@lge.com Hub touchscreen [END_LGE]
 #endif
 
+#if defined(CONFIG_MUIC)
 /* LGE_SJIT 2012-01-27 [dojip.kim@lge.com] add muic platform data */
 static struct muic_platform_data muic_pdata = {
 	.gpio_int = MUIC_INT_GPIO,
 	.gpio_ifx_vbus = GPIO_IFX_USB_VBUS_EN,
 	//.gpio_mhl = NULL,	
 };
+#endif
 
 static struct i2c_board_info __initdata hub_i2c_bus2_info[] = {
 // 20100629 jh.koo@lge.com Hub Backlight [START_LGE]

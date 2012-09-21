@@ -106,7 +106,7 @@ enum key_leds {
 
 static int init_stabled = -1;
 //--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.03.20] - TBD
-int lcd_off_boot = 0;
+static int lcd_off_boot = 0;
 //--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.03.20]- TBD
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
