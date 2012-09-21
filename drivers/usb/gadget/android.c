@@ -60,7 +60,7 @@
 #include "f_mtp.c"
 #include "f_accessory.c"
 
-#if defined(CONFIG_LGE_ANDROID_USB)
+#if defined(CONFIG_LGE_ANDROID_USB_DONOTUSE)
 #include "f_ecm.c"
 #else
 #define USB_ETH_RNDIS y
@@ -609,7 +609,7 @@ static struct android_usb_function ptp_function = {
 	.bind_config	= ptp_function_bind_config,
 };
 
-#if !defined(CONFIG_LGE_ANDROID_USB)
+#if !defined(CONFIG_LGE_ANDROID_USB_DONOTUSE)
 struct rndis_function_config {
 	u8      ethaddr[ETH_ALEN];
 	u32     vendorID;
@@ -695,7 +695,7 @@ static ssize_t rndis_manufacturer_store(struct device *dev,
 	return -1;
 }
 
-static DEVICE_ATTR(rndis_manufacturer, S_IRUGO | S_IWUSR, rndis_manufacturer_show,
+static DEVICE_ATTR(manufacturer, S_IRUGO | S_IWUSR, rndis_manufacturer_show,
 						    rndis_manufacturer_store);
 
 static ssize_t rndis_wceis_show(struct device *dev,
@@ -720,7 +720,7 @@ static ssize_t rndis_wceis_store(struct device *dev,
 	return -EINVAL;
 }
 
-static DEVICE_ATTR(rndis_wceis, S_IRUGO | S_IWUSR, rndis_wceis_show,
+static DEVICE_ATTR(wceis, S_IRUGO | S_IWUSR, rndis_wceis_show,
 					     rndis_wceis_store);
 
 static ssize_t rndis_ethaddr_show(struct device *dev,
@@ -747,7 +747,7 @@ static ssize_t rndis_ethaddr_store(struct device *dev,
 	return -EINVAL;
 }
 
-static DEVICE_ATTR(rndis_ethaddr, S_IRUGO | S_IWUSR, rndis_ethaddr_show,
+static DEVICE_ATTR(ethaddr, S_IRUGO | S_IWUSR, rndis_ethaddr_show,
 					       rndis_ethaddr_store);
 
 static ssize_t rndis_vendorID_show(struct device *dev,
@@ -772,14 +772,14 @@ static ssize_t rndis_vendorID_store(struct device *dev,
 	return -EINVAL;
 }
 
-static DEVICE_ATTR(rndis_vendorID, S_IRUGO | S_IWUSR, rndis_vendorID_show,
+static DEVICE_ATTR(vendorID, S_IRUGO | S_IWUSR, rndis_vendorID_show,
 						rndis_vendorID_store);
 
 static struct device_attribute *rndis_function_attributes[] = {
-	&dev_attr_rndis_manufacturer,
-	&dev_attr_rndis_wceis,
-	&dev_attr_rndis_ethaddr,
-	&dev_attr_rndis_vendorID,
+	&dev_attr_manufacturer,
+	&dev_attr_wceis,
+	&dev_attr_ethaddr,
+	&dev_attr_vendorID,
 	NULL
 };
 
@@ -793,7 +793,7 @@ static struct android_usb_function rndis_function = {
 };
 #endif
 
-#if defined(CONFIG_LGE_ANDROID_USB)
+#if defined(CONFIG_LGE_ANDROID_USB_DONOTUSE)
 // ecm function
 struct ecm_function_config {
 	u8      ethaddr[ETH_ALEN];
@@ -1068,7 +1068,7 @@ static struct android_usb_function *supported_functions[] = {
 	&acm_function,
 	&mtp_function,
 	&ptp_function,
-#if defined(CONFIG_LGE_ANDROID_USB)
+#if defined(CONFIG_LGE_ANDROID_USB_DONOTUSE)
 	&ecm_function,
 #else	
 	&rndis_function,
