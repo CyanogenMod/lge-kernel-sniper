@@ -275,7 +275,8 @@ obj-$(CONFIG_MACH_LGE_HUB)		+= board-hub.o \
 					   board-hub-panel.o \
 					   board-hub-wifi.o \
 					   omapxx_apps_brd_id.o \
-					   board-hub-camera.o
+					   board-hub-camera.o \
+					   lge_cmdline.o
 #					   board-hub-ers.o \
 
 endif
