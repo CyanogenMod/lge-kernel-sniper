@@ -104,6 +104,8 @@ enum key_leds {
 	SEARCH,
 };
 
+extern void touchkey_pressed(enum key_leds id);
+
 static int init_stabled = -1;
 //--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.03.20] - TBD
 static int lcd_off_boot = 0;
@@ -782,6 +784,22 @@ do
 				if(pressed_button_type != KEY_REJECT && !ts_i)
 				{
 					input_report_key(p_ts->input_dev, pressed_button_type, 0);
+                                                switch(pressed_button_type)
+                                                {
+                                                        case KEY_MENU:
+                                                                touchkey_pressed(MENU);
+                                                                break;
+                                                        case KEY_HOME:
+                                                                touchkey_pressed(HOME);
+                                                                break;
+                                                        case KEY_BACK:
+                                                                touchkey_pressed(BACK);
+                                                                break;
+                                                        case KEY_SEARCH:
+                                                                touchkey_pressed(SEARCH);
+                                                                break;
+                                                }
+
 					pressed_button_type = KEY_REJECT;
 				}
 			}

@@ -405,15 +405,6 @@ void touchkey_pressed(enum key_leds id)
 		bd2802_on(led);
 		led->led_state = BD2802_ON;
 	}
-	/* LGE_UPDATE_S 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
-	else if (led->led_state == BD2802_OFF) {
-		led->white_current = BD2802_CURRENT_WHITE_MAX;
-		led->blue_current = BD2802_CURRENT_000;	
-		led->led_state = BD2802_ON;
-		bd2802_on(led);
-		bd2802_enable(led);
-	}
-	/* LGE_UPDATE_E 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
 
 	if (led->key_led != id)
 		bd2802_turn_white(led,led->key_led);
@@ -552,15 +543,20 @@ static void bd2802_ledmin_work_func(struct work_struct *work)
 	struct bd2802_led *led = container_of(work, struct bd2802_led, ledmin_work);
 	led->white_current = BD2802_CURRENT_WHITE_MIN;
 	led->blue_current = BD2802_CURRENT_000;
-/* LGE_UPDATE_S 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
-#if 0
+#if 1  
+    led->led_state=BD2802_ON;
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.09.09] - Merge from Black_Froyo MR Ver.
+    //bd2802_off(led);
+    bd2802_turn_white(led, MENU);
+       bd2802_turn_white(led, HOME);
+       bd2802_turn_white(led, BACK);
+       bd2802_turn_white(led, SEARCH);
+       
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.09.09]- Merge from Black_Froyo MR Ver.
+#else  
 	bd2802_on(led);
-	led->led_state = BD2802_DIMMING;
-#else
-	bd2802_off(led);
-	led->led_state = BD2802_OFF;
 #endif
-/* LGE_UPDATE_E 2011-10-26 [daewung.kim@lge.com] : Turn off LED backlight for power consumption */
+	led->led_state = BD2802_DIMMING;
 }
 
 static enum hrtimer_restart bd2802_ledmin_timer_func(struct hrtimer *timer)
@@ -724,7 +720,7 @@ static ssize_t bd2802_store_led_onoff(struct device *dev,
 
 	DBG("value=%d\n",value);
 
-	if ((value==1)&&(led->led_state!=BD2802_ON))
+	if ((value==1 || value == 255)/*&&(led->led_state!=BD2802_ON)*/)
 	{
 		led->led_state = BD2802_ON;
 		led->white_current = BD2802_CURRENT_WHITE_MAX;
@@ -734,7 +730,7 @@ static ssize_t bd2802_store_led_onoff(struct device *dev,
 		bd2802_on(led);
 		bd2802_enable(led);
 	}
-	else if ((value==0)&&(led->led_state!=BD2802_OFF))
+	else if ((value==0)/*&&(led->led_state!=BD2802_OFF)*/)
 	{
 		bd2802_off(led);
 		gpio_set_value(RGB_LED_CNTL, 0);
