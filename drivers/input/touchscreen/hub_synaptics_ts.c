@@ -27,6 +27,7 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/platform_device.h>
+#include <linux/irq.h>
 #include <mach/gpio.h>
 #include <linux/jiffies.h>
 
@@ -36,14 +37,16 @@
 
 #include <linux/slab.h>
 
+#include <../../../arch/arm/mach-omap2/mux.h>
+
 //--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.03.20] - Not included
 /* 20110331 sookyoung.kim@lge.com LG-DVFS [START_LGE] */
 //#include <linux/dvs_suite.h>
 /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 //--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.03.20]- Not included
 
-#include "synaptics_ts_firmware.h"
-#include "synaptics_ts_firmware_lgit.h"
+#include "black_synaptics_ts_firmware.h"
+#include "black_synaptics_ts_firmware_lgit.h"
 #define SYNAPTICS_SUPPORT_FW_UPGRADE
 
 #if 0
@@ -60,6 +63,9 @@
 
 #define FEATURE_LGE_TOUCH_REAL_TIME_WORK_QUEUE
 #define FEATURE_LGE_TOUCH_ESD_DETECT
+
+#define TS_DEBUG	0
+#define TS_IRQ_DEPTH_CHECK	1
 /*===========================================================================
                 DEFINITIONS AND DECLARATIONS FOR MODULE
 
@@ -107,9 +113,6 @@ enum key_leds {
 extern void touchkey_pressed(enum key_leds id);
 
 static int init_stabled = -1;
-//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.03.20] - TBD
-static int lcd_off_boot = 0;
-//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.03.20]- TBD
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static void synaptics_ts_early_suspend(struct early_suspend *h);
@@ -118,7 +121,9 @@ static void synaptics_ts_late_resume(struct early_suspend *h);
 
 #define TOUCH_INT_N_GPIO						35
 
-extern void bd2802_touch_on(void);
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.04.02] - Do not Turn on Keyled in Kernel.
+//extern void bd2802_touch_on(void);
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.04.02]- Do not Turn on Keyled in Kernel.
 extern void bd2802_touch_timer_restart(void);
 extern u8 key_led_flag;
 
@@ -353,16 +358,37 @@ static unsigned long pressed_time;
 #endif
 
 #ifdef FEATURE_LGE_TOUCH_ESD_DETECT
-extern int aat2870_ldo_write(u8 reg , u8 val);
+extern int aat2870_touch_ldo_write(u8 reg , u8 val);
+extern u8 aat2870_touch_ldo_read(u8 reg);
 static bool  synatics_ts_touch_recovery(void);
 #endif /*FEATURE_LGE_TOUCH_ESD_DETECT*/
 
-//extern int lcd_off_boot;
+extern int lcd_off_boot;
+//static void synaptics_ts_initialize(void)
+static unsigned int synaptics_irq_depth_count(void)
+{
+	struct irq_desc *desc = irq_to_desc(p_ts->client->irq);
+	unsigned int irq_depth = desc->depth;
 
-static void synaptics_ts_initialize(void)
+	return irq_depth;
+}
+
+static int disable_irq_flag = 0;
+static void synaptics_ts_initialize(struct work_struct *work)
 {
 	int ret;
-	printk("%s : %d\n",__func__,__LINE__);
+	unsigned int irq_depth = synaptics_irq_depth_count();
+	unsigned int before_irq_depth;
+	
+#if TS_IRQ_DEPTH_CHECK
+	printk("[TS Fixed] %s : %d / irq_depth = %d(%d)\n",__func__,__LINE__, irq_depth, disable_irq_flag);
+#else
+	printk("[TS NOT Fixed] %s : %d / irq_depth = %d(%d)\n",__func__,__LINE__, irq_depth, disable_irq_flag);
+#endif
+
+	ret = gpio_direction_input(TOUCH_INT_N_GPIO);
+	if(ret < 0)
+		printk("[SHYUN] [%s-%d] gpio_direction_input error [%d]\n",__func__, __LINE__, ret);
 	
 	if(!gpio_get_value(TOUCH_INT_N_GPIO))
 	{
@@ -432,6 +458,7 @@ static void synaptics_ts_initialize(void)
 //--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.09.08] - Prevent duplication of enable_irq api calling.(Remove the warning log)
 	init_stabled = 1;
 //--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.09.08]- Prevent duplication of enable_irq api calling.(Remove the warning log)
+	melt_flag = 1;
 	ret = i2c_smbus_write_byte_data(p_ts->client, SYNAPTICS_RIM_CONTROL_INTERRUPT_ENABLE, 0x07); //interrupt enable
 	if(ret<0)
 	{
@@ -441,6 +468,22 @@ static void synaptics_ts_initialize(void)
 		i2c_smbus_write_byte_data(p_ts->client, SYNAPTICS_RIM_CONTROL_INTERRUPT_ENABLE, 0x07);
 	}
 	
+	before_irq_depth = irq_depth;
+
+#if TS_IRQ_DEPTH_CHECK
+	if(irq_depth > 0)
+	{
+		printk("[SHYUN_TOUCH] IRQ Depth Checking [depth = %d]!\n", irq_depth);
+
+		while(irq_depth > 0)
+		{
+			enable_irq(p_ts->client->irq);
+			irq_depth--;			
+		}
+	}
+#endif
+	printk("[SHYUN_TOUCH] TS_Init END [%d -> %d]\n",before_irq_depth, irq_depth);
+
 	return;
 }
 
@@ -528,9 +571,47 @@ static u8 ghost_count=0;
 static int ts_check=0;
 static u8 ts_esd_detect_count=0;
 
+#if TS_DEBUG
+#define DEBUG_IRQ_CNT		200
+#define DEBUG_WORK_CNT		200
+
+#define DUMMY_X_POS			0
+#define DUMMY_Y_POS			0
+
+enum {
+	TYPE_IRQ_DEBUG = 0,
+	TYPE_WORK_DEBUG
+};
+
+static void synaptics_work_debug(unsigned int x_pos, unsigned int y_pos, int type)
+{
+	static int work_cnt = DEBUG_WORK_CNT, irq_cnt = DEBUG_IRQ_CNT;
+
+	if(type == TYPE_IRQ_DEBUG)
+	{
+		if((++irq_cnt % DEBUG_IRQ_CNT) == 0) {
+			printk("[SHYUN] TS_IRQ\n");
+			irq_cnt = DEBUG_IRQ_CNT;
+		}
+	}
+	else if(type == TYPE_WORK_DEBUG)
+	{
+		if((++work_cnt % DEBUG_WORK_CNT) == 0) {
+			printk("[SHYUN] X:%d, Y:%d\n", x_pos, y_pos);
+			work_cnt = DEBUG_WORK_CNT;
+		}
+	}
+}
+#endif	//#if TS_DEBUG
+
+static void touch_reinitialize(void);
 static void synaptics_ts_work_func(struct work_struct *work)
 {
+	static bool press_flag = false;
+	int touch_cnt = 0;
+	int ret = -1;
 	p_ts = container_of(work, struct synaptics_ts_priv, work);
+
 
 //--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.09.09] - Merge from Black_Froyo MR Ver.
 #if 0
@@ -539,6 +620,8 @@ do
 #endif
 //--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.09.09]- Merge from Black_Froyo MR Ver.
 	ts_ret = i2c_smbus_read_i2c_block_data(p_ts->client, SYNAPTICS_DATA_BASE_REG, sizeof(ts_reg_data), (u8 *)&ts_reg_data);
+	if(ts_ret < 0)
+		printk("[SHYUN] [%s-%d] i2c_error [ret = %d]!\n",__func__, __LINE__, ts_ret);
 
 		for(ts_i = 0; ts_i < SYNAPTICS_FINGER_MAX; ts_i++)
 		{
@@ -614,7 +697,14 @@ do
 							input_report_abs(p_ts->input_dev, ABS_MT_WIDTH_MAJOR, curr_ts_data.width[ts_i]);
 							input_report_key(p_ts->input_dev, BTN_TOUCH, true);
 							input_mt_sync(p_ts->input_dev);
+#if TS_DEBUG
+							synaptics_work_debug(curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i], TYPE_WORK_DEBUG);
+#endif
 							//printk("[touch] (%d, %d),  melt mode=%d\n", curr_ts_data.X_position[0], curr_ts_data.Y_position[0],melt_mode);
+							if(!prev_ts_data.touch_status[ts_i]) {
+								printk("[TS-1] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
+								press_flag = true;
+							}
 						}
 					}
 					else if(curr_event_type == TOUCH_EVENT_BUTTON)
@@ -743,6 +833,13 @@ do
 								input_report_key(p_ts->input_dev, BTN_TOUCH, true);								
 
 								input_mt_sync(p_ts->input_dev);
+#if TS_DEBUG
+								synaptics_work_debug(curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i], TYPE_WORK_DEBUG);
+#endif
+								if(!prev_ts_data.touch_status[ts_i]) {
+									printk("[TS-2] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
+									press_flag = true;
+								}
 
 								curr_event_type = TOUCH_EVENT_ABS;
 						}
@@ -774,6 +871,13 @@ do
 						input_report_key(p_ts->input_dev, BTN_TOUCH, true);						
 
 						input_mt_sync(p_ts->input_dev);
+#if TS_DEBUG
+						synaptics_work_debug(curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i], TYPE_WORK_DEBUG);
+#endif
+						if(!prev_ts_data.touch_status[ts_i]) {
+							printk("[TS-3] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
+							press_flag = true;
+						}
 						
 						if(curr_ts_data.X_position[1] || curr_ts_data.Y_position[1]) ghost_count=0;
 					}
@@ -813,6 +917,13 @@ do
 
 		if(!finger_count)
 		{
+			if(prev_event_type != TOUCH_EVENT_BUTTON) {
+				if(press_flag == true) {
+					printk("[TS] [RELEASE]\n");
+					press_flag = false;
+				}
+			}
+
 			prev_event_type = TOUCH_EVENT_NULL;
 		}
 		else
@@ -850,7 +961,6 @@ do
                     	i2c_smbus_write_byte_data(p_ts->client, MELT_CONTROL, NO_MELT);
                         ghost_count = 0;
                         melt_mode++;
-                        printk("[touch] NO_MELT MODE\n");
                     }
 				}
             	ghost_finger_1 = 0;
@@ -898,17 +1008,50 @@ do
 	else
 		ts_esd_detect_count=0;
 #endif
-//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.03.20] - TBD
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.04.02] - Do not Turn on Keyled in Kernel.
 //	if(init_stabled && !key_led_flag)	bd2802_touch_on();
-//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.03.20]- TBD
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.04.02]- Do not Turn on Keyled in Kernel.
 	
 //--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.09.09] - Merge from Black_Froyo MR Ver.
+#if 0
 	for(ts_ret=0;ts_ret<100;ts_ret++)
 	{
 		if(!gpio_get_value(TOUCH_INT_N_GPIO))	 i2c_smbus_read_i2c_block_data(p_ts->client, 0x14, 1, &dummy);
 		else									 break;
 	}
-	if(ts_ret>=100)	printk("[touch] TOUCH_INT_N_GPIO is LOW. touch lock up!!\n");
+	if(ts_ret>=100)	
+	{ 
+		printk("[touch] TOUCH_INT_N_GPIO is LOW. touch lock up!!\n");
+		touch_reinitialize();
+		printk("[touch] TOUCH LockUP Fixed!!\n");
+	}
+#else
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.08.21] - Touch lock-up fix process.
+	for(touch_cnt = 0;touch_cnt <= 100;touch_cnt++)
+	{
+		if(touch_cnt == 100) {
+			printk("[touch] TOUCH_INT_N_GPIO is LOW. touch lock up!!\n");
+			touch_reinitialize();
+			printk("[touch] TOUCH LockUP Fixed!!\n");
+
+			touch_cnt = 0;
+
+			break;
+		}
+
+		if(!gpio_get_value(TOUCH_INT_N_GPIO)) {
+			ret = i2c_smbus_read_i2c_block_data(p_ts->client, 0x14, 1, &dummy);
+			if(ret < 0)
+				printk("[SHYUN] [%s-%d] i2c_error! [ret = %d]\n",__func__, __LINE__, ret);
+
+			touch_cnt++;
+		}
+		else {
+			break;
+		}
+	}
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.08.21]- Touch lock-up fix process.
+#endif
 //--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2011.09.09]- Merge from Black_Froyo MR Ver.
 
 	memset(&curr_ts_data, 0x0, sizeof(ts_finger_data));
@@ -962,6 +1105,9 @@ static irqreturn_t synaptics_ts_irq_handler(int irq, void *dev_id)
 //--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.03.20]- This feature is disabled.
 /* 20110331 sookyoung.kim@lge.com LG-DVFS [END_LGE] */
 
+#if TS_DEBUG
+	synaptics_work_debug(DUMMY_X_POS, DUMMY_X_POS, TYPE_IRQ_DEBUG);
+#endif	
 
 	queue_work(synaptics_wq, &p_ts->work);
 	return IRQ_HANDLED;
@@ -984,17 +1130,304 @@ static unsigned char synaptics_ts_check_fwver(struct i2c_client *client)
 	return SynapticsFirmVersion;
 }
 
+//#define MUX_PARTITION_BASE	0xFA002030
+//#define MUX_GPIO_35			(MUX_PARTITION_BASE + MUX_GPIO_35_OFFSET)
+#define MUX_GPIO_35_OFFSET	0x4C
+static u32 get_mux_base(void)
+{
+	struct omap_mux *mux;
+	u32 mux_base;
+
+	mux = omap_mux_get_gpio(TOUCH_INT_N_GPIO);
+
+	mux_base = (u32)mux->partition->base;
+
+	return mux_base;
+}
+
+static u16 touch_get_mux(void)
+{
+	u32 mux_base = get_mux_base();
+
+	return __raw_readw(mux_base + MUX_GPIO_35_OFFSET);
+}
+
+static void touch_set_mux_input(void)
+{
+	u32 mux_base = get_mux_base();
+
+	__raw_writew((OMAP_PIN_INPUT | OMAP_WAKEUP_EN | OMAP_OFFOUT_EN | OMAP_MUX_MODE4), (mux_base + MUX_GPIO_35_OFFSET));
+}
+
+static void touch_set_mode0_input(void)
+{
+	u32 mux_base = get_mux_base();
+
+	__raw_writew((OMAP_PIN_INPUT | OMAP_WAKEUP_EN | OMAP_OFFOUT_EN | OMAP_MUX_MODE0), (mux_base + MUX_GPIO_35_OFFSET));
+}
+
+static void touch_set_mux_output(void)
+{
+	u32 mux_base = get_mux_base();
+
+	__raw_writew((OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT), (mux_base + MUX_GPIO_35_OFFSET));
+}
+
+static int touch_set_mux(void)
+{
+	int ret = -1;
+	
+	ret = omap_mux_init_signal("gpio_35", OMAP_PIN_INPUT | OMAP_WAKEUP_EN | OMAP_OFFOUT_EN);
+	if(ret < 0)
+		printk("[SHYUN] touch_set_mux error [%d]\n",ret);
+
+	ret = gpio_direction_input(TOUCH_INT_N_GPIO);
+	if(ret < 0)
+		printk("[SHYUN] gpio_direction_input error [%d]\n",ret);
+
+	ret = gpio_set_debounce(TOUCH_INT_N_GPIO, 0xa);
+	if(ret < 0)
+		printk("[SHYUN] gpio_set_debounce error [%d]\n",ret);
+
+	return ret;
+}
+
+#define AAT2870_LDO_EN_LDOC		(1 << 2)
+#define AAT2870_LDO_EN_LDOD		(1 << 3)
+#define AAT2870_LDO_EN_REG		0x26
+
+#define AAT2870_LDOCD_REG		0x25
+
+static u8 touch_get_ldo_en_status(void)
+{
+	return aat2870_touch_ldo_read(AAT2870_LDO_EN_REG);
+}
+
+static u8 touch_get_ldo_status(void)
+{
+	return aat2870_touch_ldo_read(AAT2870_LDOCD_REG);
+}
+
+static void touch_power_off(void)
+{
+	aat2870_touch_ldo_write(AAT2870_LDOCD_REG , 0x00);
+
+	mdelay(50);
+}
+
+static void touch_power_on(void)
+{
+	aat2870_touch_ldo_write(AAT2870_LDOCD_REG , 0x00);
+	mdelay(50);
+
+	aat2870_touch_ldo_write(AAT2870_LDOCD_REG , 0x4C);
+	mdelay(30);
+}
+
+static void touch_reinitialize(void)
+{
+	int ret = -1;
+	u16 mux = 0x0;
+	int f_gpio_val = -1, l_gpio_val = -1;
+
+	f_gpio_val = gpio_get_value(TOUCH_INT_N_GPIO);
+
+	touch_set_mux_input();
+
+	ret = gpio_direction_input(TOUCH_INT_N_GPIO);
+	if(ret < 0)
+		printk("[SHYUN] gpio_direction_input error [%d]\n",ret);
+
+	ret = gpio_set_debounce(TOUCH_INT_N_GPIO, 0xa);
+	if(ret < 0)
+		printk("[SHYUN] gpio_set_debounce error [%d]\n",ret);
+
+	touch_power_on();
+
+	//synaptics_ts_initialize();
+	schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(400));
+
+	mux = touch_get_mux();
+
+	l_gpio_val = gpio_get_value(TOUCH_INT_N_GPIO);
+
+	printk("[SHYUN] f_gpio = %d / l_gpio = %d / mux_val = 0x%x\n",f_gpio_val, l_gpio_val, mux);
+	
+}
 
 static ssize_t hub_ts_FW_show(struct device *dev,  struct device_attribute *attr,  char *buf)
 {
 	int r;
+	u16 mux_val = 0x0;
+	int gpio_val = 0x0;
 
 	r = snprintf(buf, PAGE_SIZE,"%d\n", touch_fw_version);
 
+	mux_val = touch_get_mux();
+
+	gpio_val = gpio_get_value(TOUCH_INT_N_GPIO);
+
+	printk("[SHYUN] omap_mux_read = 0x%x / gpio_val = %d\n",mux_val, gpio_val);
+
+	printk("================== SYSFS SUPPORT COMMAND ===============\n");
+	printk("[0] SYSFS_TOUCH_POWER_OFF\n");
+	printk("[1] SYSFS_TOUCH_POWER_ON\n");
+	printk("[2] SYSFS_TOUCH_PROCESS_INIT\n");
+	printk("[3] SYSFS_TOUCH_POWER_OFF_ON_PROCESS_INIT\n");
+	printk("[4] SYSFS_TOUCH_MUX_INIT\n");
+	printk("[5] SYSFS_TOUCH_FULL_INIT\n");
+	printk("[6] SYSFS_TOUCH_OUTPUT_TEST\n");
+	printk("[7] SYSFS_TOUCH_SET_INPUT\n");
+	printk("[8] SYSFS_TOUCH_REINITIALIZE\n");
+	printk("[9] SYSFS_TOUCH_SET_INPUT_MODE0\n");
+	printk("[10] SYSFS_TOUCH_GET_LDO\n");
+	printk("[11] SYSFS_TOUCH_DISABLE_IRQ\n");
+	printk("[12] SYSFS_TOUCH_ENABLE_IRQ\n");
+	printk("[13] 3SYSFS_TOUCH_GET_IRQ_DEPTH\n");
+	printk("========================================================\n");
+	
 	return r;
 }
 
-static DEVICE_ATTR(fw, 0666, hub_ts_FW_show, NULL);
+enum {
+	SYSFS_TOUCH_POWER_OFF = 0,				// 0
+	SYSFS_TOUCH_POWER_ON,					// 1
+	SYSFS_TOUCH_PROCESS_INIT,				// 2
+	SYSFS_TOUCH_POWER_OFF_ON_PROCESS_INIT,	// 3
+	SYSFS_TOUCH_MUX_INIT,					// 4
+	SYSFS_TOUCH_FULL_INIT,					// 5
+	SYSFS_TOUCH_OUTPUT_TEST,				// 6
+	SYSFS_TOUCH_SET_INPUT,					// 7
+	SYSFS_TOUCH_REINITIALIZE,				// 8
+	SYSFS_TOUCH_SET_INPUT_MODE0,			// 9
+	SYSFS_TOUCH_GET_LDO,					// 10
+	SYSFS_TOUCH_DISABLE_IRQ,				// 11
+	SYSFS_TOUCH_ENABLE_IRQ,					// 12
+	SYSFS_TOUCH_GET_IRQ_DEPTH,				// 13
+};
+
+ssize_t hub_ts_FW_store(struct device *dev, struct device_attribute *attr, const char *buffer, size_t count)
+{
+	int store_value = 0;
+	u8 touch_ldo_val, touch_ldo_en_status;
+	
+	sscanf(buffer, "%d", &store_value);
+
+
+	switch(store_value)
+	{
+		case SYSFS_TOUCH_POWER_OFF:
+		{
+			touch_power_off();
+			
+			printk("[SHYUN] Touch-LDO OFF!\n");
+			break;
+		}
+		case SYSFS_TOUCH_POWER_ON:
+		{
+			touch_power_on();
+			
+			printk("[SHYUN] Touch-LDO ON!\n");
+			break;
+		}
+		case SYSFS_TOUCH_PROCESS_INIT:
+		{
+			//synaptics_ts_initialize();
+			schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(400));
+			printk("[SHYUN] Touch Process Initialize!\n");
+			break;
+		}
+		case SYSFS_TOUCH_POWER_OFF_ON_PROCESS_INIT:
+		{
+			touch_power_off();
+			touch_power_on();
+
+			//synaptics_ts_initialize();
+			schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(400));
+			
+			printk("[SHYUN] Touch Power Off/On & Initialize!\n");
+			
+			break;
+		}
+		case SYSFS_TOUCH_MUX_INIT:
+		{
+			touch_set_mux();
+
+			printk("[SHYUN] Touch Mux Initizlize!\n");
+			break;
+		}
+		case SYSFS_TOUCH_FULL_INIT:
+		{
+			touch_set_mux();
+
+			touch_power_off();
+			touch_power_on();
+
+			//synaptics_ts_initialize();
+			schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(400));
+		
+			printk("[SHYUN] Touch Power Off/On & Initialize & mux reset!\n");
+
+			break;
+		}
+		case SYSFS_TOUCH_OUTPUT_TEST:
+		{
+			touch_set_mux_output();
+
+			printk("[SHYUN] Touch N Gpio Output Test Setting!\n");
+			break;
+		}
+		case SYSFS_TOUCH_SET_INPUT:
+		{
+			touch_set_mux_input();
+
+			printk("[SHYUN] Touch Mux Set Input!\n");
+			break;
+		}
+		case SYSFS_TOUCH_REINITIALIZE:
+		{
+			touch_reinitialize();
+			break;
+		}
+		case SYSFS_TOUCH_SET_INPUT_MODE0:
+		{
+			printk("[SHYUN] Touch Mux Set Input/Mode0!\n");
+			touch_set_mode0_input();
+			break;
+		}
+		case SYSFS_TOUCH_GET_LDO:
+		{
+			touch_ldo_val = touch_get_ldo_status();
+			touch_ldo_en_status = touch_get_ldo_en_status();
+
+			printk("[SHYUN] SYSFS_TOUCH_GET_LDO [ EN = 0x%x / LDO = 0x%x ]\n",touch_ldo_en_status, touch_ldo_val);
+			break;
+		}
+		case SYSFS_TOUCH_DISABLE_IRQ:
+		{
+			disable_irq(p_ts->client->irq);
+			printk("[SHYUN_TS] disable_irq(%d)\n", p_ts->client->irq);
+			break;
+		}
+		case SYSFS_TOUCH_ENABLE_IRQ:
+		{
+			enable_irq(p_ts->client->irq);
+			printk("[SHYUN_TS] enable_irq(%d)\n", p_ts->client->irq);
+			break;
+		}
+		case SYSFS_TOUCH_GET_IRQ_DEPTH:
+		{
+			printk("[SHYUN_TS] depth_count = %d\n",synaptics_irq_depth_count());
+			break;
+		}
+		default:
+			printk("[SHYUN] FW_store function error!\n");
+	}
+
+	return count;
+}
+
+static DEVICE_ATTR(fw, 0666, hub_ts_FW_show, hub_ts_FW_store);
 
 
 
@@ -1346,6 +1779,7 @@ static bool synaptics_ts_fw_upgrade(struct i2c_client *client)
 static bool  synatics_ts_touch_recovery()
 {
 	disable_irq(p_ts->client->irq);
+	printk("[SHYUN] [%s] - [%d] [irq_depth = %d]\n", __func__, __LINE__, synaptics_irq_depth_count());
 	//touch power down reset for ESD recovery
 	mdelay(30);
 //	aat2870_ldo_write(0x25 , 0x00);	//SHYUN_TBD
@@ -1371,16 +1805,16 @@ static bool  synatics_ts_touch_recovery()
 static void synatics_ts_power_on(void)
 {
 	printk("%s : %d\n",__func__,__LINE__);
-	aat2870_ldo_write(0x25 , 0x00);
+	//aat2870_ldo_write(0x25 , 0x00);
 	mdelay(30);
-	aat2870_ldo_write(0x25 , 0x4C);
+	//aat2870_ldo_write(0x25 , 0x4C);
 	return;
 }
 
 static void synatics_ts_power_off(void)
 {
 	printk("%s : %d\n",__func__,__LINE__);
-	aat2870_ldo_write(0x25 , 0x00);
+	//aat2870_ldo_write(0x25 , 0x00);
 	mdelay(50);
 	return;
 }
@@ -1405,6 +1839,9 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 
 	char product_id[6];
 	uint8_t product_id_addr;
+
+	printk("[SHYUN] [%s] - [%d] [init_input ver.]\n", __func__, __LINE__);
+	printk("[SHYUN] [%s] - [%d] [touch sysfs added ver.]\n", __func__, __LINE__);
 
 	if(lcd_off_boot ==1) 	
 	{
@@ -1432,7 +1869,8 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 	i2c_set_clientdata(client, p_ts);
 
 	INIT_WORK(&p_ts->work, synaptics_ts_work_func);
-	INIT_DELAYED_WORK(&p_ts->init_delayed_work, synaptics_ts_init_delayed_work);
+//	INIT_DELAYED_WORK(&p_ts->init_delayed_work, synaptics_ts_init_delayed_work);
+	INIT_DELAYED_WORK(&p_ts->init_delayed_work, synaptics_ts_initialize);
 
 #ifdef FEATURE_LGE_TOUCH_ESD_DETECT
 	wake_lock_init(&ts_wake_lock, WAKE_LOCK_SUSPEND, "ts_upgrade");
@@ -1584,8 +2022,9 @@ static int synaptics_ts_probe(struct i2c_client *client, const struct i2c_device
 	ghost_count=0;
 	melt_flag=0;
 
-	synaptics_ts_initialize();
-	schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(30000));
+	//synaptics_ts_initialize();
+	//schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(30000));
+	schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(15000));
 
 	printk("synaptics_ts_probe: Start touchscreen %s in %s mode\n", p_ts->input_dev->name, p_ts->use_irq ? "interrupt" : "polling");
 	return 0;
@@ -1606,6 +2045,8 @@ void synaptics_ts_disable_irq()
 	if(lcd_off_boot==1)	return;
 
 	disable_irq(hub_ts_client->irq);
+	disable_irq_flag = 1;
+	printk("[SHYUN] [%s] - [%d] [irq_depth = %d]\n", __func__, __LINE__, synaptics_irq_depth_count());
 }
 EXPORT_SYMBOL(synaptics_ts_disable_irq);
 
@@ -1628,6 +2069,8 @@ static int synaptics_ts_remove(struct i2c_client *client)
 static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	int ret;
+
+	printk("[SHYUN] [%s] - [%d] [Cancel delayed work]\n", __func__, __LINE__);
 
 	init_stabled = 0;
 
@@ -1659,7 +2102,15 @@ static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 
 static int synaptics_ts_resume(struct i2c_client *client)
 {
-	printk("%s : %d\n",__func__,__LINE__);
+	u16 old_mux = 0x0, new_mux = 0x0;
+	u8 touch_ldo_status, touch_ldo_en_status;
+
+	printk("[SHYUN] [%s] - [%d] [Delay 400ms]\n", __func__, __LINE__);
+
+	touch_ldo_en_status = touch_get_ldo_en_status();
+
+	touch_ldo_status = touch_get_ldo_status();
+
 	if (p_ts->use_irq)
 		enable_irq(client->irq);
 
@@ -1670,8 +2121,32 @@ static int synaptics_ts_resume(struct i2c_client *client)
 	memset(&prev_ts_data, 0x0, sizeof(ts_finger_data));
   	memset(&curr_ts_data, 0x0, sizeof(ts_finger_data));
 
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.08.21] - Check the mux_mode
+	old_mux = touch_get_mux();
+
+	printk("[%s-%d] [ en = 0x%x / ldo = 0x%x / mux = 0x%x ] \n",__func__,__LINE__, touch_ldo_en_status, touch_ldo_status, old_mux);
+
+	if(old_mux != (OMAP_PIN_INPUT | OMAP_WAKEUP_EN | OMAP_OFFOUT_EN | OMAP_MUX_MODE4)) {
+
+		printk("[SHYUN] [%s-%d] mux_mode is modified! [ old_mux = 0x%x ]\n",__func__, __LINE__, old_mux);
+
+		touch_set_mux_input();
+
+		new_mux = touch_get_mux();
+
+		printk("[SHYUN] [%s-%d] New mux mode setting! [ old_mux = 0x%x / new_mux = 0x%x ]\n",__func__, __LINE__, old_mux, new_mux);
+	}
+
+//--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2012.09.01] - Fix the touch lockup
+#if 0
 	synaptics_ts_initialize();
+
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.08.21]- Check the mux_mode
 	schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(4000));
+#else
+	schedule_delayed_work(&p_ts->init_delayed_work, msecs_to_jiffies(400));
+#endif
+//--]] LGE_UBIQUIX_MODIFIED_END : shyun@ubiquix.com [2012.09.01]- Fix the touch lockup
 
 	return 0;
 }
