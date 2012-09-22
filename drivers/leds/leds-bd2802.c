@@ -153,6 +153,7 @@ struct bd2802_led {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend; 
 #endif
+	int     led_resumed;//2011205 kyungyoon.kim@lge.com lcd resume speed
 };
 
 static struct i2c_client *bd2802_i2c_client;
@@ -1024,6 +1025,9 @@ static int bd2802_bl_resume(struct i2c_client *client)
 {
 	struct bd2802_led *led = i2c_get_clientdata(client);
 	DBG("\n");
+
+	if (led->led_resumed==1)
+		return 0;
 	
 	led->led_state = BD2802_ON;
 	led->white_current = BD2802_CURRENT_WHITE_MAX;
@@ -1038,9 +1042,14 @@ static int bd2802_bl_resume(struct i2c_client *client)
 
 	//hrtimer_start(&led->touchkey_timer, ktime_set(0, 500000000), HRTIMER_MODE_REL); /*5 sec */
 	hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
+	led->led_resumed=1;
 	return 0;
 }
 
+/* 20110304 seven.kim@lge.com late_resume_lcd [START] */
+static int bd2802_suspend(struct i2c_client *client, pm_message_t mesg);
+static int bd2802_resume(struct i2c_client *client);
+/* 20110304 seven.kim@lge.com late_resume_lcd [END] */
 
 static void bd2802_early_suspend(struct early_suspend *h)
 {
@@ -1055,7 +1064,20 @@ static void bd2802_early_suspend(struct early_suspend *h)
 	hrtimer_cancel(&led->timer);
 	hrtimer_cancel(&led->touchkey_timer);
 	hrtimer_cancel(&led->ledmin_timer);
+
+	// dajin.kim@lge.com - add cancel_work_sync [Start]
+	cancel_work_sync(&led->work);
+	cancel_work_sync(&led->touchkey_work);
+	cancel_work_sync(&led->ledmin_work);
+	// dajin.kim@lge.com - add cancel_work_sync [End]
+
 	bd2802_bl_suspend(led->client, PMSG_SUSPEND);
+	led->led_resumed=0;
+
+	/* 20110304 seven.kim@lge.com late_resume_lcd [START] */
+	bd2802_suspend(led->client, PMSG_SUSPEND);
+	/* 20110304 seven.kim@lge.com late_resume_lcd [END] */  
+
 }
 
 
@@ -1065,6 +1087,10 @@ static void bd2802_late_resume(struct early_suspend *h)
 	DBG("\n");
 
 	led = container_of(h, struct bd2802_led, early_suspend);
+
+	/* 20110304 seven.kim@lge.com late_resume_lcd [START] */
+	bd2802_resume(led->client);
+	/* 20110304 seven.kim@lge.com late_resume_lcd [END] */
 
 	if (led->led_state==BD2802_SEQ)
 		return;
@@ -1214,6 +1240,7 @@ static int bd2802_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	gpio_set_value(RGB_LED_CNTL, 0);
 	led->led_state = BD2802_OFF;
+	led->led_resumed=0;
 
 	return 0;
 }
@@ -1245,8 +1272,10 @@ static struct i2c_driver bd2802_i2c_driver = {
 	},
 	.probe		= bd2802_probe,
 	.remove		= __exit_p(bd2802_remove),
+#ifndef CONFIG_HAS_EARLYSUSPEND /* 20110304 seven.kim@lge.com late_resume_lcd */
 	.suspend	= bd2802_suspend,
 	.resume		= bd2802_resume,
+#endif
 	.id_table	= bd2802_id,
 };
 
