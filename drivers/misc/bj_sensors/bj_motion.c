@@ -2145,8 +2145,8 @@ static void mpu3050_early_suspend(struct early_suspend *h)
 	
 	heaven_motion_suspend(NULL);
 	sensor_sleep_st = 1;
-#if 0
-	#if 1
+#if 1
+	#if 0
 	//timer removed
 	if(atomic_read(&accel_flag)){
 		hrtimer_cancel(&heaven_motion_dev.timer[0]);
@@ -2198,7 +2198,7 @@ static void mpu3050_late_resume(struct early_suspend *h)
 
 	heaven_motion_resume(NULL);	
 	
-	#if 1
+	#if 0
 	//timer restart
 	if(atomic_read(&accel_flag)){
 		current_delay = atomic_read(&accel_delay);
