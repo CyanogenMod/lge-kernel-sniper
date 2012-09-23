@@ -662,10 +662,14 @@ int aat2870_ldo_status(void)
 /* 20110216 seven.kim@lge.com to check AAT2870 LDO_ABCD_EN_REG [END] */
 void aat2870_shutdown(void)
 {
+    struct aat2870_device *dev;
     DBG("aat2870_shutdown ..\n");
 
     aat2870_write_reg(aat2870_i2c_client, LDO_ABCD_EN_REG, 0x00);
     mdelay(1);   	
+
+    dev = i2c_get_clientdata(aat2870_i2c_client);
+    dev->bl_resumed = 0;
 	
     gpio_direction_output(LCD_CP_EN, 0);
    
@@ -874,8 +878,14 @@ static void aat2870_backlight_off(struct i2c_client *client)
 static int aat2870_bl_set_intensity(struct backlight_device *bd)
 {
 	struct i2c_client *client = to_i2c_client(bd->dev.parent);
+	struct aat2870_device *dev = NULL;
+
+	dev = (struct aat2870_device *) i2c_get_clientdata(client);
 
 	DBG("\n");
+
+	if (!dev->bl_resumed)
+                return 0;
 
 	aat2870_set_main_current_level(client, bd->props.brightness);
 
@@ -1698,6 +1708,7 @@ static int aat2870_probe(struct i2c_client *i2c_dev, const struct i2c_device_id 
 	dev->early_suspend.resume = aat2870_late_resume;
 	register_early_suspend(&dev->early_suspend);
 #endif
+	dev->bl_resumed = 1;
 	
 	gpio_request(LCD_CP_EN, "LCD_CP_EN");
 
