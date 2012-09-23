@@ -96,9 +96,14 @@ static void early_suspend(struct work_struct *work)
 		pr_info("early_suspend: call handlers\n");
 	list_for_each_entry(pos, &early_suspend_handlers, link) {
 		if (pos->suspend != NULL) {
+			char sym[KSYM_SYMBOL_LEN];
+			sprintf(sym,"%pf",pos->suspend);
 			if (debug_mask & DEBUG_VERBOSE)
-				pr_info("early_suspend: calling %pf\n", pos->suspend);
-			pos->suspend(pos);
+				pr_info("early_suspend: calling %pf (%d)\n", pos->suspend,strlen(sym));
+			if (!strlen(sym))
+				pr_err("late_resume: this would have crashed. Someone unregistered its hooks!\n");
+			else
+				pos->suspend(pos);
 		}
 	}
 	mutex_unlock(&early_suspend_lock);
@@ -137,10 +142,15 @@ static void late_resume(struct work_struct *work)
 		pr_info("late_resume: call handlers\n");
 	list_for_each_entry_reverse(pos, &early_suspend_handlers, link) {
 		if (pos->resume != NULL) {
+			char sym[KSYM_SYMBOL_LEN];
+			sprintf(sym,"%pf",pos->resume);
 			if (debug_mask & DEBUG_VERBOSE)
-				pr_info("late_resume: calling %pf\n", pos->resume);
+				pr_info("late_resume: calling %pf (%d)\n", pos->resume,strlen(sym));
 
-			pos->resume(pos);
+			if (!strlen(sym))
+				pr_err("late_resume: this would have crashed. Someone unregistered its hooks!\n");
+			else
+				pos->resume(pos);
 		}
 	}
 	if (debug_mask & DEBUG_SUSPEND)
