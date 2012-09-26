@@ -730,10 +730,12 @@ static void aat2870_set_main_current_level(struct i2c_client *client, int level)
 {
 	struct aat2870_device *dev;
 	unsigned char val;
-	
+
 	//DBG("level = %d\n", level);
 
 	dev = (struct aat2870_device *) i2c_get_clientdata(client);
+        if (!dev->bl_resumed)
+                return;
 #if 0  // 20120814 sangki.hyun@lge.com ICS Backlight tunning
 	if (cur_main_lcd_level ==level)
 		return;
@@ -1487,6 +1489,7 @@ static void aat2870_early_suspend(struct early_suspend *h)
 	DBG("\n");
 	dev = container_of(h, struct aat2870_device, early_suspend);
 
+	hrtimer_cancel(&dev->als_timer);
 	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [START] */
 	g_AAT2870_State_Machine = AAT2870_EARLY_SUSPEND_STATE;
 	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [END] */
@@ -1509,6 +1512,7 @@ static void aat2870_late_resume(struct early_suspend *h)
 	/* 20110218 seven.kim@lge.com to contorl AAT2870 sleep/resume state machine [END] */
 
 	 /* 20110304 seven.kim@lge.com late_resume_lcd [START] */	
+	 hrtimer_start(&dev->als_timer, ktime_set(0,500000000), HRTIMER_MODE_REL); //20100304 seven.kim@lge.com late_reaume_lcd changed 100ms -> 500ms
 	 aat2870_bl_resume(dev->client); //20110321 for black lcd display
  	 /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
 }
