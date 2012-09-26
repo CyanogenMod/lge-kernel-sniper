@@ -903,7 +903,11 @@ static struct i2c_board_info __initdata hub_i2c_bus3_info[] = {
 	{	 
 		I2C_BOARD_INFO("black_proxi", 0x44),
 	},
+#elif defined(CONFIG_GP2AP_PROXIMITY)
+        {       I2C_BOARD_INFO("hub_proxi", 0x44),
+        },
 #endif
+
 
 /* Accelerometer Sensor */
 #if defined(CONFIG_BJ_KXTF9_SENSOR)
