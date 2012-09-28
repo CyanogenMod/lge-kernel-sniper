@@ -702,7 +702,7 @@ do
 #endif
 							//printk("[touch] (%d, %d),  melt mode=%d\n", curr_ts_data.X_position[0], curr_ts_data.Y_position[0],melt_mode);
 							if(!prev_ts_data.touch_status[ts_i]) {
-								printk("[TS-1] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
+								//printk("[TS-1] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
 								press_flag = true;
 							}
 						}
@@ -715,7 +715,7 @@ do
 							{
 								if(!prev_ts_data.touch_status[ts_i])
 								{
-									printk("[key-touch] [KEY_MENU]\n");
+									//printk("[key-touch] [KEY_MENU]\n");
 									input_report_key(p_ts->input_dev, KEY_MENU, 1); //seven blocked for key drag action
 									pressed_button_type = KEY_MENU;
 								}
@@ -723,7 +723,7 @@ do
 								{
 									if(pressed_button_type != KEY_MENU && pressed_button_type != KEY_REJECT)
 									{
-										printk("[key-touch] [KEY_MENU]\n");
+										//printk("[key-touch] [KEY_MENU]\n");
 										input_report_key(p_ts->input_dev, KEY_REJECT, 1);
 										input_report_key(p_ts->input_dev, KEY_REJECT, 0);
 										input_report_key(p_ts->input_dev, pressed_button_type, 0);
@@ -735,7 +735,7 @@ do
 							{
 								if(!prev_ts_data.touch_status[ts_i])
 								{
-									printk("[key-touch] [KEY_HOME]\n");
+									//printk("[key-touch] [KEY_HOME]\n");
 									input_report_key(p_ts->input_dev, KEY_HOME, 1); //seven blocked for key drag action
 									pressed_button_type = KEY_HOME;
 								}
@@ -743,7 +743,7 @@ do
 								{
 									if(pressed_button_type != KEY_HOME && pressed_button_type != KEY_REJECT)
 									{
-										printk("[key-touch] [KEY_HOME]\n");
+										//printk("[key-touch] [KEY_HOME]\n");
 										input_report_key(p_ts->input_dev, KEY_REJECT, 1);
 										input_report_key(p_ts->input_dev, KEY_REJECT, 0);
 										input_report_key(p_ts->input_dev, pressed_button_type, 0);
@@ -755,7 +755,7 @@ do
 							{
 								if(!prev_ts_data.touch_status[ts_i])
 								{
-									printk("[key-touch] [KEY_BACK]\n");
+									//printk("[key-touch] [KEY_BACK]\n");
 									input_report_key(p_ts->input_dev, KEY_BACK, 1); //seven blocked for key drag action
 									pressed_button_type = KEY_BACK;
 								}
@@ -763,7 +763,7 @@ do
 								{
 									if(pressed_button_type != KEY_BACK && pressed_button_type != KEY_REJECT)
 									{
-										printk("[key-touch] [KEY_BACK]\n");
+										//printk("[key-touch] [KEY_BACK]\n");
 										input_report_key(p_ts->input_dev, KEY_REJECT, 1);
 										input_report_key(p_ts->input_dev, KEY_REJECT, 0);
 										input_report_key(p_ts->input_dev, pressed_button_type, 0);
@@ -775,7 +775,7 @@ do
 							{
 								if(!prev_ts_data.touch_status[ts_i])
 								{
-									printk("[key-touch] [KEY_SERACH]\n");
+									//printk("[key-touch] [KEY_SERACH]\n");
 									input_report_key(p_ts->input_dev, KEY_SEARCH, 1); //seven blocked for key drag action
 									pressed_button_type = KEY_SEARCH;
 								}
@@ -783,7 +783,7 @@ do
 								{
 									if(pressed_button_type != KEY_SEARCH && pressed_button_type != KEY_REJECT)
 									{
-										printk("[key-touch] [KEY_SEARCH]\n");
+										//printk("[key-touch] [KEY_SEARCH]\n");
 										input_report_key(p_ts->input_dev, KEY_REJECT, 1);
 										input_report_key(p_ts->input_dev, KEY_REJECT, 0);
 										input_report_key(p_ts->input_dev, pressed_button_type, 0);
@@ -837,7 +837,7 @@ do
 								synaptics_work_debug(curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i], TYPE_WORK_DEBUG);
 #endif
 								if(!prev_ts_data.touch_status[ts_i]) {
-									printk("[TS-2] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
+									//printk("[TS-2] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
 									press_flag = true;
 								}
 
@@ -875,7 +875,7 @@ do
 						synaptics_work_debug(curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i], TYPE_WORK_DEBUG);
 #endif
 						if(!prev_ts_data.touch_status[ts_i]) {
-							printk("[TS-3] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
+							//printk("[TS-3] [PRESS] [%d] %d:%d\n",ts_i, curr_ts_data.X_position[ts_i], curr_ts_data.Y_position[ts_i]);
 							press_flag = true;
 						}
 						
@@ -919,7 +919,7 @@ do
 		{
 			if(prev_event_type != TOUCH_EVENT_BUTTON) {
 				if(press_flag == true) {
-					printk("[TS] [RELEASE]\n");
+					//printk("[TS] [RELEASE]\n");
 					press_flag = false;
 				}
 			}

@@ -468,7 +468,7 @@ static int ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsig
         	case TSPDRV_ENABLE_AMP:
 					ImmVibeSPI_ForceOut_AmpEnable( arg );
 					enable_time = time_ms();
-					printk("VIB Enable\n");
+					//printk("VIB Enable\n");
             		DbgRecorderReset( ( arg ) );
             		DbgRecord( ( arg,";------- TSPDRV_ENABLE_AMP ---------\n" ) );
 					enabled = 1;
@@ -481,7 +481,7 @@ static int ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsig
                 		ImmVibeSPI_ForceOut_AmpDisable( arg );
 						enabled = 0;
 						disable_time = time_ms();	
-						printk("VIB Disable [%lu][!req=%d]\n", (disable_time - enable_time), !g_bStopRequested);
+						//printk("VIB Disable [%lu][!req=%d]\n", (disable_time - enable_time), !g_bStopRequested);
             		}
             		break;
 
