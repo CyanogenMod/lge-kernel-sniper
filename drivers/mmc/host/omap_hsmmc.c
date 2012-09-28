@@ -1836,12 +1836,6 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 		if (dsor > 250)
 			dsor = 250;
-
-// prime@sdcmicro.com Changed not to overwrite clock rate (make it same as 2.6.32 code) [START]
-#ifndef CONFIG_MACH_LGE_HUB
-		ios->clock = host->master_clock / dsor;
-#endif
-// prime@sdcmicro.com Changed not to overwrite clock rate (make it same as 2.6.32 code) [END]
 	}
 	omap_hsmmc_stop_clock(host);
 	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
@@ -2311,8 +2305,7 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
 	}
 	host->power_mode = MMC_POWER_OFF;
 
-	if(strncmp(mmc_hostname(mmc),"mmc1",4))
-		host->flags	= AUTO_CMD12;
+	host->flags	= AUTO_CMD12;
 
 	host->master_clock = OMAP_MMC_MASTER_CLOCK;
 	if (mmc_slot(host).features & HSMMC_HAS_48MHZ_MASTER_CLK)
@@ -2635,10 +2628,8 @@ static int omap_hsmmc_suspend(struct device *dev)
 			mmc_host_enable(host->mmc);
 			omap_hsmmc_disable_irq(host);
 
-            if(strncmp(mmc_hostname(host->mmc),"mmc1",4)){
-			    OMAP_HSMMC_WRITE(host->base, HCTL,
+			OMAP_HSMMC_WRITE(host->base, HCTL,
 				OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
-			}
 			mmc_host_disable(host->mmc);
 
 			if (host->got_dbclk)
@@ -2676,7 +2667,6 @@ static int omap_hsmmc_resume(struct device *dev)
 		if (host->got_dbclk)
 			clk_enable(host->dbclk);
 
-        if(strncmp(mmc_hostname(host->mmc),"mmc1",4))
     		omap_hsmmc_conf_bus_power(host);
 
 

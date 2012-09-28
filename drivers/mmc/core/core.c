@@ -66,8 +66,6 @@ MODULE_PARM_DESC(
 	removable,
 	"MMC/SD cards are removable and may be removed during suspend");
 
-//for bakcup of SD control parameter by KSM
-struct mmc_ios ios_backup;
 /*
  * Internal function. Schedule delayed work in the MMC work queue.
  */
@@ -450,13 +448,6 @@ int mmc_host_disable(struct mmc_host *host)
 	if (host->en_dis_recurs)
 		return 0;
 
-	/* LGE_SJIT 2011-12-22 [dojip.kim@lge.com] P940 GB
-	 * taehwan.kim@lge.com 20121204 in unnormal case, nesting_cnt is -1,
-	 * it causes lockup
-	 */
-	if (host->nesting_cnt == 0)
-		return 0;
-
 	if (--host->nesting_cnt)
 		return 0;
 
@@ -586,13 +577,6 @@ int mmc_host_lazy_disable(struct mmc_host *host)
 		return 0;
 
 	if (host->en_dis_recurs)
-		return 0;
-
-	/* LGE_SJIT 2011-12-22 [dojip.kim@lge.com] P940 GB
-	 * taehwan.kim@lge.com 20121204 in unnormal case, nesting_cnt is -1,
-	 * it causes lockup
-	 */
-	if (host->nesting_cnt == 0)
 		return 0;
 
 	if (--host->nesting_cnt)
@@ -1077,7 +1061,7 @@ static void mmc_power_up(struct mmc_host *host)
 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
 	 * time required to reach a stable voltage.
 	 */
-	mmc_delay(20);
+	mmc_delay(10);
 
 	mmc_host_clk_release(host);
 }
@@ -1879,21 +1863,10 @@ int mmc_suspend_host(struct mmc_host *host)
 	}
 	mmc_bus_put(host);
 
-#if 1
-	if(!strncmp(mmc_hostname(host),"mmc1",4))
-	{
-	    mmc_host_clk_hold(host);
-		memcpy(&ios_backup,&host->ios,sizeof(struct mmc_ios));
-		printk("\n(IOS backup)\n%s: clock %uHz busmode %u powermode %u cs %u Vdd %u width %u timing %u\n",mmc_hostname(host), ios_backup.clock, ios_backup.bus_mode,ios_backup.power_mode, ios_backup.chip_select, ios_backup.vdd,ios_backup.bus_width, ios_backup.timing);
-		mmc_host_clk_release(host);
-	}
-#endif
 // BEGIN : munho.lee@lge.com 2010-12-27
 // MOD: 0013091: SD card stability patch 
 #if 1
-	if (strcmp(mmc_hostname(host), "mmc1") == 0) {
-		printk("sd card suspend...\n");
-	} else if(strcmp(mmc_hostname(host), "mmc2") == 0) {
+	if(strcmp(mmc_hostname(host), "mmc2") == 0) {
 		printk("sdio suspend...\n");
 	} else {
 		if (!err)
@@ -1952,14 +1925,6 @@ int mmc_resume_host(struct mmc_host *host)
 		}
 	}
 	host->pm_flags &= ~MMC_PM_KEEP_POWER;
-#if 1
-	if(!strncmp(mmc_hostname(host),"mmc1",4))
-	{
-		memcpy(&host->ios,&ios_backup,sizeof(struct mmc_ios));
-		mmc_set_ios(host);
-		printk("\n(IOS restore)\n%s: clock %uHz busmode %u powermode %u cs %u Vdd %u  width %u timing %u\n",mmc_hostname(host), ios_backup.clock, ios_backup.bus_mode,ios_backup.power_mode, ios_backup.chip_select, ios_backup.vdd,ios_backup.bus_width, ios_backup.timing);
-	}
-#endif
 	mmc_bus_put(host);
 
 	return err;
