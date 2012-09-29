@@ -18,6 +18,8 @@
 #include <linux/mmc/mmc.h>
 #include <linux/mmc/sd.h>
 
+#include <asm/gpio.h>
+
 #include "core.h"
 #include "bus.h"
 #include "mmc_ops.h"
@@ -1012,7 +1014,7 @@ static void mmc_sd_remove(struct mmc_host *host)
 static void mmc_sd_detect(struct mmc_host *host)
 {
 	int err = 0;
-#ifdef CONFIG_MMC_PARANOID_SD_INIT
+#if 1//def CONFIG_MMC_PARANOID_SD_INIT
         int retries = 5;
 #endif
 
@@ -1024,7 +1026,7 @@ static void mmc_sd_detect(struct mmc_host *host)
 	/*
 	 * Just check if our card has been removed.
 	 */
-#ifdef CONFIG_MMC_PARANOID_SD_INIT
+#if 1//def CONFIG_MMC_PARANOID_SD_INIT
 	while(retries) {
 		err = mmc_send_status(host->card, NULL);
 		if (err) {
@@ -1056,6 +1058,11 @@ static void mmc_sd_detect(struct mmc_host *host)
  * Suspend callback from host.
  */
 static int mmc_sd_suspend(struct mmc_host *host)
+#if 1
+{
+	return 0;
+}
+#else
 {
 	BUG_ON(!host);
 	BUG_ON(!host->card);
@@ -1068,7 +1075,7 @@ static int mmc_sd_suspend(struct mmc_host *host)
 
 	return 0;
 }
-
+#endif
 /*
  * Resume callback from host.
  *
@@ -1076,6 +1083,11 @@ static int mmc_sd_suspend(struct mmc_host *host)
  * and, if so, restore all state to it.
  */
 static int mmc_sd_resume(struct mmc_host *host)
+#if 1// do not re-init at resume time!
+{
+	return 0;
+}
+#else
 {
 	int err;
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
@@ -1090,6 +1102,17 @@ static int mmc_sd_resume(struct mmc_host *host)
 	retries = 5;
 	while (retries) {
 		err = mmc_sd_init_card(host, host->ocr, host->card);
+
+		/* LGE_SJIT 2012-02-03 [dojip.kim@lge.com]
+		 * skip the retry if nomedium
+		 */
+#ifdef CONFIG_MACH_LGE
+		if (err == -ENOMEDIUM) {
+			printk(KERN_ERR "%s: Re-init card error: nomedium\n",
+					mmc_hostname(host));
+			break;
+		}
+#endif
 
 		if (err) {
 			printk(KERN_ERR "%s: Re-init card rc = %d (retries = %d)\n",
@@ -1107,10 +1130,19 @@ static int mmc_sd_resume(struct mmc_host *host)
 
 	return err;
 }
+#endif
 
 static int mmc_sd_power_restore(struct mmc_host *host)
 {
 	int ret;
+
+	/* LGE_SJIT 2011-11-29 [dojip.kim@lge.com]
+	 * Null point exception
+	 *
+	 * euikyeom.kim@lge.com 2011.02.11 imgrated from model
+	 */
+	if (host == NULL || host->card == NULL)
+		return -ENOENT;
 
 	host->card->state &= ~MMC_STATE_HIGHSPEED;
 	mmc_claim_host(host);

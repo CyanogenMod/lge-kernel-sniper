@@ -953,6 +953,14 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 
 		mmc_queue_bounce_post(mq);
 
+		/* LGE_SJIT 2011-11-28 [dojip.kim@lge.com]
+		 * Enhanced the error handling
+		 * Don't redo I/O when ENOMEDIUM error.
+		 */
+		if (brq.cmd.error == -ENOMEDIUM) {
+			goto cmd_err;
+		}
+
 		/*
 		 * sbc.error indicates a problem with the set block count
 		 * command.  No data will have been transferred.
@@ -1061,6 +1069,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 	if (mmc_card_sd(card)) {
 		u32 blocks;
 
+
 		blocks = mmc_sd_num_wr_blocks(card);
 		if (blocks != (u32)-1) {
 			spin_lock_irq(&md->lock);
@@ -1075,8 +1084,14 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
 
  cmd_abort:
 	spin_lock_irq(&md->lock);
-	while (ret)
+	while (ret) {
+		/* LGE_SJIT 2011-11-28 [dojip.kim@lge.com]
+		 * Enhanced the error handling
+		 * Supressed the error message.
+		 */
+		req->cmd_flags |= REQ_QUIET;
 		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
+	}
 	spin_unlock_irq(&md->lock);
 
 	return 0;
