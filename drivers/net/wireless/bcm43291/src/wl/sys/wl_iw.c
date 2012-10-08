@@ -1432,7 +1432,7 @@ wl_control_wl_start_real(struct net_device *dev, int restart)
 	int ret = 0;
 	wl_iw_t *iw;
 
-	WL_ERROR(("Enter %s \n", __FUNCTION__));
+	WL_ERROR(("Enter %s (restarting: %d) \n", __FUNCTION__, restart));
 
 	if (!dev) {
 		WL_ERROR(("%s: dev is null\n", __FUNCTION__));
@@ -1458,6 +1458,27 @@ wl_control_wl_start_real(struct net_device *dev, int restart)
 		dhd_dev_init_ioctl(dev);
 		}
 		g_onoff = G_WLAN_SET_ON;
+	}
+	else if (restart) {
+		dhd_dev_reset(dev, 1);
+#if defined(BCMLXSDMMC)
+		sdioh_stop(NULL);
+#endif
+		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_OFF);
+
+		bcm_mdelay(200); 
+
+		dhd_customer_gpio_wlan_ctrl(WLAN_RESET_ON);
+#if defined(BCMLXSDMMC)
+		sdioh_start(NULL, 0);
+#endif
+
+		dhd_dev_reset(dev, 0);
+
+#if defined(BCMLXSDMMC)
+		sdioh_start(NULL, 1);
+#endif
+
 	}
 	WL_ERROR(("Exited %s \n", __FUNCTION__));
 
