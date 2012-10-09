@@ -191,7 +191,7 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
 
 	omap_hsmmc1_before_set_reg(dev, slot, power_on, vdd);
 
-	if((host->suspended) != 1) // not suspend case! do control regulator ON,OFF regularly
+	//if((host->suspended) != 1) // not suspend case! do control regulator ON,OFF regularly
     {
 
 	    if (power_on) 
@@ -205,6 +205,7 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
 		    subpm_output_enable();
     	}
 	}
+#if 0
 	else	// suspend case! ON is allowed , OFF is not allowed
 	{
 	    if (power_on) 
@@ -216,6 +217,7 @@ static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
 	    }
 
     }
+#endif
 
 	omap_hsmmc1_after_set_reg(dev, slot, power_on, vdd);
 
