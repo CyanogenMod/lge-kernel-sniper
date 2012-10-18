@@ -524,7 +524,7 @@ static void bd2802_touchkey_work_func(struct work_struct *work)
 	bd2802_turn_white(led,led->key_led);
 	bd2802_turn_blue(led,HIDDEN1);
 	bd2802_turn_blue(led,HIDDEN2);
-	hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
+	//hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
 }
 
 static enum hrtimer_restart bd2802_touchkey_timer_func(struct hrtimer *timer)
@@ -1041,7 +1041,7 @@ static int bd2802_bl_resume(struct i2c_client *client)
 	bd2802_enable(led);
 
 	//hrtimer_start(&led->touchkey_timer, ktime_set(0, 500000000), HRTIMER_MODE_REL); /*5 sec */
-	hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
+	//hrtimer_start(&led->ledmin_timer, ktime_set(5, 0), HRTIMER_MODE_REL);
 	led->led_resumed=1;
 	return 0;
 }
