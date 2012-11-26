@@ -255,6 +255,9 @@ ifx_spi_open(struct tty_struct *tty, struct file *filp)
 		break;
 	}
 
+        if (spi_data == NULL) {
+            return -ENODEV;
+        }
 	spi_data->ifx_spi_lock = 0;
 
 	ifx_spi_buffer_initialization(spi_data);
