@@ -34,7 +34,7 @@
 #define CTX_PWR_ON      1
 #define CTX_PWR_DEFAULT CTX_PWR_OFF //OFF
 
-#define CTX_BR_DEFAULT  7
+#define CTX_BR_DEFAULT  6	  // 20120823 jungyeal@lge.com modify default br 7->6
 #define CTX_WB_DEFAULT  0
 #define CTX_EF_DEFAULT  0
 
@@ -568,6 +568,21 @@ int mt9v113sensor_set_brightness(u16 value, struct v4l2_int_device *s,
   MT9V113_LOGD("Cur %d | Req %d ",sensor->ctx.ctx_br,value);
 
 
+   // 20120823 jungyeal@lge.com check mode code moved this code here
+   // Org code here...  
+   
+  if(sensor->ctx.ctx_br == value)
+  {
+    MT9V113_LOGD("SAME ! Return \n");
+    return err;
+  }
+  else
+  {
+    sensor->ctx.ctx_br = value;
+    MT9V113_LOGD("Different ! Chage BR %d\n",sensor->ctx.ctx_br);
+  }
+
+  // 20120823 jungyeal@lge.com check mode code moved this code here
   mt9v113_write_reg(client, 0x098C, 0xA103, REG_VAL_DATA_LEN);
   mt9v113_write_reg(client, 0x0990, 0x0005, REG_VAL_DATA_LEN);
   mt9v113_chk_modeChange(client, 0xA103);
@@ -581,17 +596,6 @@ int mt9v113sensor_set_brightness(u16 value, struct v4l2_int_device *s,
   msleep(10);
 
 
-  if(sensor->ctx.ctx_br == value)
-  {
-    MT9V113_LOGD("SAME ! Return \n");
-    return err;
-  }
-  else
-  {
-    sensor->ctx.ctx_br = value;
-    MT9V113_LOGD("Different ! Chage BR %d\n",sensor->ctx.ctx_br);
-  }
-  
   switch (value) {
   case  0:
     mt9v113_write_regs(client, Brightness1);
@@ -1498,7 +1502,11 @@ static int ioctl_s_ctrl(struct v4l2_int_device *s,
     return -EINVAL;
 
   /* 20120605 jungyeal@lge.com Workaround I2C write error when cam power state off [START] */	
-  if (sensor->ctx.ctx_pwrOnState  == CTX_PWR_OFF)
+  if (sensor->ctx.ctx_pwrOnState  == CTX_PWR_OFF && 
+  	vc->id != V4L2_CID_PRIVATE_OMAP3ISP_HYNIX_SMART_CAMERA_VT && 
+	vc->id != V4L2_CID_PRIVATE_OMAP3ISP_HYNIX_SMART_CAMERA && 
+	vc->id != V4L2_CID_PRIVATE_OMAP3ISP_APTINA_SUB_VR 
+  )
   {
   	MT9V113_LOGD("Warning Cam power state is OFF  !!!\n");
 	return -EINVAL;

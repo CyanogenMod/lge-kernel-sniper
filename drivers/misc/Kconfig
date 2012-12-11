@@ -595,6 +595,6 @@ source "drivers/misc/mpu3050/Kconfig"
 # LGE_CHANGE_E, ryu.seeyeol@lge.com, 2011-01-28, Porting for Sensor Driver 
 
 # Black & Justin sensor drivers is added.
-source "drivers/misc/bj_sensors/Kconfig"
+# source "drivers/misc/bj_sensors/Kconfig"
 
 endif # MISC_DEVICES

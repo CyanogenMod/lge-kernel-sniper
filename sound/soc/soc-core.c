@@ -64,6 +64,12 @@ static LIST_HEAD(codec_list);
 static int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num);
 int soc_dsp_debugfs_add(struct snd_soc_pcm_runtime *rtd);
 
+#define ABE_SUSPEND_ENABLE_IN_PARTIAL  //LGE_BSP seungdae.goh@lge.com 2012-05-08  Temporary FM radio current issue fix
+#ifdef ABE_SUSPEND_ENABLE_IN_PARTIAL
+int s_partial_suspend = 0; //LGE_D1_BSP_ICS seungdae.goh@lge.com 2012-04-17
+#endif
+extern int fmradio_get_curmode(void);//+DEJA /* B Project GB FM Radio sleep issue */ //aravind.srinivas@lge.com
+
 /*
  * This is a timeout to do a DAPM powerdown after a stream is closed().
  * It can be used to eliminate pops between different playback streams, e.g.
@@ -1204,12 +1210,45 @@ int snd_soc_suspend(struct device *dev)
 	struct snd_soc_codec *codec;
 	int i;
 
+  int phone_suspended =  fmradio_get_curmode();//~DEJA /* B Project GB FM Radio sleep issue */ //aravind.srinivas@lge.com//FM sleep
+
+   //printk("====== choi snd_soc_suspend : %d=====\n",phone_suspended);
+     for (i = 0; i < card->num_rtd; i++) {
+      
+    struct snd_soc_pcm_runtime *rtd = &card->rtd[i];
+    
+  //printk("====== choi  %d :card->rtd[i].dai_link->name(%s) : \n",i,card->rtd[i].dai_link->name);
+  }
 	/* cancel pending deferred resume if any */
 	cancel_work_sync(&card->deferred_resume_work);
 
 	/* If the initialization of this soc device failed, there is no codec
 	 * associated with it. Just bail out in this case.
 	 */
+	 
+
+            //LGE_D1_BSP_ICS seungdae.goh@lge.com 2012-04-17
+#ifdef ABE_SUSPEND_ENABLE_IN_PARTIAL
+#if 0
+   if(phone_suspended)
+       s_partial_suspend = 1;
+#else
+            for (i = 0; i < card->num_rtd; i++) {
+                if( card->rtd[i].dai_link->name && strcmp(card->rtd[i].dai_link->name, "TWL4030_FM") == 0 ){
+                    struct snd_soc_pcm_runtime *rtd = &card->rtd[i];
+                    
+                    //printk("====== choi  rtd->codec_dai->capture_active (%d) (%d)(%d): \n",rtd->codec_dai->capture_active,rtd->codec_dai->playback_active,rtd->codec_dai->active);
+                    if(phone_suspended)
+                               s_partial_suspend = 1;
+                    if( /*card->rtd[i].dai_link->dsp_link->active && */rtd->codec_dai && rtd->codec_dai->capture_active ){
+                        //printk(KERN_DEBUG"$$$ check active: [%s][%s] codec capture_active\n", card->rtd[i].dai_link->name , card->rtd[i].dai_link->stream_name);
+                        s_partial_suspend = 1;
+                    }
+                }
+            }
+#endif            
+#endif
+	 
 	if (list_empty(&card->codec_dev_list))
 		return 0;
 
@@ -1245,8 +1284,31 @@ int snd_soc_suspend(struct device *dev)
 		if (card->rtd[i].dai_link->ignore_suspend ||
 				card->rtd[i].dai_link->no_pcm)
 			continue;
-
+#ifdef ABE_SUSPEND_ENABLE_IN_PARTIAL
+                    //LGE_D1_BSP_ICS_S  seungdae.goh@lge.com 2012-04-17    [START_LGE]
+                    if( s_partial_suspend ) {
+                    #if 0    
+                    if(phone_suspended)
+                    {
+                        printk(KERN_DEBUG"$$$ Do NOT suspend stream [%d][%s][%s] ~~\n", i , card->rtd[i].dai_link->name, card->rtd[i].dai_link->stream_name );
+                    }   
+                    #else
+                        if( card->rtd[i].dai_link->name && strcmp(card->rtd[i].dai_link->name, "TWL4030_FM"  ) ==0) {
+                            printk(KERN_DEBUG"$$$ Do NOT suspend stream [%d][%s][%s] ~~\n", i , card->rtd[i].dai_link->name, card->rtd[i].dai_link->stream_name );
+                        }
+                     #endif   
+                    #if 0    
+                        else if(card->rtd[i].dai_link->name && strcmp(card->rtd[i].dai_link->name, "SDP4430 Media Capture") == 0 ) {
+                            printk(KERN_DEBUG"$$$ Do NOT suspend stream [%d][%s][%s] ~~\n", i , card->rtd[i].dai_link->name, card->rtd[i].dai_link->stream_name);
+                        }
+                     #endif   
+                        else
 		snd_pcm_suspend_all(card->rtd[i].pcm);
+	}
+                    else
+                    snd_pcm_suspend_all(card->rtd[i].pcm);
+                    //LGE_D1_BSP_ICS_E  seungdae.goh@lge.com 2012-04-17    [END_LGE]               
+#endif
 	}
 
 	if (card->suspend_pre)
@@ -1273,6 +1335,10 @@ int snd_soc_suspend(struct device *dev)
 	}
 
 	/* close any waiting streams and save state */
+  
+#ifdef ABE_SUSPEND_ENABLE_IN_PARTIAL
+        if(s_partial_suspend==0){
+#endif
 	for (i = 0; i < card->num_rtd; i++) {
 		flush_delayed_work_sync(&card->rtd[i].delayed_work);
 		card->rtd[i].codec->dapm.suspend_bias_level = card->rtd[i].codec->dapm.bias_level;
@@ -1326,6 +1392,9 @@ int snd_soc_suspend(struct device *dev)
 			if (cpu_dai->driver->suspend && cpu_dai->driver->ac97_control)
 				cpu_dai->driver->suspend(cpu_dai);
 	}
+#ifdef ABE_SUSPEND_ENABLE_IN_PARTIAL
+       }
+#endif
 
 	if (card->suspend_post)
 		card->suspend_post(card);
@@ -1355,7 +1424,9 @@ static void soc_resume_deferred(struct work_struct *work)
 
 	if (card->resume_pre)
 		card->resume_pre(card);
-
+#ifdef ABE_SUSPEND_ENABLE_IN_PARTIAL
+          if( s_partial_suspend == 0 ){
+#endif
 	/* resume AC97 DAIs */
 	for (i = 0; i < card->num_rtd; i++) {
 		struct snd_soc_dai *cpu_dai = card->rtd[i].cpu_dai;
@@ -1422,6 +1493,13 @@ static void soc_resume_deferred(struct work_struct *work)
 				drv->ops->digital_mute(dai, 0);
 		}
 	}
+#ifdef ABE_SUSPEND_ENABLE_IN_PARTIAL
+     }
+    else{
+          s_partial_suspend = 0;
+  
+      }
+#endif
 
 	for (i = 0; i < card->num_rtd; i++) {
 		struct snd_soc_dai *cpu_dai = card->rtd[i].cpu_dai;
@@ -2336,6 +2414,7 @@ int snd_soc_poweroff(struct device *dev)
 		flush_delayed_work_sync(&rtd->delayed_work);
 	}
 
+   //printk("====== choi snd_soc_poweroff ====\n");
 	snd_soc_dapm_shutdown(card);
 
 	return 0;

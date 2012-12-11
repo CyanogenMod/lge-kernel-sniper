@@ -163,7 +163,10 @@ typedef enum {
 	MUIC_EARMIC,		// 11
 	MUIC_TV_OUT_LOAD,	// 12 - Not used.
 	MUIC_OTG,		// 13 - Not used.
-#if	defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if	defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900)
+/* [LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if	defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
+
 	MUIC_CP_DOWNLOAD,	// 14
 	MUIC_ILLEGAL_CHG,	// 15
 	MUIC_RESERVE1,		// 16

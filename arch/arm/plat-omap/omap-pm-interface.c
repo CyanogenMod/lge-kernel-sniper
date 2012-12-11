@@ -48,9 +48,25 @@ int omap_pm_set_max_mpu_wakeup_lat(struct pm_qos_request_list **pmqos_req,
 	return -EINVAL;
 }
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+extern u32 doing_wakeup;
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 int omap_pm_set_min_bus_tput(struct device *dev, u8 agent_id, long r)
 {
 	int ret;
+
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+	if (doing_wakeup == 1)
+	{
+//		return 0; // TODO : investigate.
+	}
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 	if (!dev || (agent_id != OCP_INITIATOR_AGENT &&
 		     agent_id != OCP_TARGET_AGENT)) {
 		WARN(1, "OMAP PM: %s: invalid parameter(s)", __func__);

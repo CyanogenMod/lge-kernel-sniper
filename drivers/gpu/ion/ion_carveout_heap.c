@@ -58,11 +58,43 @@ ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
 			mnTotalIonMemory/(1024*1024), (mnTotalIonMemory%(1024*1024))/1024);
 		if (mnTotalIonMemory < OMAP3_ION_HEAP_CARVEOUT_INPUT_SIZE/10) {	// 10%
 			// Kill mediaserver to prevent hang-up during ART test
-			struct task_struct *p, *pmediaserver = NULL;
-			for_each_process(p) {
-				printk("rt5604: ---> ion_carveout_allocate: process:%d:%s\n",p->pid,p->comm);
-				if(!strncmp(p->comm,"mediaserver", 11)) {
-					pmediaserver = p;
+			struct task_struct *pC=NULL, *pcamera = NULL;
+			struct task_struct *pF=NULL, *pfw3a_core = NULL;
+			struct task_struct *pM=NULL, *pmediaserver = NULL;
+
+			//--- kill camera ---
+			for_each_process(pC) {
+				printk("rt5604: ---> ion_carveout_allocate: process:%d:%s\n",pC->pid,pC->comm);
+				if(!strncmp(pC->comm,"com.lge.camera", 14)) {
+					pcamera = pC;
+				}
+				if (pcamera) break;
+			}
+
+			if(pcamera) {
+				printk("rt5604: ---> ion_carveout_allocate: KILL %s (pid=%d)!!!\n", pcamera->comm, pcamera->pid);
+				force_sig(SIGKILL, pcamera);
+			}
+
+            //--- kill fw3a_core -----------------
+            for_each_process(pF) {
+  	           printk("rt5604: ---> ion_carveout_allocate: process:%d:%s\n",pF->pid, pF->comm);
+	           if(!strncmp(pF->comm,"fw3a_core", 9)) {
+		           pfw3a_core = pF;
+		       }
+		       if (pfw3a_core) break;
+		    }
+			
+		    if(pfw3a_core) {
+  	           printk("rt5604: ---> ion_carveout_allocate: KILL %s (pid=%d)!!!\n", pfw3a_core->comm, pfw3a_core->pid);  
+			   force_sig(SIGKILL, pfw3a_core);
+		    }
+
+            //--- kill mediaserver ---
+			for_each_process(pM) {
+				printk("rt5604: ---> ion_carveout_allocate: process:%d:%s\n",pM->pid,pM->comm);
+				if(!strncmp(pM->comm,"mediaserver", 11)) {
+					pmediaserver = pM;
 				}
 				if (pmediaserver) break;
 			}
@@ -71,6 +103,8 @@ ion_phys_addr_t ion_carveout_allocate(struct ion_heap *heap,
 				printk("rt5604: ---> ion_carveout_allocate: KILL %s (pid=%d)!!!\n", pmediaserver->comm, pmediaserver->pid);
 				force_sig(SIGKILL, pmediaserver);
 			}
+			printk(KERN_DEBUG "kill mediaserver : ion_carveout_allocate:Allocation FAILURE!!!\n");
+			return ION_CARVEOUT_ALLOCATE_FAIL;
 		}
 	}
 	// rt5604@mnbt.co.kr 2012.08.06 to prevent system reboot due to ION Memory short for camera & video application during ART test <-

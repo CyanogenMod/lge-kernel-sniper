@@ -86,6 +86,14 @@ static int _cpuidle_deny_idle(struct powerdomain *pwrdm,
 	return 0;
 }
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+extern u32 te_cpu_idle_block;
+u32 doing_wakeup;
+EXPORT_SYMBOL(doing_wakeup);
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 /**
  * omap3_enter_idle - Programs OMAP3 to enter the specified state
  * @dev: cpuidle device
@@ -113,20 +121,40 @@ static int omap3_enter_idle(struct cpuidle_device *dev,
 	if (omap_irq_pending() || need_resched())
 		goto return_sleep_time;
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+	/* Deny idle for C1 */
+	if (te_cpu_idle_block == 1 || doing_wakeup == 1) {
+		pwrdm_for_each_clkdm(mpu_pd, _cpuidle_deny_idle);
+		pwrdm_for_each_clkdm(core_pd, _cpuidle_deny_idle);
+	}
+#else
 	/* Deny idle for C1 */
 	if (state == &dev->states[0]) {
 		pwrdm_for_each_clkdm(mpu_pd, _cpuidle_deny_idle);
 		pwrdm_for_each_clkdm(core_pd, _cpuidle_deny_idle);
 	}
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
 
 	/* Execute ARM wfi */
 	omap_sram_idle(false);
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+	/* Re-allow idle for C1 */
+	if (te_cpu_idle_block == 1 || doing_wakeup == 1) {
+		pwrdm_for_each_clkdm(mpu_pd, _cpuidle_allow_idle);
+		pwrdm_for_each_clkdm(core_pd, _cpuidle_allow_idle);
+	}
+#else
 	/* Re-allow idle for C1 */
 	if (state == &dev->states[0]) {
 		pwrdm_for_each_clkdm(mpu_pd, _cpuidle_allow_idle);
 		pwrdm_for_each_clkdm(core_pd, _cpuidle_allow_idle);
 	}
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
 
 return_sleep_time:
 	getnstimeofday(&ts_postidle);

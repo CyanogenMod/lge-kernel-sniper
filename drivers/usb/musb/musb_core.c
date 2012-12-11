@@ -102,6 +102,7 @@
 #include <linux/prefetch.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/delay.h>
 
 #include "musb_core.h"
 
@@ -1929,6 +1930,42 @@ static void musb_free(struct musb *musb)
 }
 
 /*
+*
+*        Reset MUSBMHDRC core or block
+*        Sometimes, D+ pin is out of control, because of not to be finished normally.
+*        So, you can use this function at this time.
+*
+*/
+#define SOFT_RST  0x7F
+#define NRSTX (1<<1)
+#define NRST (1<<0)
+static void musb_core_reset(struct musb *musb)
+{
+         int cnt, mvalue;
+                   
+         musb_writeb(musb->mregs, SOFT_RST, NRSTX | NRST);
+         
+         cnt = 0;
+         do{
+                   
+                     mvalue = musb_readb(musb->mregs, SOFT_RST) & (NRSTX | NRST);
+                     udelay(10);
+                     
+                     if(cnt >= 100) break;
+                     cnt++;    
+                     
+         }while(mvalue != 0);
+         
+         if(cnt >= 100)
+         {
+                   printk(" ## MUSB Software Reset Timeout - SOFT_RST = 0x%02x \n", musb_readb(musb->mregs, SOFT_RST));
+         }
+                   
+}
+
+
+
+/*
  * Perform generic per-controller initialization.
  *
  * @pDevice: the controller (already clocked, etc)
@@ -2012,6 +2049,8 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	/* be sure interrupts are disabled before connecting ISR */
 	musb_platform_disable(musb);
 	musb_generic_disable(musb);
+
+	musb_core_reset(musb);  
 
 	/* setup musb parts of the core (especially endpoints) */
 	status = musb_core_init(plat->config->multipoint

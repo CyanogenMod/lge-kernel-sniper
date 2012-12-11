@@ -282,6 +282,7 @@ static ssize_t hub_proxi_onoff_store(struct device *dev,  struct device_attribut
 {
 	int val;
 	int ret;
+        int status=0;
 	struct hub_proxi_data* data = dev_get_drvdata(dev);
 
 	val = simple_strtoul(buf, NULL, 10);
@@ -292,6 +293,12 @@ static ssize_t hub_proxi_onoff_store(struct device *dev,  struct device_attribut
 	if(ret)	{
 		hub_proxi_enable(data->client);
 		enable_irq(data->client->irq);
+                mdelay(5);
+		status = hub_read_vo_bit(data->client);	// 20121126 subum.choi@lge.com
+
+                  input_report_abs(data->input_dev, ABS_DISTANCE, status);
+                 input_sync(data->input_dev);
+	      
 	}
 	else {
 		disable_irq(data->client->irq);

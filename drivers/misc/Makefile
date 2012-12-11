@@ -73,4 +73,4 @@ obj-$(CONFIG_TSPDRV)		+= tspdrv/
 obj-$(CONFIG_LBEE9QMB_RFKILL)	+= lbee9qmb-rfkill.o
 obj-$(CONFIG_BD_ADDRESS)        += bd_address.o
 # Black & Justin sensor drivers is added.
-obj-$(CONFIG_BJ_SENSORS)	+= bj_sensors/
+#obj-$(CONFIG_BJ_SENSORS)	+= bj_sensors/

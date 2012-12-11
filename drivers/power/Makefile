@@ -40,7 +40,8 @@ obj-$(CONFIG_CHARGER_GPIO)	+= gpio-charger.o
 obj-$(CONFIG_CHARGER_BQ2415x)	+= bq2415x_charger.o
 
 ifeq ($(CONFIG_PRODUCT_LGE_P970),y)
-obj-$(CONFIG_TWL4030_BCI_BATTERY)       += twl4030_bci_battery.o
+#obj-$(CONFIG_TWL4030_BCI_BATTERY)       += twl4030_bci_battery.o
+obj-$(CONFIG_TWL4030_BCI_BATTERY)       += twl4030_bci_battery_p970.o
 endif
 ifeq ($(CONFIG_PRODUCT_LGE_KU5900),y)
 obj-$(CONFIG_TWL4030_BCI_BATTERY)       += twl4030_bci_battery_ku5900.o

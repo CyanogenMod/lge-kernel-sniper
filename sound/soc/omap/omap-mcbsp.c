@@ -354,7 +354,8 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	if (channels == 2 && (format == SND_SOC_DAIFMT_I2S ||
 			      format == SND_SOC_DAIFMT_LEFT_J)) {
 		/* Use dual-phase frames */
-#ifndef CONFIG_PRODUCT_LGE_KU5900
+#if 0	// gt.kim@lge.com justin/black same appliy ASR Patch...
+//#ifndef CONFIG_PRODUCT_LGE_KU5900
 		regs->rcr2	|= RPHASE;
 		regs->xcr2	|= XPHASE;
 #else
@@ -378,7 +379,8 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
 	regs->rcr1	|= RFRLEN1(wpf - 1);
 	regs->xcr1	|= XFRLEN1(wpf - 1);
 
-#ifdef CONFIG_PRODUCT_LGE_KU5900
+#if 1	// gt.kim@lge.com justin/black same appliy ASR Patch...
+//#ifdef CONFIG_PRODUCT_LGE_KU5900
 	if (channels == 1 && (format == SND_SOC_DAIFMT_I2S)){
 		if(substream->stream)
 		{

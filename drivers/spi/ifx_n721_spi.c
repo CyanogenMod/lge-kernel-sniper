@@ -248,7 +248,7 @@ ifx_spi_open(struct tty_struct *tty, struct file *filp)
 		spi_data = spi_data_table[1];
 		break;
 	case 1: /* ttyspi1 */
-		spi_data = spi_data_table[0];
+		spi_data = spi_data_table[1];
 		break;
 	default:
 		spi_data = spi_data_table[0];
@@ -256,7 +256,7 @@ ifx_spi_open(struct tty_struct *tty, struct file *filp)
 	}
 
         if (spi_data == NULL) {
-            return -ENODEV;
+            return -ENOTTY;
         }
 	spi_data->ifx_spi_lock = 0;
 
@@ -385,16 +385,19 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 
 	if(spi_data->ifx_ret_count==0)
 	{	
-		ifx_spi_set_mrdy_signal(spi_data, 0);
  
-        printk("%s - timeout!! Can't get SRDY from CP for 10sec. Set MRDY high to low\n", __FUNCTION__); // 20120213 taeju.park@lge.com To delete compile warning, too many arguments for format
-        dump_spi_buffer("timeout - ifx_spi_write()", buf, count);     
-	{
                 int pin_val;
                 pin_val = gpio_get_value(spi_data->srdy_gpio);
 		printk("SRDY SIGNAL = %d\n", pin_val);
-        }
 
+		ifx_spi_set_mrdy_signal(spi_data, 0);
+ 
+        printk("%s - timeout!! Can't get SRDY from CP for 10sec. Set MRDY high to low\n", __FUNCTION__); // 20120213 taeju.park@lge.com To delete compile warning, too many arguments for format
+        dump_spi_buffer("timeout - ifx_spi_write()", buf, count);
+
+		init_completion(&spi_data->ifx_read_write_completion);
+
+        return -3;
 
 	}
 // LGE_UPDATE_E eungbo.shim@lge.com 20110111 -- SPI RETRY 

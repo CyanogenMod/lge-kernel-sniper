@@ -178,7 +178,9 @@ static const u8 twl4030_reg[TWL4030_CACHEREGNUM] = {
 #elif defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)
 static const u8 twl4030_reg[TWL4030_CACHEREGNUM] = {
 	0x00, /* this register not used		*/
-	0xa1, /* REG_CODEC_MODE		(0x1)	*/
+    // wooho.jeong@lge.com 2012.10.05
+    // MOD : for 44.1K audio sample rate
+	0x91, /* REG_CODEC_MODE		(0x1)	*/
 	0xc3, /* REG_OPTION		(0x2)	*/
 	0x00, /* REG_UNKNOWN		(0x3)	*/
 	0x00, /* REG_MICBIAS_CTL	(0x4)	*/
@@ -187,8 +189,12 @@ static const u8 twl4030_reg[TWL4030_CACHEREGNUM] = {
 	0x08, /* REG_AVADC_CTL		(0x7)	*/
 	0x00, /* REG_ADCMICSEL		(0x8)	*/
 	0x00, /* REG_DIGMIXING		(0x9)	*/
-	0x0c, /* REG_ATXL1PGA		(0xA)	*/
-	0x0c, /* REG_ATXR1PGA		(0xB)	*/
+	
+	//0x0c, /* REG_ATXL1PGA		(0xA)	*/
+	0x00, /* REG_ATXL1PGA		(0xA)	*/ // 20121030 bs.lim@lge.com
+	//0x0c, /* REG_ATXR1PGA		(0xB)	*/
+	0x00, /* REG_ATXR1PGA		(0xB)	*/ //20121030 bs.lim@lge.com
+	
 	0x00, /* REG_AVTXL2PGA		(0xC)	*/	// 20100920 junyeop.kim@lge.com, call tuning for call(HW require) [START_LGE]
 	0x00, /* REG_AVTXR2PGA		(0xD)	*/	// 20100820 junyeop.kim@lge.com, call tuning for call(HW require) [START_LGE]
 	0x01, /* REG_AUDIO_IF		(0xE)	*/
@@ -659,10 +665,233 @@ static const twl_reg_type twl_headphone_call_tab[] =
 	{TWL4030_END_SEQ,0x00,0x00}
 };
 
-#elif defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)
+#elif defined (CONFIG_PRODUCT_LGE_P970)
 static const twl_reg_type twl_receiver_call_tab[] =
 {
-	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},
+	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
+	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x2d}, // 20121030 bs.lim@lge.com
+
+	{TWL4030_CMD ,TWL4030_REG_AUDIO_IF, 0x03},		// gt.kim@lge.com 20120713 voice call state PCM Line Open
+
+	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
+	{TWL4030_CMD ,TWL4030_REG_ADCMICSEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_MICBIAS_CTL, 0x01},
+
+	{TWL4030_CMD ,TWL4030_REG_ANAMICR, 0x00}, // 20121030 bs.lim@lge.com
+	
+	{TWL4030_CMD ,TWL4030_REG_ANAMICL, 0x71},
+	//    {TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x0a},
+	{TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x08},	//20100916 junyeop.kim@lge.com, only ADC L enable
+	{TWL4030_CMD ,TWL4030_REG_AVDAC_CTL, 0x1c},
+	{TWL4030_CMD ,TWL4030_REG_VSTPGA, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_VRXPGA, 0x25},
+	{TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x2b}, // 20121030 bs.lim@lge.com
+	//    {TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x1b},	// 20100924 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
+	{TWL4030_CMD ,TWL4030_REG_ARXL2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_ARXR2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_AVTXL2PGA, 0x00},	//20100912, junyeop.kim@lge.com, voice call tuning
+	{TWL4030_CMD ,TWL4030_REG_AVTXR2PGA, 0x00},	//20100912, junyeop.kim@lge.com, voice call tuning
+
+	{TWL4030_CMD ,TWL4030_REG_ARXR2PGA, 0x3f},	// gt.kim@lge.com 20120713 voice call state PCM Line Open
+	{TWL4030_CMD ,TWL4030_REG_ARXL2PGA, 0x3f},  // gt.kim@lge.com 20120713 voice call state PCM Line Open
+
+	//    {TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x10},	//20100916 junyeop.kim@lge.com, don't use reg.
+	//    {TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x10},	//20100916 junyeop.kim@lge.com, don't use reg.
+	{TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x00},	//20100916 junyeop.kim@lge.com, don't use reg. shut down
+	{TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x00},	//20100916 junyeop.kim@lge.com, don't use reg. shut down
+	{TWL4030_CMD ,TWL4030_REG_HS_SEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_EAR_CTL, 0x15},
+	{TWL4030_END_SEQ,0x00,0x00}
+};
+
+static const twl_reg_type twl_receiver_call_dmb_tab[] =
+{
+	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},
+	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
+	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x1b},
+	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
+	{TWL4030_CMD ,TWL4030_REG_ADCMICSEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_MICBIAS_CTL, 0x03},	 // 20101231 seungdae.goh@lge.com  MICBIAS2 disable  3 --> 1 --> 3
+	{TWL4030_CMD ,TWL4030_REG_ANAMICL, 0x71},
+	//    {TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x0a},
+	{TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x08},	//20100916 junyeop.kim@lge.com, only ADC L enable
+	{TWL4030_CMD ,TWL4030_REG_AVDAC_CTL, 0x1c},
+	{TWL4030_CMD ,TWL4030_REG_VSTPGA, 0x00},
+	//    {TWL4030_CMD ,TWL4030_REG_VRXPGA, 0x19},	// 20100912 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
+	//    {TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x33},
+	{TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x1b},	// 20100920 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
+	{TWL4030_CMD ,TWL4030_REG_ARXL2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_ARXR2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_AVTXL2PGA, 0x00},	//20100912, junyeop.kim@lge.com, voice call tuning
+	{TWL4030_CMD ,TWL4030_REG_AVTXR2PGA, 0x00},	//20100912, junyeop.kim@lge.com, voice call tuning
+	//    {TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x10},	//20100916 junyeop.kim@lge.com, don't use reg.
+	//    {TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x10},	//20100916 junyeop.kim@lge.com, don't use reg.
+	{TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x00},	//20100916 junyeop.kim@lge.com, don't use reg. shut down
+	{TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x00},	//20100916 junyeop.kim@lge.com, don't use reg. shut down
+	{TWL4030_CMD ,TWL4030_REG_HS_SEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_EAR_CTL, 0x15},
+	{TWL4030_END_SEQ,0x00,0x00}
+};
+
+static const twl_reg_type twl_headset_call_tab[] =
+{
+	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},
+	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
+	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x24}, // 20121030 bs.lim@lge.com
+
+	{TWL4030_CMD ,TWL4030_REG_AUDIO_IF, 0x03},		// gt.kim@lge.com 20120713 voice call state PCM Line Open
+
+	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
+	{TWL4030_CMD ,TWL4030_REG_ADCMICSEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_MICBIAS_CTL, 0x02}, // 20101231 seungdae.goh@lge.com  MICBIAS2 disable  2 --> 0 --> 2
+	{TWL4030_CMD ,TWL4030_REG_ANAMICL, 0x72},
+	{TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x08},
+	{TWL4030_CMD ,TWL4030_REG_AVDAC_CTL, 0x1c},
+	{TWL4030_CMD ,TWL4030_REG_VSTPGA, 0x00},
+
+	{TWL4030_CMD ,TWL4030_REG_ANAMICR, 0x00}, // 20121030 bs.lim@lge.com
+	{TWL4030_CMD ,TWL4030_REG_ATXL1PGA, 0x00}, // 20121030 bs.lim@lge.com
+	{TWL4030_CMD ,TWL4030_REG_ATXR1PGA, 0x00}, // 20121030 bs.lim@lge.com
+	
+//	{TWL4030_CMD ,TWL4030_REG_VRXPGA, 0x22},	// 20120714 gt.kim@lge.com Voice Volume settint register remove
+
+	{TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x33}, // 20121030 bs.lim@lge.com
+
+	{TWL4030_CMD ,TWL4030_REG_EAR_CTL, 0x30},
+	{TWL4030_CMD ,TWL4030_REG_ARXL2_APGA_CTL, 0x2b},
+	{TWL4030_CMD ,TWL4030_REG_ARXR2_APGA_CTL, 0x2b},	// 20110404  seungdae.goh@lge.com error fix
+	//{TWL4030_CMD ,TWL4030_REG_ATX2ARXPGA, 0x34},	//20110317 seungdae.goh
+
+
+	{TWL4030_CMD ,TWL4030_REG_AVTXL2PGA, 0x05}, // 20121030 bs.lim@lge.com
+	{TWL4030_CMD ,TWL4030_REG_AVTXR2PGA, 0x05},
+
+	{TWL4030_CMD ,TWL4030_REG_ARXR2PGA, 0x3f},	// gt.kim@lge.com 20120713 voice call state PCM Line Open
+	{TWL4030_CMD ,TWL4030_REG_ARXL2PGA, 0x3f},  // gt.kim@lge.com 20120713 voice call state PCM Line Open
+
+	{TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_HS_SEL, 0x29},
+	{TWL4030_CMD ,TWL4030_REG_HS_GAIN_SET, 0x05},
+
+	{TWL4030_END_SEQ,0x00,0x00}
+};
+
+static const twl_reg_type twl_headphone_call_tab[] =
+{
+	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},
+	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
+	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x24}, // 20121030 bs.lim@lge.com
+	
+	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
+	{TWL4030_CMD ,TWL4030_REG_ADCMICSEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_MICBIAS_CTL, 0x03},  // 20101231 seungdae.goh@lge.com  MICBIAS2 disable 3-->1 -->3
+	{TWL4030_CMD ,TWL4030_REG_ANAMICL, 0x71},
+	//    {TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x0a},
+	{TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x08},	//20100824 junyeop.kim@lge.com, only ADC L enable
+	{TWL4030_CMD ,TWL4030_REG_AVDAC_CTL, 0x1c},
+	{TWL4030_CMD ,TWL4030_REG_VSTPGA, 0x00},
+
+	{TWL4030_CMD ,TWL4030_REG_ANAMICR, 0x00}, // 20121030 bs.lim@lge.com
+	
+	//    {TWL4030_CMD ,TWL4030_REG_VRXPGA, 0x19},	// 20100912 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
+	//    {TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x33},
+	{TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x33}, // 20121030 bs.lim@lge.com
+	
+	{TWL4030_CMD ,TWL4030_REG_ARXL2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_ARXR2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_AVTXL2PGA, 0x04},	//20110227  seungdae.goh@lge.com
+	{TWL4030_CMD ,TWL4030_REG_AVTXR2PGA, 0x00},	//20100912, junyeop.kim@lge.com, voice call tuning
+	{TWL4030_CMD ,TWL4030_REG_EAR_CTL, 0x30},	//20100912, junyeop.kim@lge.com, workaround for call playback sound
+	//    {TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x10},	//20100916 junyeop.kim@lge.com, don't use reg.
+	//    {TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x10},	//20100916 junyeop.kim@lge.com, don't use reg.
+	{TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x00},	//20100916 junyeop.kim@lge.com, don't use reg. shut down
+	{TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x00},	//20100916 junyeop.kim@lge.com, don't use reg. shut down
+	{TWL4030_CMD ,TWL4030_REG_HS_SEL, 0x29},
+	{TWL4030_CMD ,TWL4030_REG_HS_GAIN_SET, 0x05},
+	//    {TWL4030_CMD ,TWL4030_REG_HS_POPN_SET, 0x42},
+	//    {TWL4030_CMD ,TWL4030_REG_HS_POPN_SET, 0x00}, 	//20101017 junyeop.kim@lge.com, modify the headset call
+	{TWL4030_END_SEQ,0x00,0x00}
+};
+
+static const twl_reg_type twl_speaker_call_headset_det_tab[] =
+{
+	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},
+	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
+	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x24},
+	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
+	{TWL4030_CMD ,TWL4030_REG_ADCMICSEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_MICBIAS_CTL, 0x03},	// 20101231 seungdae.goh@lge.com  MICBIAS2 disable   3 --> 1 --> 3
+	{TWL4030_CMD ,TWL4030_REG_ANAMICL, 0x71},
+	//    {TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x0a},
+	{TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x08},	//20100824 junyeop.kim@lge.com, only ADC L enable
+	{TWL4030_CMD ,TWL4030_REG_AVDAC_CTL, 0x1c},
+	{TWL4030_CMD ,TWL4030_REG_VSTPGA, 0x00},
+	//    {TWL4030_CMD ,TWL4030_REG_VRXPGA, 0x19},	// 20100912 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
+	{TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x33},
+	//    {TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x23},	// 20100920 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
+	{TWL4030_CMD ,TWL4030_REG_ARXL2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_ARXR2_APGA_CTL, 0x2b},	//20100908, junyeop.kim@lge.com, workaround for call playback sound
+	{TWL4030_CMD ,TWL4030_REG_AVTXL2PGA, 0x00},		//20100912, junyeop.kim@lge.com, voice call tuning
+	{TWL4030_CMD ,TWL4030_REG_AVTXR2PGA, 0x00},		//20100912, junyeop.kim@lge.com, voice call tuning
+	{TWL4030_CMD ,TWL4030_REG_EAR_CTL, 0x10},
+	{TWL4030_CMD ,TWL4030_REG_HS_SEL, 0x09},
+	{TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x25},
+	{TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x25},
+	{TWL4030_END_SEQ,0x00,0x00}
+};
+
+static const twl_reg_type twl_speaker_call_tab[] =
+{
+	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},
+	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
+	
+	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x1b}, // 20121030 bs.lim@lge.com
+
+	{TWL4030_CMD ,TWL4030_REG_AUDIO_IF, 0x03},		// gt.kim@lge.com 20120713 voice call state PCM Line Open
+
+	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
+	{TWL4030_CMD ,TWL4030_REG_ADCMICSEL, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_MICBIAS_CTL, 0x02},
+
+	{TWL4030_CMD ,TWL4030_REG_ANAMICR, 0x00}, // 20121030 bs.lim@lge.com
+	
+	{TWL4030_CMD ,TWL4030_REG_ANAMICL, 0x71},
+
+	{TWL4030_CMD ,TWL4030_REG_AVADC_CTL, 0x08},	//20100824 junyeop.kim@lge.com, only ADC L enable
+	{TWL4030_CMD ,TWL4030_REG_AVDAC_CTL, 0x1c},
+	{TWL4030_CMD ,TWL4030_REG_VSTPGA, 0x00},
+	
+	{TWL4030_CMD ,TWL4030_REG_VRXPGA, 0x26},	// 20121030 bs.lim@lge.com
+	
+	{TWL4030_CMD ,TWL4030_REG_VDL_APGA_CTL, 0x33}, // 20121030 bs.lim@lge.com
+
+	{TWL4030_CMD ,TWL4030_REG_ATXL1PGA, 0x00}, // 20121030 bs.lim@lge.com
+	{TWL4030_CMD ,TWL4030_REG_AVTXL2PGA, 0x00}, // 20121030 bs.lim@lge.com
+	
+	{TWL4030_CMD ,TWL4030_REG_ARXL2_APGA_CTL, 0x2b}, // 20121030 bs.lim@lge.com
+	{TWL4030_CMD ,TWL4030_REG_ARXR2_APGA_CTL, 0x2b}, // 20121030 bs.lim@lge.com
+	
+	{TWL4030_CMD ,TWL4030_REG_AVTXL2PGA, 0x01},
+	{TWL4030_CMD ,TWL4030_REG_AVTXR2PGA, 0x00},
+	{TWL4030_CMD ,TWL4030_REG_ARXR2PGA, 0x3f},
+	{TWL4030_CMD ,TWL4030_REG_ARXL2PGA, 0x3f},
+	{TWL4030_CMD ,TWL4030_REG_EAR_CTL, 0x10},
+	{TWL4030_CMD ,TWL4030_REG_HS_SEL, 0x09},
+	
+	{TWL4030_CMD ,TWL4030_REG_PREDL_CTL, 0x25}, // 20121030 bs.lim@lge.com
+	{TWL4030_CMD ,TWL4030_REG_PREDR_CTL, 0x25}, // 20121030 bs.lim@lge.com
+	{TWL4030_END_SEQ,0x00,0x00}
+};
+
+#elif defined(CONFIG_PRODUCT_LGE_KU5900) //|| defined (CONFIG_PRODUCT_LGE_P970)
+static const twl_reg_type twl_receiver_call_tab[] =
+{
+    // wooho.jeong@lge.com 2012.10.05
+    // MOD : for 44.1K audio sample rate
+	//{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    {TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},        
 	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
 	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x2d},
 	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
@@ -687,7 +916,10 @@ static const twl_reg_type twl_receiver_call_tab[] =
 
 static const twl_reg_type twl_receiver_call_dmb_tab[] =
 {
-	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    // wooho.jeong@lge.com 2012.10.05
+    // MOD : for 44.1K audio sample rate
+	//{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    {TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},        
 	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
 	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x1b},
 	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
@@ -712,7 +944,10 @@ static const twl_reg_type twl_receiver_call_dmb_tab[] =
 
 static const twl_reg_type twl_headset_call_tab[] =
 {
-	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    // wooho.jeong@lge.com 2012.10.05
+    // MOD : for 44.1K audio sample rate
+	//{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    {TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},         
 	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
 	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x24},	//20110320 seungdae.goh@lge.com
 	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
@@ -738,7 +973,10 @@ static const twl_reg_type twl_headset_call_tab[] =
 
 static const twl_reg_type twl_speaker_call_tab[] =
 {
-	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    // wooho.jeong@lge.com 2012.10.05
+    // MOD : for 44.1K audio sample rate
+	//{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    {TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},          
 	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
 	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x1b/*0x24*/},	// 20100927 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
 	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
@@ -765,7 +1003,10 @@ static const twl_reg_type twl_speaker_call_tab[] =
 
 static const twl_reg_type twl_speaker_call_headset_det_tab[] =
 {
-	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    // wooho.jeong@lge.com 2012.10.05
+    // MOD : for 44.1K audio sample rate
+	//{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    {TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},        
 	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
 	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x24},
 	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
@@ -789,7 +1030,10 @@ static const twl_reg_type twl_speaker_call_headset_det_tab[] =
 
 static const twl_reg_type twl_headphone_call_tab[] =
 {
-	{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    // wooho.jeong@lge.com 2012.10.05
+    // MOD : for 44.1K audio sample rate
+	//{TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0xa2},
+    {TWL4030_CMD ,TWL4030_REG_CODEC_MODE, 0x92},        
 	{TWL4030_CMD ,TWL4030_REG_OPTION, 0xdf},
 	{TWL4030_CMD ,TWL4030_REG_ANAMIC_GAIN, 0x1b},
 	{TWL4030_CMD ,TWL4030_REG_VOICE_IF, 0x61},
@@ -910,7 +1154,31 @@ struct twl4030_priv {
 #endif
 };
 
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)||defined(CONFIG_PRODUCT_LGE_LU6800)	
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900)||defined(CONFIG_PRODUCT_LGE_LU6800) || defined (CONFIG_PRODUCT_LGE_P970)	
+
+int get_twl4030_apll_state(void)
+{
+    struct snd_soc_codec* codec = snd_soc_get_codec("twl4030-codec");
+    if(codec == NULL)
+    {
+        printk(KERN_ERR "snd_soc_get_codec twl4030-codec :: Null \n");
+        return -1;
+    }
+    struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
+
+    if(twl4030->apll_enabled)
+        return 1;
+     else
+        return 0;
+}
+
+EXPORT_SYMBOL_GPL(get_twl4030_apll_state);
+
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)
+/* [LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
 wm9093_mode_enum cur_ext_amp_mode = OFF_MODE;
 void set_ext_amp_mode(int mode)
 {
@@ -931,29 +1199,13 @@ int get_twl4030_headset_spk_codec_status(void)
         || twl4030->predriver_enabled || twl4030->predrivel_enabled /* CHECK SPEKER   */
        )
         return 1;
-     else
-        return 0;
-}
-
-int get_twl4030_apll_state(void)
-{
-    struct snd_soc_codec* codec = snd_soc_get_codec("twl4030-codec");
-    if(codec == NULL)
-    {
-        printk(KERN_ERR "snd_soc_get_codec twl4030-codec :: Null \n");
-        return -1;
-    }
-    struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
-
-    if(twl4030->apll_enabled)
-        return 1;
     else
         return 0;
 }
 
-EXPORT_SYMBOL_GPL(get_twl4030_apll_state);
 EXPORT_SYMBOL_GPL(set_ext_amp_mode);
 EXPORT_SYMBOL_GPL(get_twl4030_headset_spk_codec_status);
+#endif
 #endif
 
 #ifdef DEBUG
@@ -1096,6 +1348,22 @@ static int twl4030_write(struct snd_soc_codec *codec,
 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
 	int write_to_reg = 0;
 
+/* LGE_CHANGE_S :  2012-09-26, gt.kim@lge.com, Desc: Headset Music Play-> VT Call->Call end Issue..    */
+    if( ( reg == TWL4030_REG_ARXL2_APGA_CTL || reg == TWL4030_REG_ARXR2_APGA_CTL )
+            && ( ! ( value & 0x0001 ) )
+            && ( twl4030->is_calling) )
+        {
+            int twl_mode = voice_get_curmode();
+            if(twl_mode >= TWL4030_VT_BT_CALL_MODE && twl_mode <= TWL4030_VT_HEADPHONE_CALL_MODE )
+            {
+//                WARN_ON(1);
+#ifdef DEBUG
+                printk("[%s:%d] func:: Return !!  reg_log_string(%s), VALUE(0x%x) twl_mode[%d]\n", __func__, __LINE__, reg_log_string(reg), value, twl_mode);
+#endif
+                return 0;
+            }
+        }
+/* LGE_CHANGE_E :  2012-09-26, gt.kim@lge.com,     */
 	// prime@sdcmicro.com LGE specific codec control [START]
 #if defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)  /* 20100618 junyeop.kim@lge.com, call path */
 #if defined(CONFIG_PRODUCT_LGE_HUB)    // 20100515 junyeop.kim@lge.com,voice call tuning (HW request) [START_LGE]
@@ -1288,7 +1556,7 @@ static void twl4030_init_chip(struct snd_soc_codec *codec)
 			TWL4030_ARXL2_EN | TWL4030_ARXR2_EN);
 
 	/* REG_ARXR2_APGA_CTL reset according to the TRM: 0dB, DA_EN */
-	twl4030_write(codec, TWL4030_REG_ARXR2_APGA_CTL, 0x32);
+	twl4030_write(codec, TWL4030_REG_ARXR2_APGA_CTL, 0x2b); // // 20121030 bs.lim@lge.com 32 -> 2b
 
 	/* Machine dependent setup */
 	if (!pdata)
@@ -1685,13 +1953,25 @@ static int aif_event(struct snd_soc_dapm_widget *w,
 
 	audio_if = twl4030_read_reg_cache(w->codec, TWL4030_REG_AUDIO_IF);
 
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)||defined(CONFIG_PRODUCT_LGE_LU6800)
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) ||defined(CONFIG_PRODUCT_LGE_LU6800) ||defined(CONFIG_PRODUCT_LGE_P970)
 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(w->codec);
+
+    if((twl4030->is_calling)&&(get_twl4030_apll_state()))
+    {
+        printk("[Twl4030] aif_event(%d) is_calling TRUE ::::: RETURN \n",event);
+        return;
+    }
+//#if defined(CONFIG_PRODUCT_LGE_KU5900) 	
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
 	if( (twl4030->is_calling == 0) && (cur_ext_amp_mode == OFF_MODE)){
 		twl4030->predrivel_enabled = 0;
 		twl4030->predriver_enabled = 0;
 		wm9093_configure_path(cur_ext_amp_mode);
         }
+#endif
 #endif
 	DBG("\n");
 
@@ -1712,7 +1992,10 @@ static int aif_event(struct snd_soc_dapm_widget *w,
 			break;
 	}
 
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900) 	
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
+
         if((twl4030->is_calling == 0) && (cur_ext_amp_mode == SPEAKER_AUDIO_MODE)){
             twl4030->predrivel_enabled = 1;
             twl4030->predriver_enabled = 1;
@@ -1732,7 +2015,10 @@ static void headset_ramp(struct snd_soc_codec *codec, int ramp)
 	unsigned int ramp_base[] = {524288, 1048576, 2097152, 4194304,
 		8388608, 16777216, 33554432, 67108864};
 	unsigned int delay;
-	printk("[LUCKYJUN77] headset_ramp\n");
+    
+    // wooho.jeong@lge.com 2012.09.25
+    // ADD : Audio for FM Radio
+	printk("[LUCKYJUN77] headset_ramp ramp = %d\n",ramp);
 	call_headset_ramp = ramp;
 
 	hs_gain = twl4030_read_reg_cache(codec, TWL4030_REG_HS_GAIN_SET);
@@ -1822,7 +2108,9 @@ static int headsetlpga_event(struct snd_soc_dapm_widget *w,
 		struct snd_kcontrol *kcontrol, int event)
 {
 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(w->codec);
-	DBG("\n");
+	
+	DBG("event %d\n",event);
+	
 
 #if defined(CONFIG_PRODUCT_LGE_HUB) /* 20100913 junyeop.kim@lge.com, fix the headset call path */
 	if(twl4030->is_calling)
@@ -1830,12 +2118,15 @@ static int headsetlpga_event(struct snd_soc_dapm_widget *w,
 #elif defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)/* 20100913 junyeop.kim@lge.com, fix the headset call path */
 	if(twl4030->is_calling|| fmradio_is_on == 1)
 	{
+	    printk(KERN_ERR "fmradio_is_on %d\n", fmradio_is_on);
 		return 0;
 	}
 #else
 	//nothing
 #endif
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900) 	
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
 	if(cur_ext_amp_mode == OFF_MODE)
 		wm9093_configure_path(cur_ext_amp_mode);
 #endif
@@ -1862,20 +2153,23 @@ static int headsetrpga_event(struct snd_soc_dapm_widget *w,
 		struct snd_kcontrol *kcontrol, int event)
 {
 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(w->codec);
-	DBG("\n");
+	DBG("event %d\n",event);
 
 #if defined(CONFIG_PRODUCT_LGE_HUB) /* 20100913 junyeop.kim@lge.com, fix the headset call path */
 	if(twl4030->is_calling)
 		return 0;
 #elif defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)/* 20100913 junyeop.kim@lge.com, fix the headset call path */
-	if(twl4030->is_calling ||fmradio_is_on == 1)
+	if(twl4030->is_calling || fmradio_is_on == 1)
 	{
+	    printk(KERN_ERR "fmradio_is_on %d\n", fmradio_is_on);
 		return 0;
 	}
 #else
 	//nothing
 #endif
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900) 	
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
          if(cur_ext_amp_mode == OFF_MODE){
              wm9093_configure_path(cur_ext_amp_mode);
              twl4030->predriver_enabled = 0;
@@ -1898,8 +2192,13 @@ static int headsetrpga_event(struct snd_soc_dapm_widget *w,
 			twl4030->hsr_enabled = 0;
 			break;
 	}
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)	
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
 //        msleep(10);
+        // wooho.jeong@lge.com 2012.09.25
+        // ADD : Audio for FM Radio
+//        if(cur_ext_amp_mode == HEADSET_AUDIO_MODE || cur_ext_amp_mode == SPEAKER_HEADSET_DUAL_AUDIO_MODE || cur_ext_amp_mode == HEADSET_FMR_MODE){
         if(cur_ext_amp_mode == HEADSET_AUDIO_MODE || cur_ext_amp_mode == SPEAKER_HEADSET_DUAL_AUDIO_MODE){
              wm9093_configure_path(cur_ext_amp_mode);
              if(cur_ext_amp_mode == SPEAKER_HEADSET_DUAL_AUDIO_MODE){
@@ -2777,7 +3076,7 @@ static int twl4030_set_bias_level(struct snd_soc_codec *codec,
 		level = SND_SOC_BIAS_ON;
 	}
 
-	if(codec->dapm.bias_level == level ||fmradio_is_on)
+	if(codec->dapm.bias_level == level || fmradio_is_on)
 		//20101222 inbang.park@lge.com Wake lock for  FM Radio [END]
 		return 0;
 
@@ -2970,7 +3269,9 @@ void voice_configure_path(voice_mode_enum mode)
 			mode = TWL4030_HEADPHONE_CALL_MODE;
 	#endif
 
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)	
+/*[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
 	if(mode != TWL4030_AUDIO_MODE)
 	{
 	    u8 audio_if;
@@ -3426,7 +3727,7 @@ static int twl4030_hw_params(struct snd_pcm_substream *substream,
 	old_format = twl4030_read_reg_cache(codec, TWL4030_REG_AUDIO_IF);
 	format = old_format;
 	format &= ~TWL4030_DATA_WIDTH;
-    	DBG("\n");
+    	//DBG("\n");
 
 	switch (params_format(params)) {
 	case SNDRV_PCM_FORMAT_S16_LE:
@@ -4099,7 +4400,8 @@ static struct snd_soc_dai_driver twl4030_dai[] = {
 	.capture = {
 		.stream_name = "Capture",
 #if 1 // TI Patch (Audio Broken issue)
-#ifdef CONFIG_PRODUCT_LGE_KU5900
+#if 1 // gt.kim@lge.com justin/black same appliy ASR Patch...
+//#ifdef CONFIG_PRODUCT_LGE_KU5900
 		.channels_min = 1,
 		.channels_max = 2,
 		.rates = TWL4030_RATES,
@@ -4211,7 +4513,8 @@ void hub_set_call_mode(struct snd_pcm_substream *substream, int mode)
 	struct twl4030_priv *twl4030 = snd_soc_codec_get_drvdata(codec);
 DBG("\n");
 	if(mode == 1){
-		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE, 0x03, TWL4030_REG_MICBIAS_CTL); //mic bias on
+		//twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE, 0x03, TWL4030_REG_MICBIAS_CTL); //mic bias on
+		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE, 0x01, TWL4030_REG_MICBIAS_CTL); //mic bias on // bs.lim 03 -> 01
 		twl_i2c_write_u8(TWL4030_MODULE_AUDIO_VOICE, 0x00, TWL4030_REG_PREDL_CTL); //spk off
 		twl4030->is_calling = 1;
 	}

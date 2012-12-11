@@ -212,7 +212,7 @@ struct spi_data_recived_struct {
 
 //20110604 ws.yang add to max frame
 //LGE_TELECA_CR1317_DATA_THROUGHPUT START
-#define MAX_WAITING_FRAMES 400
+#define MAX_WAITING_FRAMES 1000 //20121017 jisil.park [P970] increasing the waiting frame size for VT call lock up 400 --> 1000
 static DECLARE_WAIT_QUEUE_HEAD(wq);
 static volatile short int frames_to_send_count[TS0710MAX_CHANNELS];
 //LGE_TELECA_CR1317_DATA_THROUGHPUT END
@@ -247,7 +247,7 @@ static u8 default_priority_table[] = {
 static u8 max_waiting_frames_count[] = {
  20,                       /* multiplexer control channel */
  3, 3, 3, 3, 3, 3, 3,      /* 1-7 DLC */
- 3, 3, 3, 3, 3, 3, 3, 3,   /* 8-15 DLC  */
+ 3, 3, 3, 3, 47, 3, 3, 3,   /* 8-15 DLC  */ //20121017 jisil.park [P970] increasing the waiting frame count size for VT call lock up 3 --> 47
  3, 3, 3, 3, 3, 47, 3, 47, /* 16-23 DLC */
  3, 47, 3, 47, 3, 3, 3, 3, /* 24-31 DLC */
  3, 3, 3, 3, 3, 3, 3, 3,   /* 32-39 DLC */  

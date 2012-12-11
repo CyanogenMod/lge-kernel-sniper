@@ -62,7 +62,9 @@ struct i2c_client *bb2802_i2c_client;//2011205 kyungyoon.kim@lge.com lcd resume 
 #define BD2812_PIN_FUNC_SETUP		0x41
 
 #define BD2802_CURRENT_WHITE_PEAK		0x5A /* 18mA */
-#define BD2802_CURRENT_WHITE_MAX		0x32 /* 10mA */
+//shim.shunggoo@lge.com[2012.11.01] - DOU game current modify from H/W team
+#define BD2802_CURRENT_WHITE_MAX		0x25 //0x32 /* 10mA */
+//shim.shunggoo@lge.com[2012.11.01] - DOU game current modify from H/W team
 //--[[ LGE_UBIQUIX_MODIFIED_START : shyun@ubiquix.com [2011.09.09] - Merge from Black_Froyo MR Ver.
 #define BD2802_CURRENT_BLUE_MAX			0x00 /* 10mA */
 #define BD2802_CURRENT_WHITE_MIN		0x03 /* 0mA */	// dajin.kim@lge.com chagned 0x05 -> 0x00 for lED off
@@ -1332,14 +1334,14 @@ static int __devinit bd2802_probe(struct i2c_client *client,
 	register_early_suspend(&led->early_suspend);
 #endif
 
-	bd2802_configure(led);
+// sangki.hyun@lge.com blink_on_booting	bd2802_configure(led);
         #if defined(BLINK_ON_BOOTING)
 	led->blink_enable =1;
         #endif
-	bd2802_on(led);
-	bd2802_enable(led);
+// sangki.hyun@lge.com blink_on_booting	bd2802_on(led);
+// sangki.hyun@lge.com blink_on_booting	bd2802_enable(led);
 
-	bd2802_off(led);
+// sangki.hyun@lge.com blink_on_booting	bd2802_off(led);
 
 	printk("[ %s ]-(%d) [NORMAL_OUT]\n",__func__, __LINE__);
 

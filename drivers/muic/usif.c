@@ -187,6 +187,8 @@ void usif_switch_ctrl(TYPE_USIF_MODE mode)
 	pr_info("usif: %s()\n", __func__);
 //USIF can't switch
 	
+	gpio_direction_output(GPIO_USIF_IN_1, 0);		// LGE_MOD 20121106 subum.choi@lge.com [FOTA] UART4 Path
+
 	if(!usif_ctrl){
 		pr_info("usif: %s: usif can't switch  \n", __func__);
 		return;

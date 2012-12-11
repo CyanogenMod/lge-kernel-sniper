@@ -174,13 +174,19 @@ static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {};
 static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
 	{
 		.name   = "gpmc_wait2.uart4_tx",
-		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
+		// LGE_CHANGE_S 20121109 subum.choi@lge.com FOTA UART Tx Mode Change 0 -> 2 
+		//.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE2,
+		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE2,
 	},
 	{
 		.name	= "gpmc_wait3.uart4_rx",
 		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
-		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
-		.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+		// LGE_CHANGE_S 20121109 subum.choi@lge.com FOTA UART4 Rx Pull-Up
+		//.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+		//.idle	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
+		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE2,
+		.idle	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE2,
+		// LGE_CHANGE_S 20121109 subum.choi@lge.com FOTA UART4 Rx Pull-Up
 	},
 };
 #endif

@@ -85,7 +85,6 @@ device_initcall(omap_ram_console_register);
 /* LGE_CHANGE_E, [jinsu.park@lge.com], 2012-06-08, <add Setting enable ram console> */
 int __init omap_ram_console_init(void)
 {
-	int ret;
 	phys_addr_t phy_addr = OMAP_RAM_CONSOLE_START;
 	size_t size = OMAP_RAM_CONSOLE_SIZE;
 
@@ -95,7 +94,7 @@ int __init omap_ram_console_init(void)
 	/* flag for registration */
 	omap_ramconsole_inited = true;
 
-	return ret;
+	return 0;
 }
 early_initcall(omap_ram_console_init);
 

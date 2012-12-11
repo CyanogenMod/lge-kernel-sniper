@@ -804,13 +804,7 @@ static int ifx_spi_probe_hw_dependible(struct ifx_spi_data *spi_data)
 
     if (gpio_request(OMAP_MODEM_WAKE, "ap sleep check") < 0)
     {
-        printk(KERN_ERR "can't get synaptics pen down GPIO\n");
-        /* 20110328 ws.yang@lge.com.  to free the memory */
-        ifx_spi_free_frame_memory(spi_data);
-        if(spi_data)
-        {
-            kfree(spi_data);
-        }           
+        printk(KERN_ERR "Can't get OMAP_MODEM_WAKE GPIO\n");
         return -ENOMEM;
     }
 
@@ -1053,12 +1047,13 @@ static int spi2spi_start_test(struct ifx_spi_data *spi_data)
     {
         MSPI_ERR("TS failed to allocate spi2spi test workqueue\n");
     }
-
+    else
+    {
     MSPI_DBG(9,"spi2spi_start_test start work \n");
     queue_work(spi_data->ifx_wq, &spi_data->ifx_work);
-
-
     return 0;
+    }
+
 out:
     MSPI_DBG(9,"spi2spi_start_test error \n");
     if(spi2spi_tx_buff != NULL)
@@ -1575,7 +1570,7 @@ ifx_spi2spi_handle_work(struct work_struct *work)
     int status = 0;
     struct ifx_spi_data *spi_data = container_of(work, struct ifx_spi_data, ifx_work);
 
-    if(spi_data != NULL || spi_data->spi != NULL)
+    if(spi_data != NULL && spi_data->spi != NULL)
     {
         struct spi_message  m;
         struct spi_transfer t = {

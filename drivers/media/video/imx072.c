@@ -28,6 +28,89 @@
 #define LP8720_ENABLE   37
 #define I2C_M_WR 0
 
+/* bumgyu.kim@lge.com
+This feature defined for kill camera if that is not response for over 60sec. when start take picture.
+It should only use for only MMS library(icapture_perform()) with omap3 on ICS. 
+This is not tested for full frame size of this module's previewing. Might be undefine that case.
+*/
+#define CAMERA_KILL_TIMER
+
+#ifdef CAMERA_KILL_TIMER
+#include <linux/timer.h>
+#define EXPIRE_SNAPSHOT_TIMER (60*HZ) /*60sec*/
+struct timer_list snapshot_timer;
+bool capture_timer_set=0;
+
+void cameratimer_handler(void)
+{
+	struct task_struct *p, *pmediaserver = NULL;
+        struct task_struct *p1, *fw3a_core = NULL;
+
+        //fw3a_core kill -----------------
+        for_each_process(p1) {
+	       //printk("IMX072 take picture fail: process:%d:%s\n",p1->pid,p1->comm);
+	       if(!strncmp(p1->comm,"fw3a_core", 9)) {
+		       fw3a_core = p1;
+		   }
+		   if (fw3a_core) break;
+		 }
+			
+		if(fw3a_core) {
+			printk("Take picture FAIL : KILL %s (pid=%d)!!!\n", fw3a_core->comm, fw3a_core->pid);
+			force_sig(SIGKILL, fw3a_core);
+			//capture_timer_set=0;
+		}
+        p1 = NULL;
+        fw3a_core = NULL; 
+
+		//mediaserver kill -----------------
+	for_each_process(p) {
+		//printk("IMX072 take picture fail: process:%d:%s\n",p->pid,p->comm);
+		if(!strncmp(p->comm,"mediaserver", 11)) {
+			pmediaserver = p;
+			}
+			if (pmediaserver) break;
+		}
+			
+		if(pmediaserver) {
+			printk("Take picture FAIL : KILL %s (pid=%d)!!!\n", pmediaserver->comm, pmediaserver->pid);
+			force_sig(SIGKILL, pmediaserver);
+			//capture_timer_set=0;
+		}
+        p = NULL;
+		pmediaserver = NULL;
+
+			capture_timer_set=0;
+/*
+		if(!strncmp(p->comm,"fw3a_core", 8)) {
+			printk("ion_carveout_allocate: KILL %s (pid=%d)!!!\n", p->comm, p->pid);
+			force_sig(SIGKILL, p);
+		}
+*/
+}
+
+void snapshot_timer_set(void)
+{
+	if(capture_timer_set==0)
+	{
+		init_timer(&snapshot_timer);
+
+		snapshot_timer.expires = get_jiffies_64() + EXPIRE_SNAPSHOT_TIMER;
+		snapshot_timer.data = NULL;
+		snapshot_timer.function = cameratimer_handler;
+		add_timer(&snapshot_timer); 
+		capture_timer_set=1;
+	}
+	else
+	{
+		del_timer(&snapshot_timer);
+		capture_timer_set=0;
+	}
+	printk("snapshot_timer_set[%d]\n", capture_timer_set);
+}
+
+#endif //CAMERA_KILL_TIMER
+
 //This table describes what should be written to the sensor register for each
 //gain value. The gain(index in the table) is in terms of 0.1EV, i.e. 10
 //indexes in the table give 2 time more gain
@@ -1414,6 +1497,9 @@ static int ioctl_s_ctrl(struct v4l2_int_device *s,
 		sensor->cc_mode = vc->value ? true : false;
 		lvc->current_value = vc->value;
 		retval = 0;
+#ifdef CAMERA_KILL_TIMER
+		snapshot_timer_set();
+#endif
 		break;
 	}
 
@@ -1713,18 +1799,19 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 	struct i2c_client *client = sensor->i2c_client;
 	struct omap34xxcam_hw_config hw_config;
 	struct vcontrol *lvc;
-	int rval, i;
+	int rval=0, i=0; // [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 Initialize the variables 
+	int err=0; // [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.
 
 	switch (on) {
 	case V4L2_POWER_ON:
-		imx072_power_on(s);
+		err = imx072_power_on(s); // [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.
 		if (current_power_state == V4L2_POWER_STANDBY) {
 			sensor->resuming = true;
-			imx072_configure(s);
+			err=imx072_configure(s); // [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.
 		}
 		break;
 	case V4L2_POWER_OFF:
-		imx072_power_off(s);
+		err = imx072_power_off(s); // [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.
 
 		/* Reset defaults for controls */
 		i = find_vctrl(V4L2_CID_GAIN);
@@ -1740,13 +1827,22 @@ static int ioctl_s_power(struct v4l2_int_device *s, enum v4l2_power on)
 		
 		break;
 	case V4L2_POWER_STANDBY:
-		imx072_power_standby(s);
+		err = imx072_power_standby(s); // [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.
 		break;
 	}
 
 	sensor->resuming = false;
+//<< [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.	>
+	if (err < 0) {
+
+		v4l_err(client, "ERROR current_power_state = %d\n", current_power_state );
+		imx072_power_standby(s);
+
+		return err;
+	}
+//< [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.	>>
 	current_power_state = on;
-	return 0;
+	return err; // [P970_OPEN_EU_ICS] daewon1004.kim@lge.com 2012.11.05 return error.
 }
 
 /**
@@ -2081,6 +2177,9 @@ late_initcall(imx072sensor_init);
  */
 static void __exit imx072sensor_cleanup(void)
 {
+#ifdef CAMERA_KILL_TIMER
+	del_timer(&snapshot_timer);
+#endif
 	i2c_del_driver(&imx072sensor_i2c_driver);
 }
 module_exit(imx072sensor_cleanup);

@@ -390,6 +390,12 @@ static int lm3528bl_suspend(struct i2c_client *client)
 	return 0;
 }
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+extern u32 doing_wakeup;
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 static int lm3528bl_resume(struct i2c_client *client)
 {
 	struct lm3528_platform_data*	pdata;
@@ -412,11 +418,13 @@ static int lm3528bl_resume(struct i2c_client *client)
 #else
 	lm3528_set_main_current_level(client, early_bl_value);
 #endif
-#ifndef LJH_TEST
-	/* S[, 20111110, mschung@ubiquix.com, Enhanced power consumption, at playing MP3. */
-// sghyun_justin temp	doing_wakeup = 0;
-	/* E], 20111110, mschung@ubiquix.com, Enhanced power consumption, at playing MP3. */
+
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+	doing_wakeup = 0;
 #endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
     return 0;
 }
 

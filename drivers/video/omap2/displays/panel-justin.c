@@ -89,6 +89,15 @@ static int __init nolcd_setup(char *unused)
 __setup("nolcd", nolcd_setup);
 // E [mannsik.chung@lge.com] LCD off boot. 
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+static int lcd_boot_status=1;
+extern u32 doing_wakeup;
+u32 te_cpu_idle_block=0;
+EXPORT_SYMBOL(te_cpu_idle_block);
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 #ifdef CONFIG_OMAP2_DSS_HDMI // goochang.jeong@ge.com switch to lcd
 extern bool HDMI_finalizing;
 extern int nDisabledGFX;
@@ -1157,6 +1166,15 @@ static int justin_power_on(struct omap_dss_device *dssdev)
 	/* At power on the first vsync has not been received yet */
         dssdev->first_vsync = false;
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+	if((doing_wakeup == 0)&&(lcd_boot_status==0))
+	{
+		doing_wakeup = 1;
+	}
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 	lm3258_power_switch(1);
 	lcd_status_backup = 1;
 	r = omapdss_dsi_display_enable(dssdev);
@@ -1177,6 +1195,17 @@ static int justin_power_on(struct omap_dss_device *dssdev)
 	omapdss_dsi_vc_enable_hs(dssdev, td->channel, false);
 
 	mdelay(5);	
+
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+	if(lcd_boot_status== 1)
+	{
+		lcd_boot_status = 0;
+	}
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
+
 
 #if 0  // sangki.hyun@lge.com
 	for (i = 0; lgd_lcd_command_for_mipi[i][0] != END_OF_COMMAND; i++) {
@@ -1507,6 +1536,12 @@ static irqreturn_t justin_te_isr(int irq, void *data)
 	if (old) {
 		cancel_delayed_work(&td->te_timeout_work);
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+		te_cpu_idle_block = 0;
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 		r = omap_dsi_update(dssdev, td->channel,
 				td->update_region.x,
 				td->update_region.y,
@@ -1594,6 +1629,13 @@ static int justin_update(struct omap_dss_device *dssdev,
 	is_update = 1;//+DEJA
 
 	if (td->te_enabled && panel_data->use_ext_te) {
+
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+		te_cpu_idle_block = 1;
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 		td->update_region.x = x;
 		td->update_region.y = y;
 		td->update_region.w = w;

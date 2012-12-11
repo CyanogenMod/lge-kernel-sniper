@@ -904,11 +904,12 @@ static struct i2c_board_info __initdata hub_i2c_bus3_info[] = {
 		I2C_BOARD_INFO("black_proxi", 0x44),
 	},
 #elif defined(CONFIG_GP2AP_PROXIMITY)
-        {       I2C_BOARD_INFO("hub_proxi", 0x44),
-        },
+	{	 I2C_BOARD_INFO("hub_proxi", 0x44),
+	},
 #endif
 
 
+#if 0
 /* Accelerometer Sensor */
 #if defined(CONFIG_BJ_KXTF9_SENSOR)
 	{
@@ -928,6 +929,7 @@ static struct i2c_board_info __initdata hub_i2c_bus3_info[] = {
 	{
 		I2C_BOARD_INFO("heaven_gyro", 0x68),
 	},	
+#endif
 #endif
 
 //--[[ LGE_UBIQUIX_MODIFIED_START : ymjun@mnbt.co.kr [2012.03.27] - CAM from GB

@@ -62,6 +62,13 @@ static int hub_i2s_hw_params(struct snd_pcm_substream *substream,
 	int ret;
 	DBG("\n");
 
+#if 1 // Applied path with justin/black..
+	// McBSP2 SLAVE MODE mux settings
+	omap_mux_init_signal("mcbsp2_fsx.mcbsp2_fsx",OMAP_PIN_INPUT);
+	omap_mux_init_signal("mcbsp2_clkx.mcbsp2_clkx",OMAP_PIN_INPUT);
+	omap_mux_init_signal("mcbsp2_dr.mcbsp2_dr",OMAP_PIN_INPUT);
+	omap_mux_init_signal("mcbsp2_dx.mcbsp2_dx",OMAP_PIN_OUTPUT | OMAP_PULL_ENA);
+#endif
 	/* Set codec DAI configuration */
 	ret = snd_soc_dai_set_fmt(codec_dai,
 				  SND_SOC_DAIFMT_I2S |
@@ -150,11 +157,13 @@ static int hub_pcm_hw_params(struct snd_pcm_substream *substream,
 
 	DBG("\n");
 
+#if 0 // Applied path with justin/black..
 	// McBSP2 SLAVE MODE mux settings
 	omap_mux_init_signal("mcbsp2_fsx.mcbsp2_fsx",OMAP_PIN_INPUT);
 	omap_mux_init_signal("mcbsp2_clkx.mcbsp2_clkx",OMAP_PIN_INPUT);
 	omap_mux_init_signal("mcbsp2_dr.mcbsp2_dr",OMAP_PIN_INPUT);
 	omap_mux_init_signal("mcbsp2_dx.mcbsp2_dx",OMAP_PIN_OUTPUT | OMAP_PULL_ENA);
+#endif
 	
 #if OMAP_MCBSP_MASTER_MODE
 	struct snd_soc_dai *codec_dai = rtd->dai->codec_dai;
@@ -444,7 +453,8 @@ static int ext_amp_get_mode(struct snd_kcontrol *kcontrol,
 static int ext_amp_set_mode(struct snd_kcontrol *kcontrol,
 	struct snd_ctl_elem_value *ucontrol)
 {
-#if defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970) /* [LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970" */
 	int ext_amp_mode = (wm9093_mode_enum)ucontrol->value.integer.value[0];
 	DBG("SET cur_ext_amp_mode(%d) codec_status(%d) wm9093_get_curmode(%d)\n",ext_amp_mode,get_twl4030_headset_spk_codec_status(),wm9093_get_curmode());
 
@@ -453,12 +463,19 @@ static int ext_amp_set_mode(struct snd_kcontrol *kcontrol,
 	    wm9093_configure_path(ext_amp_mode);
 	}
 
-	if( (OFF_MODE <= ext_amp_mode) && (ext_amp_mode <= SPEAKER_HEADSET_DUAL_AUDIO_MODE)){
+    // wooho.jeong@lge.com 2012.09.25
+    // ADD : Audio for FM Radio
+	if( ( (OFF_MODE <= ext_amp_mode) && (ext_amp_mode <= SPEAKER_HEADSET_DUAL_AUDIO_MODE ) ) 
+        || ( ( ext_amp_mode == SPEAKER_FMR_MODE ) || ( ext_amp_mode == HEADSET_FMR_MODE ) )
+        )
+    {
 	    set_ext_amp_mode(ext_amp_mode);
 
 	    if( ((get_twl4030_headset_spk_codec_status() == 1) ||(wm9093_get_curmode() != OFF_MODE && ext_amp_mode != OFF_MODE))
 	        ||((get_twl4030_apll_state() == 1) && (wm9093_get_curmode() == OFF_MODE && ext_amp_mode == SPEAKER_AUDIO_MODE)) )
 	        wm9093_configure_path(ext_amp_mode);
+        else if(( ext_amp_mode == SPEAKER_FMR_MODE ) || ( ext_amp_mode == HEADSET_FMR_MODE ))
+            wm9093_configure_path(ext_amp_mode);
 	}
 	else
 	    wm9093_configure_path(ext_amp_mode);

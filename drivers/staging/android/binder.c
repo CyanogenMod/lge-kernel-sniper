@@ -38,6 +38,7 @@
 
 static DEFINE_MUTEX(binder_lock);
 static DEFINE_MUTEX(binder_deferred_lock);
+static DEFINE_MUTEX(binder_mmap_lock); // kyoungpyo.kang 121021 fq_rca 12_0835 patch
 
 static HLIST_HEAD(binder_procs);
 static HLIST_HEAD(binder_deferred_list);
@@ -287,6 +288,7 @@ struct binder_proc {
 	struct rb_root refs_by_node;
 	int pid;
 	struct vm_area_struct *vma;
+	struct mm_struct *vma_vm_mm; // kyoungpyo.kang 120913 patch
 	struct task_struct *tsk;
 	struct files_struct *files;
 	struct hlist_node deferred_work_node;
@@ -632,6 +634,12 @@ static int binder_update_page_range(struct binder_proc *proc, int allocate,
 	if (mm) {
 		down_write(&mm->mmap_sem);
 		vma = proc->vma;
+        // kyoungpyo.kang 120913 patch
+		if (vma && mm != proc->vma_vm_mm) {
+			pr_err("binder: %d: vma mm and task mm mismatch\n",
+				proc->pid);
+			vma = NULL;
+		}
 	}
 
 	if (allocate == 0)
@@ -2799,6 +2807,7 @@ static void binder_vma_close(struct vm_area_struct *vma)
 		     (vma->vm_end - vma->vm_start) / SZ_1K, vma->vm_flags,
 		     (unsigned long)pgprot_val(vma->vm_page_prot));
 	proc->vma = NULL;
+	proc->vma_vm_mm = NULL; // kyoungpyo.kang 120913 patch
 	binder_defer_work(proc, BINDER_DEFERRED_PUT_FILES);
 }
 
@@ -2831,6 +2840,7 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	}
 	vma->vm_flags = (vma->vm_flags | VM_DONTCOPY) & ~VM_MAYWRITE;
 
+	mutex_lock(&binder_mmap_lock); // kyoungpyo.kang 121021 fq_rca 12_0835 patch
 	if (proc->buffer) {
 		ret = -EBUSY;
 		failure_string = "already mapped";
@@ -2845,6 +2855,7 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	}
 	proc->buffer = area->addr;
 	proc->user_buffer_offset = vma->vm_start - (uintptr_t)proc->buffer;
+	mutex_unlock(&binder_mmap_lock); // kyoungpyo.kang 121021 fq_rca 12_0835 patch
 
 #ifdef CONFIG_CPU_CACHE_VIPT
 	if (cache_is_vipt_aliasing()) {
@@ -2879,6 +2890,7 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	barrier();
 	proc->files = get_files_struct(current);
 	proc->vma = vma;
+	proc->vma_vm_mm = vma->vm_mm; // kyoungpyo.kang 120913 patch
 
 	/*printk(KERN_INFO "binder_mmap: %d %lx-%lx maps %p\n",
 		 proc->pid, vma->vm_start, vma->vm_end, proc->buffer);*/
@@ -2888,10 +2900,12 @@ err_alloc_small_buf_failed:
 	kfree(proc->pages);
 	proc->pages = NULL;
 err_alloc_pages_failed:
+	mutex_lock(&binder_mmap_lock); // kyoungpyo.kang 121021 fq_rca 12_0835 patch
 	vfree(proc->buffer);
 	proc->buffer = NULL;
 err_get_vm_area_failed:
 err_already_mapped:
+	mutex_unlock(&binder_mmap_lock); // kyoungpyo.kang 121021 fq_rca 12_0835 patch
 err_bad_arg:
 	printk(KERN_ERR "binder_mmap: %d %lx-%lx %s failed %d\n",
 	       proc->pid, vma->vm_start, vma->vm_end, failure_string, ret);

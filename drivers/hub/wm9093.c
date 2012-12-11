@@ -398,9 +398,16 @@ static const wm9093_reg_type wm9093_in1_to_hp_tab[] =
 	{WM9093_CMD ,0x2F, 0x0000},
 	{WM9093_CMD ,0x30, 0x0000},
 	{WM9093_CMD ,0x16, 0x0000},
+// jk6884.lee@lge.com 20121022 P970 Audio parameter // 20121026 133 -> 135
+#ifdef CONFIG_PRODUCT_LGE_P970
+	{WM9093_CMD ,0x1C, 0x0134},
+	{WM9093_CMD ,0x1D, 0x0134},
+	{WM9093_CMD ,0x1C, 0x0134},
+#else
 	{WM9093_CMD ,0x1C, 0x0135},	// 20110224 mikyoung.chang@lge.com hw request
 	{WM9093_CMD ,0x1D, 0x0135},	// 20110224 mikyoung.chang@lge.com hw request
 	{WM9093_CMD ,0x1C, 0x0135},	// 20110224 mikyoung.chang@lge.com hw request
+#endif
 	{WM9093_CMD ,0x46, 0x0100},
 	{WM9093_CMD ,0x49, 0x0100},
     {WM9093_END_SEQ,0x00,0x00}
@@ -499,9 +506,9 @@ static const wm9093_reg_type wm9093_in2_to_out_hp_tab[] =
 	{WM9093_CMD ,0x2D, 0x0040},
 	{WM9093_CMD ,0x2E, 0x0010},
     {WM9093_CMD ,0x03, 0x0138},
-	{WM9093_CMD ,0x1C, 0x0023},	// 20110224 mikyoung.chang@lge.com hw request
-	{WM9093_CMD ,0x1D, 0x0123},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
-	{WM9093_CMD ,0x1C, 0x0123},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE]
+	{WM9093_CMD ,0x1C, 0x001b},	// 20110224 mikyoung.chang@lge.com hw request // 20121029 bs.lim@lge.com 23->1b
+	{WM9093_CMD ,0x1D, 0x011b},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE] // 20121029 bs.lim@lge.com 23->1b
+	{WM9093_CMD ,0x1C, 0x011b},	// 20101011 junyeop.kim@lge.com, dual path tuning for call(HW require) [START_LGE] // 20121029 bs.lim@lge.com 23->1b
 	{WM9093_CMD ,0x2F, 0x0000},
 	{WM9093_CMD ,0x30, 0x0000},
     {WM9093_CMD ,0x16, 0x0000},
@@ -517,8 +524,14 @@ static const wm9093_reg_type wm9093_in2_to_out_call_tab[] =	//spk call
 	{WM9093_CMD ,0x39, 0x000D},		//20100720 junyeop.kim@lge.com, fix the call mute
  	{WM9093_CMD ,0x01, 0x000B},
 	{WM9093_CMD ,0x02, 0x6020},
+// jk6884.lee@lge.com 20121022 P970 Audio parameter
+#ifdef CONFIG_PRODUCT_LGE_P970
+	{WM9093_CMD ,0x1A, 0x0102},
+	{WM9093_CMD ,0x1B, 0x0102},
+#else
 	{WM9093_CMD ,0x1A, 0x0100},		// 20110126 mikyoung.chang@lge.com, spk tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x1B, 0x0100},		// 20110126 mikyoung.chang@lge.com, spk tuning for call(HW require) [START_LGE]
+#endif
 	{WM9093_CMD ,0x36, 0x0004},
 	{WM9093_CMD ,0x03, 0x0008},
 	{WM9093_CMD ,0x22, 0x0000},		// 20100816 junyeop.kim@lge.com, spk tuning for call(HW require) [START_LGE]
@@ -570,7 +583,12 @@ static const wm9093_reg_type wm9093_in2_to_out_tab[] =
 	{WM9093_CMD ,0x25, 0x0178},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
 	{WM9093_CMD ,0x24, 0x0010},		// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
 	//{WM9093_CMD ,0x26, 0x0132}, 	// 20100604 junyeop.kim@lge.com, spk tuning for media(PL require) [START_LGE]
+// jk6884.lee@lge.com 20121022 P970 Audio parameter
+#ifdef CONFIG_PRODUCT_LGE_P970
+	{WM9093_CMD ,0x26, 0x0138},
+#else
 	{WM9093_CMD ,0x26, 0x0137},
+#endif
 
 
 	{WM9093_CMD ,0x17, 0x0000},
@@ -639,9 +657,17 @@ static const wm9093_reg_type wm9093_in2_to_hp_tab[] =	// headset call
     {WM9093_CMD ,0x2F, 0x0000},	// 20100816 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
     {WM9093_CMD ,0x30, 0x0000},	// 20100816 junyeop.kim@lge.com, headset tuning for call(HW require) [START_LGE]
 	{WM9093_CMD ,0x16, 0x0000},
+	
+// jk6884.lee@lge.com 20121022 P970 Audio parameter // 20121026 133 -> 135
+#ifdef CONFIG_PRODUCT_LGE_P970
+	{WM9093_CMD ,0x1C, 0x0131}, // 20121030 bs.lim@lge.com 35->31->30->31
+	{WM9093_CMD ,0x1D, 0x0131}, // 20121030 bs.lim@lge.com 35->31->30->31
+	{WM9093_CMD ,0x1C, 0x0131}, // 20121030 bs.lim@lge.com 35->31->30->31
+#else
 	{WM9093_CMD ,0x1C, 0x0133},	// 20110224 mikyoung.chang@lge.com hw request
 	{WM9093_CMD ,0x1D, 0x0133},	// 20110224 mikyoung.chang@lge.com hw request
 	{WM9093_CMD ,0x1C, 0x0133},	// 20110224 mikyoung.chang@lge.com hw request
+#endif
 	{WM9093_CMD ,0x46, 0x0100},
 	{WM9093_CMD ,0x49, 0x0100},
     {WM9093_END_SEQ,0x00,0x00}

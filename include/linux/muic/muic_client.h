@@ -38,7 +38,9 @@ struct muic_client_ops {
 	int (*on_tv_out_load) (struct muic_client_device *);
 	int (*on_otg) (struct muic_client_device *);
 	int (*on_mhl)(struct muic_client_device *);
-#if	defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900)
+//#if	defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900)
+/* [LGE_CHANGE] 20120908 pyocool.cho@lge.com "p970"*/
+#if	defined(CONFIG_PRODUCT_LGE_LU6800) || defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
 	int (*on_cp_download) (struct muic_client_device *);
 	int (*on_illegal_chg)(struct muic_client_device *);
 #endif

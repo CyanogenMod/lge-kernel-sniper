@@ -245,35 +245,33 @@ struct lcd_ctrl_data {
 	unsigned char val;
 };
 
+//shim.shunggoo@lge.com,20121106 ,rollback from KT to EU GB value for ALC
 static struct lcd_ctrl_data normal_to_als_mode[]=
 {
-	{AAT2870_REG18,0x12},	// 4.05mA
+	{AAT2870_REG18,0x12},	// 4.05 mA //chagne 0x12 < 0x0E
 	{AAT2870_REG19,0x15},	// 4.725mA
-	{AAT2870_REG20,0x16},	// 4.95mA
-	{AAT2870_REG21,0x18},	// 5.4mA
+	{AAT2870_REG20,0x17},	// 5.175 mA
+	{AAT2870_REG21,0x19},	// 5.625 mA
 	{AAT2870_REG22,0x1A},	// 5.85mA
 	{AAT2870_REG23,0x1B},	// 6.075mA
 	{AAT2870_REG24,0x1D},	// 6.525mA
-	{AAT2870_REG25,0x1E},	// 6.75mA
+	{AAT2870_REG25,0x20},	// 7.2  mA
 	{AAT2870_REG26,0x21},	// 7.425mA
 	{AAT2870_REG27,0x23},	// 7.875mA
-	{AAT2870_REG28,0x24},	// 8.1mA
-	{AAT2870_REG29,0x25},	// 8.325mA
-	{AAT2870_REG30,0x26},	// 8.55mA
-	{AAT2870_REG31,0x26},	// 8.55mA
-	{AAT2870_REG32,0x27},	// 8.775mA
-	{AAT2870_REG33,0x27},	// 8.775mA
+	{AAT2870_REG28,0x25},	// 8.325 mA
+	{AAT2870_REG29,0x26},	// 8.55 mA
+	{AAT2870_REG30,0x27},	// 8.775 mA
+	{AAT2870_REG31,0x28},	// 9 mA
+	{AAT2870_REG32,0x29},	// 9.225 mA
+	{AAT2870_REG33,0x2A},	// 9.45 mA
 	{AAT2870_REG14,0x77},
 	{AAT2870_REG15,0x01},
-#if 1
-	{AAT2870_REG16,0x9E},
-#else  // kyungrae.jo, 2011-03-11, HW TEST
-	{AAT2870_REG16,0xBE},
-#endif
+	{AAT2870_REG16,0x95},
 	{AAT2870_REG0,0xFF},
 	{I2C_NO_REG, 0x00}  /* End of array */
 
 };
+//shim.shunggoo@lge.com,20121106 ,rollback from KT to EU GB value for ALC
 //changhyun.han@lge.com, 20100119 ,added the optimized brightness mode
 static struct lcd_ctrl_data normal_to_als_optimize_mode[]=
 {
@@ -613,6 +611,7 @@ extern unsigned int mp3_playing;//2011205 kyungyoon.kim@lge.com lcd resume speed
 int check_bl_shutdown=0;
 void hub_lcd_initialize(void)
 {
+	printk(" lcd : %s \n", __func__);
 #if 0	/* 20110304 seven.kim@lge.com late_resume_lcd */
 	DBG("LCD intialize ..mp3_playing=%d\n",mp3_playing);
 	if (mp3_playing==1)
@@ -770,6 +769,15 @@ static void aat2870_set_main_current_level(struct i2c_client *client, int level)
 
 	DBG("fisrt val = 0x%x\n", val);
 
+	// 20120829 sangki.hyun@lge.com backlight i2c failed {
+	if(check_bl_shutdown)
+	{
+		gpio_set_value(LCD_CP_EN, 1);
+		check_bl_shutdown = 0;
+		udelay(80);
+	}
+	// 20120829 sangki.hyun@lge.com backlight i2c failed }
+	
 	aat2870_write_reg(client, AAT2870_REG1, val);
 
 	// TODO : check mdelay
@@ -1500,6 +1508,11 @@ static void aat2870_early_suspend(struct early_suspend *h)
 	//20100205 kyungyoon.kim@lge.com for LCD resume speed[END]
 }
 
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+extern u32 doing_wakeup;
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
 
 static void aat2870_late_resume(struct early_suspend *h)
 {
@@ -1515,6 +1528,13 @@ static void aat2870_late_resume(struct early_suspend *h)
 	 hrtimer_start(&dev->als_timer, ktime_set(0,500000000), HRTIMER_MODE_REL); //20100304 seven.kim@lge.com late_reaume_lcd changed 100ms -> 500ms
 	 aat2870_bl_resume(dev->client); //20110321 for black lcd display
  	 /* 20110304 seven.kim@lge.com late_resume_lcd [END] */
+
+/* S[, 20120922, mannsik.chung@lge.com, PM from froyo. */
+#if defined(CONFIG_PRODUCT_LGE_LU6800)
+	doing_wakeup = 0;
+#endif
+/* E], 20120922, mannsik.chung@lge.com, PM from froyo. */
+
 }
 #endif	/* CONFIG_HAS_EARLYSUSPEND */
 
@@ -1523,7 +1543,7 @@ static int aat2870_suspend(struct i2c_client *client, pm_message_t state)
 	struct aat2870_device *dev;
 	dev = i2c_get_clientdata(client);
 	
-	DBG("[aat2870_suspend] new state: %d\n",state.event);
+	printk("[aat2870_suspend] new state: %d\n",state.event);
 
 	client->dev.power.power_state = state;
 #if	0  // 20120814 sangki.hyun@lge.com ICS Backlight tunning
@@ -1538,6 +1558,7 @@ static int aat2870_suspend(struct i2c_client *client, pm_message_t state)
 //	aat2870_touch_ldo_enable(client, 0);
 //	msleep(5);
 #endif
+	gpio_direction_output(LCD_CP_EN, 0);  // 20120829 sangki.hyun@lge.com
 
 // prime@sdcmicro.com The following calls are made by aat2870_shutdown() which is called by panel-hub.c [START]
         #if 0

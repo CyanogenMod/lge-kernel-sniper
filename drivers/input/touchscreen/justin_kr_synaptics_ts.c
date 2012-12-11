@@ -1445,15 +1445,17 @@ static int synaptics_ts_remove(struct i2c_client *client)
 static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 {
 	struct synaptics_ts_data *ts = i2c_get_clientdata(client);
-	int ret;
 	init_stabled = 0;
+
+	printk("[SHYUN] [%s] - [%d] [IN]\n", __func__, __LINE__);
 
 	if (ts->use_irq)
 		disable_irq(client->irq);
 	else
 		hrtimer_cancel(&ts->timer);
 
-	ret = cancel_work_sync(&ts->work);
+	cancel_work_sync(&ts->work);
+	cancel_delayed_work_sync(&ts->init_delayed_work);
 
 	//if (ret && ts->use_irq) /* if work was pending disable-count is now 2 */
 	//	enable_irq(client->irq);
@@ -1478,6 +1480,8 @@ static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 static int synaptics_ts_resume(struct i2c_client *client)
 {
 	struct synaptics_ts_data *ts = i2c_get_clientdata(client);
+
+	printk("[SHYUN] [%s] - [%d] [IN]\n", __func__, __LINE__);
 
 	init_stabled = 1;
 

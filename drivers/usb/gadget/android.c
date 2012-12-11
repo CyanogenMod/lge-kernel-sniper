@@ -1633,10 +1633,12 @@ void android_USB_disconnect(){
      
      composite_disconnect(dev->cdev->gadget);  
 #if 1  	
-  	printk(KERN_INFO "[ED_AD].usb_disconnect for missing() \n");  
+  	printk(KERN_INFO "====>[ANDROID].usb_discon() from MUIC\n");
+//	dump_stack();
 #endif      
      spin_lock_irqsave(&cdev->lock, flags);  
      dev->disconnected = 1;  
+     dev->connected = 0; 
      schedule_work(&dev->work);  
      spin_unlock_irqrestore(&cdev->lock, flags);  
 }  
@@ -1646,7 +1648,10 @@ static void android_disconnect(struct usb_gadget *gadget)
 	struct android_dev *dev = _android_dev;
 	struct usb_composite_dev *cdev = get_gadget_data(gadget);
 	unsigned long flags;
-
+#if 1 	
+	printk(KERN_INFO "====>[ANDROID].usb_discon()\n");
+//	dump_stack();
+#endif
 	composite_disconnect(gadget);
 
 	spin_lock_irqsave(&cdev->lock, flags);

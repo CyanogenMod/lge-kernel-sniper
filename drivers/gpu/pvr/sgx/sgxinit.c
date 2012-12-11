@@ -53,6 +53,12 @@
 #include "srvkm.h"
 #include "ttrace.h"
 
+// LGE_MOD_S 20121119 subum.choi@lge.com PVR_K hidden reset
+#include "linux/reboot.h"
+#include "../../../../arch/arm/mach-omap2/control.h"
+#include <mach/system.h>
+#include <plat/common.h>
+
 #define VAR(x) #x
 
  
@@ -72,6 +78,12 @@
 IMG_BOOL SGX_ISRHandler(IMG_VOID *pvData);
 #endif
 
+// LGE_MOD_S 20121119 subum.choi@lge.com PVR_K hidden reset
+int pvr_k_lock_up_cnt = 0;
+u32 l = 0x00000000;
+extern char reset_mode;
+#define PVR_K_MAX_COUNT 1
+// LGE_MOD_E 20121119 subum.choi@lge.com PVR_K hidden reset
 
 static
 PVRSRV_ERROR SGXGetMiscInfoUkernel(PVRSRV_SGXDEV_INFO	*psDevInfo,
@@ -1315,6 +1327,25 @@ IMG_VOID SGXOSTimer(IMG_VOID *pvData)
 	#endif
 				{
 					PVR_DPF((PVR_DBG_ERROR, "SGXOSTimer() detected SGX lockup (0x%x tasks)", ui32EDMTasks));
+					// LGE_MOD_S 20121119 subum.choi@lge.com PVR_K hidden reset
+					pvr_k_lock_up_cnt++;
+										
+					if(pvr_k_lock_up_cnt >= PVR_K_MAX_COUNT)
+					{
+						printk("\n[%s] PVR_K lockup :: Count (%d) Hidden Reset\n", __func__, pvr_k_lock_up_cnt);
+						reset_mode = 'h';
+						l = ('B' << 24) | ('M' << 16) | ('h' << 8) | 0x52;
+						printk("[%s] Hidden reset setting :: addr:0x%X val:0x%X \n", __func__, OMAP343X_SCRATCHPAD + 4, l);
+						omap_writel(l, OMAP343X_SCRATCHPAD + 4);
+
+						//emergency_restart();
+						arch_reset(reset_mode, NULL);
+					}
+					else
+					{
+						printk("\n[%s] PVR_K lockup :: Count (%d)\n", __func__, pvr_k_lock_up_cnt);
+					}
+					// LGE_MOD_E 20121119 subum.choi@lge.com PVR_K hidden reset
 
 					bLockup = IMG_TRUE;
 					(psDevInfo->psSGXHostCtl)->ui32OpenCLDelayCount = 0;

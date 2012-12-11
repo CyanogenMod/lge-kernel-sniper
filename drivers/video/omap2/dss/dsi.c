@@ -1051,7 +1051,9 @@ static u32 dsi_get_errors(struct platform_device *dsidev)
 	return e;
 }
 
-#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//[LGE_CHANGE] 201200908 pyocool.cho@lge.com "for p970"
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined(CONFIG_PRODUCT_LGE_P970)
 static void dsi_vc_enable_bta_irq(struct platform_device *dsidev,
 	int channel)
 {
@@ -3055,7 +3057,9 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 #endif
 	struct platform_device *dsidev = dsi_get_dsidev_from_dssdev(dssdev);
 	DECLARE_COMPLETION_ONSTACK(completion);
-#if defined(CONFIG_PRODUCT_LGE_KU5900) // 20120727 sangki.hyun@lge.com MP3 Playing
+//#if defined(CONFIG_PRODUCT_LGE_KU5900) // 20120727 sangki.hyun@lge.com MP3 Playing
+//[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970"
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)
 	DECLARE_COMPLETION_ONSTACK(bta_completion);
 #endif
 	int r = 0, i = 0;
@@ -3066,7 +3070,10 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 	if (r)
 		goto err1;
 
-#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970"
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)
+
 	r = dsi_register_isr_vc(dsidev, channel, dsi_completion_handler, &bta_completion,
 			DSI_VC_IRQ_BTA);
 	if (r)
@@ -3080,7 +3087,10 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 		goto err1;
 
 	/* wait for BTA ACK */
-#if !defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//#if !defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970"
+#if !defined(CONFIG_PRODUCT_LGE_KU5900) && !defined(CONFIG_PRODUCT_LGE_P970)
+
 	while (i < 500) {
 		if (REG_GET(dsidev, DSI_VC_IRQSTATUS(channel), 5, 5)) {
 			DSSDBG("BTA recieved\n");
@@ -3110,7 +3120,10 @@ int dsi_vc_send_bta_sync(struct omap_dss_device *dssdev, int channel)
 	}
 
 err1:
-#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//#if defined(CONFIG_PRODUCT_LGE_KU5900)  // 20120727 sangki.hyun@lge.com MP3 Playing
+//[LGE_CHANGE] 20120908 pyocool.cho@lge.com "for p970"
+#if defined(CONFIG_PRODUCT_LGE_KU5900) || defined (CONFIG_PRODUCT_LGE_P970)
+
 	dsi_vc_disable_bta_irq(dsidev, channel);
 	dsi_unregister_isr_vc(dsidev, channel, dsi_completion_handler, &bta_completion,
 			DSI_VC_IRQ_BTA);

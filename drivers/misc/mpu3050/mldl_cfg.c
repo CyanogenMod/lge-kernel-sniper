@@ -654,11 +654,12 @@ static int MLDLPowerMgmtMPU(struct mldl_cfg *pdata,
 
 void mpu_print_cfg(struct mldl_cfg *mldl_cfg)
 {
-	// 20120213 taeju.park@lge.com To delete compile warning, unused variables.
-	//struct mpu3050_platform_data *pdata = mldl_cfg->pdata;
-	//struct ext_slave_platform_data *accel = &mldl_cfg->pdata->accel;
-	//struct ext_slave_platform_data *compass = &mldl_cfg->pdata->compass;
-	//struct ext_slave_platform_data *pressure =  &mldl_cfg->pdata->pressure;
+	struct mpu3050_platform_data *pdata = mldl_cfg->pdata;
+	struct ext_slave_platform_data *accel = &mldl_cfg->pdata->accel;
+	struct ext_slave_platform_data *compass =
+	    &mldl_cfg->pdata->compass;
+	struct ext_slave_platform_data *pressure =
+	    &mldl_cfg->pdata->pressure;
 
 	MPL_LOGD("mldl_cfg.addr             = %02x\n", mldl_cfg->addr);
 	MPL_LOGD("mldl_cfg.int_config       = %02x\n",

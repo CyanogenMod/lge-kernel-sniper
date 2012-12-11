@@ -849,7 +849,10 @@ static int twl4030battery_capacity(struct twl4030_bci_device_info *di)
 		ret = max17043_get_capacity();
 	}
 	else {				// Use Calculated capacity from voltage
-		vol_history[vol_history_idx++] = di->voltage_uV;
+                // LGE_CHANGE_S 20121011 subum.choi WBT(TD2170398097)
+                //vol_history[vol_history_idx++] = di->voltage_uV;
+                vol_history[((vol_history_idx >= 20) ? 0 : vol_history_idx++)] = di->voltage_uV;
+                // LGE_CHANGE_E 20121011 subum.choi WBT(TD2170398097)
 
 		if(vol_history_idx >= 20)
 			vol_history_idx = 0;

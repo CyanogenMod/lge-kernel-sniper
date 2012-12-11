@@ -1120,6 +1120,8 @@ s32 muic_device_detection(s32 upon_irq)
 	// CP UART Mode
 	case MUIC_CP_UART:
 	case MUIC_AP_UART:
+		android_USB_disconnect(); // for usb disconnect event
+
 		if ((int_stat_val & MIDNO) == 0x0b) {
 			muic_mode = MUIC_NONE;
 		}
@@ -1145,8 +1147,9 @@ s32 muic_device_detection(s32 upon_irq)
 
 	// USB Mode
 	case MUIC_AP_USB:
-			android_USB_disconnect(); // for usb disconnect event
 	case MUIC_CP_USB:
+		android_USB_disconnect(); // for usb disconnect event
+
 		if ((int_stat_val & MVBUS) == 0){
 			// Exit USB Mode
 			muic_mode = MUIC_NONE;
