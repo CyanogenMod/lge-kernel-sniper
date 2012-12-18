@@ -60,8 +60,6 @@
 //#define CP_RETAIN	//LGE_UPDATE [jaejoong.kim] disable CP_RETAIN
 /* LGE_CHANGE_E [kenneth.kang@lge.com] 2010-12-14, CP retain mode and 910K cable detect*/
 
-extern void android_USB_disconnect();// for usb disconnect event
-
 static const char name_muic_mode[MUIC_MODE_NO][30] = {
 	"MUIC_UNKNOWN",		// 0
 	"MUIC_NONE",   		// 1
@@ -1014,7 +1012,6 @@ s32 muic_device_detection(s32 upon_irq)
 
 	// USB Mode
 	case MUIC_AP_USB:
-		android_USB_disconnect(); // for usb disconnect event
 	case MUIC_CP_USB:
 		if ((int_stat_val & MVBUS) == 0){
 			// Exit USB Mode

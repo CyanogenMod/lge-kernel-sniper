@@ -62,8 +62,6 @@
 #define TS5USBA33402	0x10
 #define MAX14526	0x20
 
-extern void android_USB_disconnect();// for usb disconnect event
-
 /* LGE_CHANGE_S [kenneth.kang@lge.com] 2010-12-14, CP retain mode and 910K cable detect*/
 #define CABLE_DETECT_910K
 //#define CP_RETAIN	//LGE_UPDATE [jaejoong.kim] disable CP_RETAIN
@@ -860,7 +858,6 @@ s32 muic_device_detection(s32 upon_irq)
 
 	// USB Mode
 	case MUIC_AP_USB:
-		android_USB_disconnect(); // for usb disconnect event
 	case MUIC_CP_USB:
 		if ((int_stat_val & MVBUS) == 0){
 			// Exit USB Mode

@@ -248,16 +248,13 @@ ifx_spi_open(struct tty_struct *tty, struct file *filp)
 		spi_data = spi_data_table[1];
 		break;
 	case 1: /* ttyspi1 */
-		spi_data = spi_data_table[1];
+		spi_data = spi_data_table[0];
 		break;
 	default:
 		spi_data = spi_data_table[0];
 		break;
 	}
 
-        if (spi_data == NULL) {
-            return -ENOTTY;
-        }
 	spi_data->ifx_spi_lock = 0;
 
 	ifx_spi_buffer_initialization(spi_data);
@@ -385,9 +382,9 @@ ifx_spi_write(struct tty_struct *tty, const unsigned char *buf, int count)
 
 	if(spi_data->ifx_ret_count==0)
 	{	
- 
-                int pin_val;
-                pin_val = gpio_get_value(spi_data->srdy_gpio);
+
+        int pin_val;
+        pin_val = gpio_get_value(spi_data->srdy_gpio);
 		printk("SRDY SIGNAL = %d\n", pin_val);
 
 		ifx_spi_set_mrdy_signal(spi_data, 0);
