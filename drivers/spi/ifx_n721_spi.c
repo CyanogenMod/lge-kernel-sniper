@@ -663,11 +663,7 @@ ifx_spi_get_header_info(unsigned char *rx_buffer, unsigned int *valid_buf_size)
 	union ifx_spi_frame_header header;
 
 	for(i=0; i<4; i++){
-		header.framesbytes[i] = 0;
-	}
-
-	for(i=3; i>=0; i--){
-		header.framesbytes[i] = rx_buffer[/*3-*/i];
+		header.framesbytes[i] = rx_buffer[i];
 	}
 
  //20101127-2, syblue.lee@lge.com, Discard if mux size is bigger than MAX SIZE [START]
