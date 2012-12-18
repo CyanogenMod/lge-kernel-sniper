@@ -186,40 +186,30 @@ static void omap_hsmmc1_after_set_reg(struct device *dev, int slot,
 static int omap_hsmmc_1_set_power(struct device *dev, int slot, int power_on,
 				  int vdd)
 {
-    int ret = 0;
 	struct omap_hsmmc_host *host = platform_get_drvdata(to_platform_device(dev));
 
 	omap_hsmmc1_before_set_reg(dev, slot, power_on, vdd);
-
-	if((host->suspended) != 1) // not suspend case! do control regulator ON,OFF regularly
-    {
-
-	    if (power_on) 
+	
+	
+	if (power_on) 
         {
-		    subpm_set_output(LDO1, 1);
-		    subpm_output_enable();
-	    }
-	    else 
-        {
-		    subpm_set_output(LDO1, 0);
-		    subpm_output_enable();
-    	}
+		subpm_set_output(LDO1, 1);	
 	}
-	else	// suspend case! ON is allowed , OFF is not allowed
-	{
-	    if (power_on) 
-        {
-            //if (g_check_on == 1 ) return 0;
-		    subpm_set_output(LDO1, 1);
-		    subpm_output_enable();
-            //g_check_on = 1;
-	    }
-
-    }
+	
+	
+	if((host->suspended) != 1) // not suspend case! do control regulator ON,OFF regularly
+        { 
+	   if(!power_on) 
+            {
+		    subpm_set_output(LDO1, 0);
+    	    }
+        }
+        
+        subpm_output_enable();
 
 	omap_hsmmc1_after_set_reg(dev, slot, power_on, vdd);
 
-	return ret;
+	return 0;
 }
 
 static int omap_hsmmc_1_set_sleep(struct device *dev, int slot, int sleep,
