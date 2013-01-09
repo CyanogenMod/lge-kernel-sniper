@@ -1,0 +1,43 @@
+--- src/bcmsdio/sys/bcmsdstd.c
++++ src/bcmsdio/sys/bcmsdstd.c
+@@ -21,7 +21,7 @@
+  * software in any way with any other Broadcom software provided under a license
+  * other than the GPL, without Broadcom's express prior written consent.
+  *
+- * $Id: bcmsdstd.c,v 1.64.4.1.4.4.2.10 2009/05/22 00:31:44 Exp $
++ * $Id: bcmsdstd.c,v 1.64.4.1.4.4.2.14 2009/10/08 20:05:30 Exp $
+  */
+ 
+ #include <typedefs.h>
+@@ -35,7 +35,6 @@
+ #include <sdioh.h>	/* SDIO Host Controller Specification */
+ #include <bcmsdbus.h>	/* bcmsdh to/from specific controller APIs */
+ #include <sdiovar.h>	/* ioctl/iovars */
+-
+ #include <pcicfg.h>
+ 
+ 
+@@ -853,9 +852,10 @@
+ 				len++;
+ 				tmpbuf = buffer;
+ 				if ((localbuf = (uint8 *)MALLOC(sd->osh, len)) == NULL) {
+-						sd_err(("out of memory, malloced %d bytes\n",
+-						       MALLOCED(sd->osh)));
+-						return SDIOH_API_RC_FAIL;
++					sd_err(("out of memory, malloced %d bytes\n",
++					        MALLOCED(sd->osh)));
++					sdstd_unlock(sd);
++					return SDIOH_API_RC_FAIL;
+ 				}
+ 				bcopy(buffer, localbuf, len);
+ 				buffer = localbuf;
+@@ -2795,7 +2809,8 @@
+ {
+ 	if (sd->sd_use_dma == FALSE)
+ 		return;
+-	if ((sd->dma_buf = DMA_ALLOC_CONSISTENT(sd->osh, SD_PAGE, &sd->dma_phys, 0x12)) == NULL) {
++	if ((sd->dma_buf = DMA_ALLOC_CONSISTENT(sd->osh, SD_PAGE, &sd->dma_phys,
++	0x12, 12)) == NULL) {
+ 		sd_err(("%s: DMA_ALLOC failed. Disabling DMA support.\n", __FUNCTION__));
+ 		sd->sd_use_dma = FALSE;
+ 	}

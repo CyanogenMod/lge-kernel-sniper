@@ -5024,6 +5024,7 @@ wl_iw_set_powermode(
 	switch (mode) {
 	case 0: mode = 2; break; /* Fast PS mode */
 	case 1: mode = 0; break; /* No PS mode */
+	case 2: mode = 0; break; /* No PS mode */
 	default: return -EINVAL;
 	}
 	error = dev_wlc_ioctl(dev, WLC_SET_PM, &mode, sizeof(mode));
@@ -6667,7 +6668,7 @@ wl_iw_set_priv(
 #endif	/* defined(CONFIG_LGE_BCM432X_PATCH) */
 /* LGE_CHANGE_S [yoohoo@lge.com] 2009-05-14, support private command */
 #if defined(CONFIG_LGE_BCM432X_PATCH)
-		else if (strnicmp(extra, "POWERMODE", 9) == 0)
+		else if (strnicmp(extra, "BTCOEXMODE", 9) == 0)
 			ret = wl_iw_set_powermode(dev, info,
 					(union iwreq_data *)dwrq, extra);
 		else if (strnicmp(extra, "SCAN-CHANNELS", 13) == 0)

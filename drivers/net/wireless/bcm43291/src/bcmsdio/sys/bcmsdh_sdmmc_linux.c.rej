@@ -1,0 +1,65 @@
+--- src/bcmsdio/sys/bcmsdh_sdmmc_linux.c
++++ src/bcmsdio/sys/bcmsdh_sdmmc_linux.c
+@@ -21,7 +21,7 @@
+  * software in any way with any other Broadcom software provided under a license
+  * other than the GPL, without Broadcom's express prior written consent.
+  *
+- * $Id: bcmsdh_sdmmc_linux.c,v 1.1.2.5.6.7 2009/05/22 00:31:44 Exp $
++ * $Id: bcmsdh_sdmmc_linux.c,v 1.1.2.5.6.10 2009/10/14 04:32:13 Exp $
+  */
+ 
+ #include <typedefs.h>
+@@ -93,7 +97,7 @@
+ 		if(func->device == 0x4) { /* 4318 */
+ 			gInstance->func[2] = NULL;
+ 			sd_trace(("NIC found, calling bcmsdh_probe...\n"));
+-			bcmsdh_probe(&sdmmc_dev);
++			ret = bcmsdh_probe(&sdmmc_dev);
+ 		}
+ 	}
+ 
+@@ -101,7 +105,7 @@
+ 
+ 	if (func->num == 2) {
+ 		sd_trace(("F2 found, calling bcmsdh_probe...\n"));
+-		bcmsdh_probe(&sdmmc_dev);
++		ret = bcmsdh_probe(&sdmmc_dev);
+ 	}
+ 
+ 	return ret;
+@@ -189,19 +200,22 @@
+ 	sdos = (struct sdos_info *)sd->sdos_info;
+ 	ASSERT(sdos);
+ 
++#if !defined(OOB_INTR_ONLY)
+ 	if (enable && !(sd->intr_handler && sd->intr_handler_arg)) {
+ 		sd_err(("%s: no handler registered, will not enable\n", __FUNCTION__));
+ 		return SDIOH_API_RC_FAIL;
+ 	}
++#endif /* !defined(OOB_INTR_ONLY) */
+ 
+ 	/* Ensure atomicity for enable/disable calls */
+ 	spin_lock_irqsave(&sdos->lock, flags);
+ 
+ 	sd->client_intr_enabled = enable;
+-	if (enable)
++	if (enable) {
+ 		sdioh_sdmmc_devintr_on(sd);
+-	else
++	} else {
+ 		sdioh_sdmmc_devintr_off(sd);
++	}
+ 
+ 	spin_unlock_irqrestore(&sdos->lock, flags);
+ 
+@@ -244,7 +258,10 @@
+ 	if (!gInstance)
+ 		return -ENOMEM;
+ 
++	bzero(&sdmmc_dev, sizeof(sdmmc_dev));
+ 	error = sdio_register_driver(&bcmsdh_sdmmc_driver);
++
++
+ 	return error;
+ }
+ 

@@ -1,0 +1,45 @@
+--- src/bcmsdio/sys/bcmsdh_linux.c
++++ src/bcmsdio/sys/bcmsdh_linux.c
+@@ -21,7 +21,7 @@
+  * software in any way with any other Broadcom software provided under a license
+  * other than the GPL, without Broadcom's express prior written consent.
+  *
+- * $Id: bcmsdh_linux.c,v 1.42.10.10.2.6 2009/04/10 19:13:00 Exp $
++ * $Id: bcmsdh_linux.c,v 1.42.10.10.2.8 2009/10/15 22:48:28 Exp $
+  */
+ 
+ /**
+@@ -41,6 +41,13 @@
+ #include <bcmdefs.h>
+ #include <bcmdevs.h>
+ 
++#if defined(OOB_INTR_ONLY)
++#include <linux/irq.h>
++extern void dhdsdio_isr(void * args);
++#include <bcmutils.h>
++#include <dngl_stats.h>
++#include <dhd.h>
++#endif /* defined(OOB_INTR_ONLY) */
+ #if defined(CONFIG_MACH_SANDGATE2G) || defined(CONFIG_MACH_LOGICPD_PXA270)
+ #if !defined(BCMPLATFORM_BUS)
+ #define BCMPLATFORM_BUS
+@@ -67,6 +74,7 @@
+ 	void *regs;			/* SDIO Host Controller address */
+ 	bcmsdh_info_t *sdh;		/* SDIO Host Controller handle */
+ 	void *ch;
++	unsigned int oob_irq;
+ };
+ static bcmsdh_hc_t *sdhcinfo = NULL;
+ 
+@@ -213,7 +228,11 @@
+ 	}
+ #endif /* BCMLXSDMMC */
+ 	sdhc->sdh = sdh;
++	sdhc->oob_irq = irq;
+ 
++	/* chain SDIO Host Controller info together */
++	sdhc->next = sdhcinfo;
++	sdhcinfo = sdhc;
+ 	/* Read the vendor/device ID from the CIS */
+ 	vendevid = bcmsdh_query_device(sdh);
+ 

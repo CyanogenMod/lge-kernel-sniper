@@ -1,0 +1,49 @@
+--- src/bcmsdio/sys/bcmsdh.c
++++ src/bcmsdio/sys/bcmsdh.c
+@@ -22,7 +22,7 @@
+  * software in any way with any other Broadcom software provided under a license
+  * other than the GPL, without Broadcom's express prior written consent.
+  *
+- * $Id: bcmsdh.c,v 1.35.2.1.4.8.6.8 2009/06/09 00:58:13 Exp $
++ * $Id: bcmsdh.c,v 1.35.2.1.4.8.6.11 2009/10/20 09:48:20 Exp $
+  */
+ /* ****************** BCMSDH Interface Functions *************************** */
+ 
+@@ -102,14 +115,11 @@
+ {
+ 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
+ 
+-	ASSERT(bcmsdh);
+-
+-	if (bcmsdh->sdioh) {
+-		sdioh_detach(osh, bcmsdh->sdioh);
+-		bcmsdh->sdioh = NULL;
+-	}
+-
+-	if (bcmsdh) {
++	if (bcmsdh != NULL) {
++		if (bcmsdh->sdioh) {
++			sdioh_detach(osh, bcmsdh->sdioh);
++			bcmsdh->sdioh = NULL;
++		}
+ 		MFREE(osh, bcmsdh, sizeof(bcmsdh_info_t));
+ 	}
+ 
+@@ -301,7 +311,7 @@
+ 	uint8 *tmp_buf, *tmp_ptr;
+ 	uint8 *ptr;
+ 	bool ascii = func & ~0xf;
+-	func &= 0xf;
++	func &= 0x7;
+ 
+ 	if (!bcmsdh)
+ 		bcmsdh = l_bcmsdh;
+@@ -354,7 +364,7 @@
+ {
+ 	bcmsdh_info_t *bcmsdh = (bcmsdh_info_t *)sdh;
+ 	SDIOH_API_RC status;
+-	uint32 word;
++	uint32 word = 0;
+ 	uint bar0 = addr & ~SBSDIO_SB_OFT_ADDR_MASK;
+ 
+ 	BCMSDH_INFO(("%s:fun = 1, addr = 0x%x, ", __FUNCTION__, addr));
