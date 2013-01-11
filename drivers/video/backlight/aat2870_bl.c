@@ -733,8 +733,6 @@ static void aat2870_set_main_current_level(struct i2c_client *client, int level)
 	//DBG("level = %d\n", level);
 
 	dev = (struct aat2870_device *) i2c_get_clientdata(client);
-        if (!dev->bl_resumed)
-                return;
 #if 0  // 20120814 sangki.hyun@lge.com ICS Backlight tunning
 	if (cur_main_lcd_level ==level)
 		return;
