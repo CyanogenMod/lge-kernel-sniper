@@ -1467,6 +1467,10 @@ static irqreturn_t hub_te_isr(int irq, void *data)
 			goto err;
 	}
 
+#ifdef CONFIG_OMAP2_DSS_FAKE_VSYNC
+	omap_dsi_fake_vsync();
+#endif
+
 	return IRQ_HANDLED;
 err:
 	dev_err(&dssdev->dev, "start update failed\n");
